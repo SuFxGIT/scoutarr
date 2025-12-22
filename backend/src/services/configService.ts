@@ -55,26 +55,8 @@ class ConfigService {
         notifiarrPassthroughDiscordChannelId: ''
       },
       applications: {
-        radarr: {
-          url: '',
-          apiKey: '',
-          count: 10,
-          tagName: 'upgradinatorr',
-          ignoreTag: '',
-          monitored: true,
-          movieStatus: 'released',
-          qualityProfileName: ''
-        },
-        sonarr: {
-          url: '',
-          apiKey: '',
-          count: 5,
-          tagName: 'upgradinatorr',
-          ignoreTag: '',
-          monitored: true,
-          seriesStatus: '',
-          qualityProfileName: ''
-        },
+        radarr: [],
+        sonarr: [],
         lidarr: {
           url: '',
           apiKey: '',

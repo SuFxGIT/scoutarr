@@ -5,28 +5,8 @@
     "notifiarrPassthroughDiscordChannelId": ""
   },
   "applications": {
-    "radarr": {
-      "url": "",
-      "apiKey": "",
-      "count": 10,
-      "tagName": "upgradinatorr",
-      "ignoreTag": "",
-      "monitored": true,
-      "movieStatus": "released",
-      "qualityProfileName": "",
-      "unattended": false
-    },
-    "sonarr": {
-      "url": "",
-      "apiKey": "",
-      "count": 5,
-      "tagName": "upgradinatorr",
-      "ignoreTag": "",
-      "monitored": true,
-      "seriesStatus": "",
-      "qualityProfileName": "",
-      "unattended": false
-    },
+    "radarr": [],
+    "sonarr": [],
     "lidarr": {
       "url": "",
       "apiKey": "",
@@ -35,8 +15,7 @@
       "ignoreTag": "",
       "monitored": true,
       "artistStatus": "",
-      "qualityProfileName": "",
-      "unattended": false
+      "qualityProfileName": ""
     },
     "readarr": {
       "url": "",
@@ -46,9 +25,13 @@
       "ignoreTag": "",
       "monitored": true,
       "authorStatus": "",
-      "qualityProfileName": "",
-      "unattended": false
+      "qualityProfileName": ""
     }
+  },
+  "scheduler": {
+    "enabled": false,
+    "schedule": "0 */6 * * *",
+    "unattended": false
   }
 }
 

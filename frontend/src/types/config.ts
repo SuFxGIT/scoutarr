@@ -5,9 +5,9 @@ export interface NotificationConfig {
 }
 
 export interface RadarrInstance {
-  id: string;
+  id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string;
+  name: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';
@@ -20,9 +20,9 @@ export interface RadarrInstance {
 }
 
 export interface SonarrInstance {
-  id: string;
+  id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string;
+  name: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';

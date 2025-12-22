@@ -57,30 +57,33 @@ Configuration is stored in `config/config.json`. On first run, the application w
     "notifiarrPassthroughDiscordChannelId": ""
   },
   "applications": {
-    "radarr": {
-      "enabled": false,
-      "url": "http://localhost:7878",
-      "apiKey": "your-api-key",
-      "count": 10,
-      "tagName": "upgradinatorr",
-      "ignoreTag": "",
-      "monitored": true,
-      "movieStatus": "released",
-      "qualityProfileName": "",
-      "unattended": false
-    },
-    "sonarr": {
-      "enabled": false,
-      "url": "http://localhost:8989",
-      "apiKey": "your-api-key",
+    "radarr": [],
+    "sonarr": [],
+    "lidarr": {
+      "url": "",
+      "apiKey": "",
       "count": 5,
       "tagName": "upgradinatorr",
       "ignoreTag": "",
       "monitored": true,
-      "seriesStatus": "",
-      "qualityProfileName": "",
-      "unattended": false
+      "artistStatus": "",
+      "qualityProfileName": ""
+    },
+    "readarr": {
+      "url": "",
+      "apiKey": "",
+      "count": 5,
+      "tagName": "upgradinatorr",
+      "ignoreTag": "",
+      "monitored": true,
+      "authorStatus": "",
+      "qualityProfileName": ""
     }
+  },
+  "scheduler": {
+    "enabled": false,
+    "schedule": "0 */6 * * *",
+    "unattended": false
   }
 }
 ```

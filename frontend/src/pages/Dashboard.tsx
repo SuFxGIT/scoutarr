@@ -9,7 +9,7 @@ import {
   Separator,
   Callout
 } from '@radix-ui/themes';
-import { PlayIcon, ReloadIcon, CrossCircledIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ReloadIcon, CrossCircledIcon, ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 import axios from 'axios';
 
 interface SearchResults {
@@ -47,7 +47,8 @@ function Dashboard() {
   const [schedulerHistory, setSchedulerHistory] = useState<Array<{ timestamp: string; results: any; success: boolean; error?: string }>>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null; nextRun: string | null } | null>(null);
-  const [showAllUpgrades, setShowAllUpgrades] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,12 +56,15 @@ function Dashboard() {
     loadSchedulerHistory();
     loadStats();
     
-    // Poll for scheduler history, status, and stats updates every 10 seconds
-    // Note: Manual run preview is NOT auto-loaded or refreshed - it only updates when Run Search or Randomize is clicked
+    // Load preview of what will be triggered
+    loadManualRun();
+    
+    // Poll for scheduler history, status, stats, and preview updates every 10 seconds
     const interval = setInterval(() => {
       loadSchedulerHistory();
       loadStatus();
       loadStats(); // Auto-refresh stats to catch scheduler-triggered upgrades
+      loadManualRun(); // Refresh preview of what will be triggered
     }, 10000);
     
     return () => clearInterval(interval);
@@ -116,6 +120,30 @@ function Dashboard() {
     }
   };
 
+  const handleClearRecentUpgrades = async () => {
+    try {
+      await axios.post('/api/stats/clear-recent');
+      await loadStats();
+      setCurrentPage(1);
+    } catch (error: any) {
+      console.error('Failed to clear recent upgrades:', error);
+      alert('Failed to clear recent upgrades: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleClearStats = async () => {
+    if (window.confirm('Are you sure you want to clear all statistics? This will reset all upgrade counts and recent upgrades. This action cannot be undone.')) {
+      try {
+        await axios.post('/api/stats/reset');
+        await loadStats();
+        setCurrentPage(1);
+      } catch (error: any) {
+        console.error('Failed to clear stats:', error);
+        alert('Failed to clear stats: ' + (error.response?.data?.error || error.message));
+      }
+    }
+  };
+
   const handleRun = async () => {
     setIsRunning(true);
     try {
@@ -131,8 +159,40 @@ function Dashboard() {
   };
 
   // Convert scheduler history to log format
-  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null, schedulerEnabled: boolean): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
+  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null, schedulerEnabled: boolean, previewResults?: SearchResults | null): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
+    
+    // Add preview of what will be triggered next
+    if (previewResults && Object.keys(previewResults).length > 0) {
+      logs.push({
+        timestamp: new Date().toLocaleTimeString(),
+        app: 'Preview',
+        message: 'Next run will trigger:',
+        type: 'info'
+      });
+      
+      Object.entries(previewResults).forEach(([app, result]: [string, any]) => {
+        if (result.success) {
+          const appName = formatAppName(app);
+          const count = result.count || 0;
+          const total = result.total || 0;
+          
+          logs.push({
+            timestamp: new Date().toLocaleTimeString(),
+            app: 'Preview',
+            message: `${appName}: Will search ${count} of ${total} items`,
+            type: 'info'
+          });
+        }
+      });
+      
+      logs.push({
+        timestamp: new Date().toLocaleTimeString(),
+        app: 'Preview',
+        message: '---',
+        type: 'info'
+      });
+    }
     
     // Add next run time at the top if scheduler is enabled
     if (schedulerEnabled && nextRun) {
@@ -230,7 +290,7 @@ function Dashboard() {
   }, [schedulerHistory, autoScroll]);
 
   const renderAutomaticRunPreview = () => {
-    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null, schedulerStatus?.enabled || false);
+    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null, schedulerStatus?.enabled || false, manualRunResults);
 
     return (
       <Card mb="4">
@@ -481,6 +541,14 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Upgrade Statistics</Heading>
+                  <Button 
+                    variant="outline" 
+                    color="red"
+                    size="2" 
+                    onClick={handleClearStats}
+                  >
+                    Clear Stats
+                  </Button>
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
@@ -513,130 +581,123 @@ function Dashboard() {
           );
         })()}
 
-        {stats && stats.recentUpgrades.length > 0 && (
-          <Card>
-            <Flex direction="column" gap="3">
-              <Flex align="center" justify="between">
-                <Heading size="5">Recent Upgrades</Heading>
-                <Flex gap="2">
-                  <Button 
-                    variant="ghost" 
-                    size="2" 
-                    onClick={() => setShowAllUpgrades(!showAllUpgrades)}
-                  >
-                    {showAllUpgrades ? 'Show Recent' : 'View All'}
-                  </Button>
-                </Flex>
-              </Flex>
-              <Separator />
-              {showAllUpgrades ? (
-                <Flex direction="column" gap="2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {stats.recentUpgrades.map((upgrade, idx) => (
-                    <Card key={idx} variant="surface" size="1">
-                      <Flex direction="column" gap="1">
-                        <Flex align="center" justify="between">
-                          <Badge size="1" style={{ textTransform: 'capitalize' }}>
-                            {upgrade.instance 
-                              ? `${upgrade.application} (${upgrade.instance})`
-                              : upgrade.application}
-                          </Badge>
-                          <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
-                        </Flex>
-                        <Text size="2">
-                          {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
-                        </Text>
-                        {upgrade.items.length > 0 && (
-                          <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
-                            {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
-                            {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
-                          </Text>
-                        )}
-                      </Flex>
-                    </Card>
-                  ))}
-                </Flex>
-              ) : (
-                <div
-                  style={{
-                    overflowX: 'auto',
-                    overflowY: 'hidden',
-                    scrollBehavior: 'smooth',
-                    WebkitOverflowScrolling: 'touch',
-                    paddingBottom: '0.5rem'
-                  }}
-                >
-                  <Flex 
-                    gap="3" 
-                    style={{ 
-                      flexWrap: 'nowrap',
-                      minWidth: 'max-content'
-                    }}
-                  >
-                    {stats.recentUpgrades.slice(0, 15).map((upgrade, idx) => (
-                      <Card 
-                        key={idx} 
-                        variant="surface" 
-                        style={{ 
-                          minWidth: '100px',
-                          maxWidth: '100px',
-                          flexShrink: 0,
-                          padding: '0.25rem'
-                        }}
+        {renderAutomaticRunPreview()}
+
+        {(() => {
+          const recentUpgrades = stats?.recentUpgrades || [];
+          const totalItems = recentUpgrades.length;
+          const totalPages = Math.ceil(totalItems / itemsPerPage);
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const currentItems = recentUpgrades.slice(startIndex, endIndex);
+          
+          return (
+            <Card>
+              <Flex direction="column" gap="2">
+                <Flex align="center" justify="between">
+                  <Heading size="5">Recent Upgrades</Heading>
+                  <Flex gap="2" align="center">
+                    {totalItems > 0 && (
+                      <Text size="2" color="gray">
+                        Page {currentPage} of {totalPages} ({totalItems} total)
+                      </Text>
+                    )}
+                    {totalItems > 0 && (
+                      <Button 
+                        variant="outline" 
+                        color="red"
+                        size="2" 
+                        onClick={handleClearRecentUpgrades}
                       >
-                        <Flex direction="column" gap="0" style={{ justifyContent: 'flex-start', padding: 0 }}>
-                          <Badge 
-                            size="1" 
+                        Clear Recent
+                      </Button>
+                    )}
+                  </Flex>
+                </Flex>
+                <Separator />
+                {totalItems === 0 ? (
+                  <Text size="2" color="gray" style={{ textAlign: 'center', padding: '1rem' }}>
+                    No recent upgrades yet
+                  </Text>
+                ) : (
+                  <>
+                    <Flex direction="column" gap="1" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                      {currentItems.map((upgrade, idx) => {
+                        const timestamp = new Date(upgrade.timestamp);
+                        const dateStr = timestamp.toLocaleDateString();
+                        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const appName = upgrade.instance 
+                          ? `${upgrade.application} (${upgrade.instance})`
+                          : upgrade.application;
+                        const itemsPreview = upgrade.items.length > 0
+                          ? upgrade.items.slice(0, 2).map(i => i.title).join(', ') + (upgrade.items.length > 2 ? ` +${upgrade.items.length - 2}` : '')
+                          : 'No items';
+                        
+                        return (
+                          <Flex 
+                            key={idx} 
+                            align="center" 
+                            gap="2" 
                             style={{ 
-                              textTransform: 'capitalize', 
-                              alignSelf: 'center',
-                              marginBottom: '0.25rem',
-                              fontSize: '0.6rem'
+                              padding: '0.5rem',
+                              borderBottom: idx < currentItems.length - 1 ? '1px solid var(--gray-6)' : 'none'
                             }}
                           >
-                            {upgrade.application}
-                          </Badge>
-                          {upgrade.items.length > 0 ? (
-                            <Text 
-                              size="1" 
-                              weight="medium"
-                              style={{ 
-                                textAlign: 'center',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                lineHeight: '1.1',
-                                wordBreak: 'break-word',
-                                margin: 0,
-                                padding: 0
-                              }}
-                              title={upgrade.items[0].title}
+                            <Badge size="1" style={{ textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>
+                              {appName}
+                            </Badge>
+                            <Text size="2" weight="medium" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {itemsPreview}
+                            </Text>
+                            <Text size="1" color="gray" style={{ minWidth: '60px', textAlign: 'right' }}>
+                              {dateStr} {timeStr}
+                            </Text>
+                            <Text size="1" color="gray" style={{ minWidth: '50px', textAlign: 'right' }}>
+                              {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'}
+                            </Text>
+                          </Flex>
+                        );
+                      })}
+                    </Flex>
+                    {totalPages > 1 && (
+                      <Flex align="center" justify="center" gap="2" mt="1">
+                        <Button
+                          variant="outline"
+                          size="2"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeftIcon /> Previous
+                        </Button>
+                        <Flex gap="1" align="center">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? "solid" : "outline"}
+                              size="2"
+                              onClick={() => setCurrentPage(page)}
+                              style={{ minWidth: '2.5rem' }}
                             >
-                              {upgrade.items[0].title}
-                            </Text>
-                          ) : (
-                            <Text size="1" color="gray" style={{ textAlign: 'center', margin: 0, padding: 0 }}>
-                              No items
-                            </Text>
-                          )}
-                          <Text size="1" color="gray" style={{ textAlign: 'center', fontSize: '0.6rem', margin: 0, padding: 0, marginTop: '0.25rem' }}>
-                            {new Date(upgrade.timestamp).toLocaleDateString()}
-                          </Text>
-                          <Text size="1" color="gray" style={{ textAlign: 'center', fontSize: '0.6rem', margin: 0, padding: 0, marginTop: '0.125rem' }}>
-                            {new Date(upgrade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
+                              {page}
+                            </Button>
+                          ))}
                         </Flex>
-                      </Card>
-                    ))}
-                  </Flex>
-                </div>
-              )}
-            </Flex>
-          </Card>
-        )}
-
-        {renderAutomaticRunPreview()}
+                        <Button
+                          variant="outline"
+                          size="2"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next <ChevronRightIcon />
+                        </Button>
+                      </Flex>
+                    )}
+                  </>
+                )}
+              </Flex>
+            </Card>
+          );
+        })()}
       </Flex>
     </div>
   );

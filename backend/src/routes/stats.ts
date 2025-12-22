@@ -26,3 +26,14 @@ statsRouter.post('/reset', async (req, res) => {
   }
 });
 
+// Clear recent upgrades only
+statsRouter.post('/clear-recent', async (req, res) => {
+  try {
+    await statsService.clearRecentUpgrades();
+    res.json({ success: true, message: 'Recent upgrades cleared successfully' });
+  } catch (error: any) {
+    logger.error('❌ Error clearing recent upgrades', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+

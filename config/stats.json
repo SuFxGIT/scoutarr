@@ -1,56 +1,13 @@
 {
-  "totalUpgrades": 4,
+  "totalUpgrades": 2,
   "upgradesByApplication": {
-    "radarr": 4
+    "radarr": 1,
+    "sonarr": 1
   },
   "upgradesByInstance": {
-    "radarr": 4
+    "radarr": 1,
+    "sonarr": 1
   },
-  "recentUpgrades": [
-    {
-      "timestamp": "2025-12-22T21:00:00.946Z",
-      "application": "radarr",
-      "count": 1,
-      "items": [
-        {
-          "id": 434,
-          "title": "Edge of Tomorrow"
-        }
-      ]
-    },
-    {
-      "timestamp": "2025-12-22T20:50:00.312Z",
-      "application": "radarr",
-      "count": 1,
-      "items": [
-        {
-          "id": 421,
-          "title": "Dune"
-        }
-      ]
-    },
-    {
-      "timestamp": "2025-12-22T20:40:00.348Z",
-      "application": "radarr",
-      "count": 1,
-      "items": [
-        {
-          "id": 417,
-          "title": "Bullet Train"
-        }
-      ]
-    },
-    {
-      "timestamp": "2025-12-22T20:33:09.740Z",
-      "application": "radarr",
-      "count": 1,
-      "items": [
-        {
-          "id": 419,
-          "title": "Dunkirk"
-        }
-      ]
-    }
-  ],
-  "lastUpgrade": "2025-12-22T21:00:00.946Z"
+  "recentUpgrades": [],
+  "lastUpgrade": "2025-12-22T21:41:37.189Z"
 }

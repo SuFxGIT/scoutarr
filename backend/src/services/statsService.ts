@@ -161,6 +161,22 @@ class StatsService {
     await this.loadStats();
     logger.info('🔄 Stats reset');
   }
+
+  async clearRecentUpgrades(): Promise<void> {
+    try {
+      const stats = await this.loadStats();
+      stats.recentUpgrades = [];
+      await fs.writeFile(STATS_FILE, JSON.stringify(stats, null, 2));
+      this.stats = stats;
+      logger.info('🔄 Recent upgrades cleared');
+    } catch (error: any) {
+      logger.error('❌ Error clearing recent upgrades', { 
+        error: error.message,
+        statsFile: STATS_FILE 
+      });
+      throw error;
+    }
+  }
 }
 
 export const statsService = new StatsService();
