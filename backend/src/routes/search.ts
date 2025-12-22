@@ -24,6 +24,95 @@ function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
   return shuffled.slice(0, count);
 }
 
+// Helper to generate result key for instances
+export function getResultKey(instanceId: string, appType: string, instanceCount: number): string {
+  return instanceCount > 1 ? instanceId : appType;
+}
+
+// Helper to extract instance info from config
+export function getInstanceInfo(config: any, appType: string): { instanceName: string; instanceId: string } {
+  return {
+    instanceName: config.name || appType,
+    instanceId: config.id || `${appType}-1`
+  };
+}
+
+// Helper to save stats for results
+export async function saveStatsForResults(results: Record<string, any>): Promise<void> {
+  for (const [app, result] of Object.entries(results)) {
+    if (result.success && result.searched && result.searched > 0) {
+      const items = result.movies || result.series || result.items || [];
+      const instanceKey = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app : undefined;
+      await statsService.addUpgrade(
+        app.split('-')[0],
+        result.searched,
+        items,
+        instanceKey
+      );
+    }
+  }
+}
+
+// Helper to create Radarr processor config
+export function createRadarrProcessor(instanceName: string, config: any) {
+  return {
+    name: instanceName,
+    config,
+    getMedia: radarrService.getMovies.bind(radarrService),
+    filterMedia: radarrService.filterMovies.bind(radarrService),
+    searchMedia: radarrService.searchMovies.bind(radarrService),
+    searchMediaOneByOne: false,
+    getTagId: radarrService.getTagId.bind(radarrService),
+    addTag: radarrService.addTagToMovies.bind(radarrService),
+    removeTag: radarrService.removeTagFromMovies.bind(radarrService),
+    getMediaId: (m: any) => m.id,
+    getMediaTitle: (m: any) => m.title
+  };
+}
+
+// Helper to create Sonarr processor config
+export function createSonarrProcessor(instanceName: string, config: any) {
+  return {
+    name: instanceName,
+    config,
+    getMedia: sonarrService.getSeries.bind(sonarrService),
+    filterMedia: sonarrService.filterSeries.bind(sonarrService),
+    searchMedia: async (cfg: any, seriesIds: number[]) => {
+      if (seriesIds.length > 0) {
+        await sonarrService.searchSeries(cfg, seriesIds[0]);
+      }
+    },
+    searchMediaOneByOne: true,
+    getTagId: sonarrService.getTagId.bind(sonarrService),
+    addTag: sonarrService.addTagToSeries.bind(sonarrService),
+    removeTag: sonarrService.removeTagFromSeries.bind(sonarrService),
+    getMediaId: (s: any) => s.id,
+    getMediaTitle: (s: any) => s.title
+  };
+}
+
+// Helper to process all instances of an app type
+async function processAppInstances<T>(
+  instances: T[],
+  appType: 'radarr' | 'sonarr',
+  createProcessor: (instanceName: string, config: any) => ApplicationProcessor<any>,
+  results: Record<string, any>,
+  unattended?: boolean
+): Promise<void> {
+  for (const instanceConfig of instances) {
+    const { instanceName, instanceId } = getInstanceInfo(instanceConfig as any, appType);
+    const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
+    const processor = createProcessor(instanceName, config);
+    const result = await processApplication(processor);
+    const resultKey = getResultKey(instanceId, appType, instances.length);
+    results[resultKey] = {
+      ...result,
+      [appType === 'radarr' ? 'movies' : 'series']: result.items,
+      instanceName
+    };
+  }
+}
+
 // Common interface for processing applications
 interface ApplicationProcessor<TMedia> {
   name: string;
@@ -163,62 +252,11 @@ searchRouter.post('/run', async (req, res) => {
 
     // Process Radarr
     const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    
-    for (const radarrConfig of radarrInstances) {
-      const instanceName = (radarrConfig as any).name || 'Radarr';
-      const instanceId = (radarrConfig as any).id || 'radarr-1';
-      const result = await processApplication({
-        name: instanceName,
-        config: radarrConfig,
-        getMedia: radarrService.getMovies.bind(radarrService),
-        filterMedia: radarrService.filterMovies.bind(radarrService),
-        searchMedia: radarrService.searchMovies.bind(radarrService),
-        searchMediaOneByOne: false,
-        getTagId: radarrService.getTagId.bind(radarrService),
-        addTag: radarrService.addTagToMovies.bind(radarrService),
-        removeTag: radarrService.removeTagFromMovies.bind(radarrService),
-        getMediaId: (m) => m.id,
-        getMediaTitle: (m) => m.title
-      });
-      const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
-      results[resultKey] = {
-        ...result,
-        movies: result.items,
-        instanceName
-      };
-    }
+    await processAppInstances(radarrInstances, 'radarr', createRadarrProcessor, results);
 
     // Process Sonarr
     const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    
-    for (const sonarrConfig of sonarrInstances) {
-      const instanceName = (sonarrConfig as any).name || 'Sonarr';
-      const instanceId = (sonarrConfig as any).id || 'sonarr-1';
-      const result = await processApplication({
-        name: instanceName,
-        config: sonarrConfig,
-        getMedia: sonarrService.getSeries.bind(sonarrService),
-        filterMedia: sonarrService.filterSeries.bind(sonarrService),
-        searchMedia: async (cfg, seriesIds) => {
-          // Sonarr only supports one at a time - this is called per-item in processApplication
-          if (seriesIds.length > 0) {
-            await sonarrService.searchSeries(cfg, seriesIds[0]);
-          }
-        },
-        searchMediaOneByOne: true,
-        getTagId: sonarrService.getTagId.bind(sonarrService),
-        addTag: sonarrService.addTagToSeries.bind(sonarrService),
-        removeTag: sonarrService.removeTagFromSeries.bind(sonarrService),
-        getMediaId: (s) => s.id,
-        getMediaTitle: (s) => s.title
-      });
-      const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
-      results[resultKey] = {
-        ...result,
-        series: result.items,
-        instanceName
-      };
-    }
+    await processAppInstances(sonarrInstances, 'sonarr', createSonarrProcessor, results);
 
     logger.info('🎉 Search operation completed', {
       results: Object.keys(results).map(app => ({
@@ -229,21 +267,7 @@ searchRouter.post('/run', async (req, res) => {
     });
 
     // Save stats for successful searches
-    for (const [app, result] of Object.entries(results)) {
-      if (result.success && result.searched && result.searched > 0) {
-        const items = result.movies || result.series || result.items || [];
-        // Use the app key directly as the instance key (it's already the instance ID for multi-instance)
-        // For single instance, it's just 'radarr' or 'sonarr'
-        // For multi-instance, it's 'radarr-1766427071907' or 'sonarr-1766427071907'
-        const instanceKey = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app : undefined;
-        await statsService.addUpgrade(
-          app.split('-')[0], // Use app type (e.g., 'radarr', 'sonarr')
-          result.searched, 
-          items,
-          instanceKey // Use full instance ID as key (e.g., 'radarr-1766427071907')
-        );
-      }
-    }
+    await saveStatsForResults(results);
 
     res.json(results);
   } catch (error: any) {
@@ -326,6 +350,37 @@ async function processManualRun<TMedia>(
   }
 }
 
+// Helper to process instances for manual run preview
+async function processManualRunInstances(
+  instances: any[],
+  appType: 'radarr' | 'sonarr',
+  getMedia: (config: any) => Promise<any[]>,
+  filterMedia: (config: any, media: any[], unattended: boolean) => Promise<any[]>,
+  getMediaId: (media: any) => number,
+  getMediaTitle: (media: any) => string,
+  getTagId: (config: any, tagName: string) => Promise<number | null>,
+  results: Record<string, any>
+): Promise<void> {
+  for (const instanceConfig of instances) {
+    const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
+    const result = await processManualRun(
+      instanceName,
+      instanceConfig,
+      getMedia,
+      filterMedia,
+      getMediaId,
+      getMediaTitle,
+      getTagId
+    );
+    const resultKey = getResultKey(instanceId, appType, instances.length);
+    results[resultKey] = {
+      ...result,
+      [appType === 'radarr' ? 'movies' : 'series']: result.items,
+      instanceName
+    };
+  }
+}
+
 // Get items that would be searched (manual run preview)
 searchRouter.post('/manual-run', async (req, res) => {
   logger.info('👀 Starting manual run preview');
@@ -335,49 +390,29 @@ searchRouter.post('/manual-run', async (req, res) => {
 
     // Process Radarr
     const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    
-    for (const radarrConfig of radarrInstances) {
-      const instanceName = (radarrConfig as any).name || 'Radarr';
-      const instanceId = (radarrConfig as any).id || 'radarr-1';
-      const result = await processManualRun(
-        instanceName,
-        radarrConfig,
-        radarrService.getMovies.bind(radarrService),
-        radarrService.filterMovies.bind(radarrService),
-        (m) => m.id,
-        (m) => m.title,
-        radarrService.getTagId.bind(radarrService)
-      );
-      const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
-      results[resultKey] = {
-        ...result,
-        movies: result.items,
-        instanceName
-      };
-    }
+    await processManualRunInstances(
+      radarrInstances,
+      'radarr',
+      radarrService.getMovies.bind(radarrService),
+      radarrService.filterMovies.bind(radarrService),
+      (m) => m.id,
+      (m) => m.title,
+      radarrService.getTagId.bind(radarrService),
+      results
+    );
 
     // Process Sonarr
     const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    
-    for (const sonarrConfig of sonarrInstances) {
-      const instanceName = (sonarrConfig as any).name || 'Sonarr';
-      const instanceId = (sonarrConfig as any).id || 'sonarr-1';
-      const result = await processManualRun(
-        instanceName,
-        sonarrConfig,
-        sonarrService.getSeries.bind(sonarrService),
-        sonarrService.filterSeries.bind(sonarrService),
-        (s) => s.id,
-        (s) => s.title,
-        sonarrService.getTagId.bind(sonarrService)
-      );
-      const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
-      results[resultKey] = {
-        ...result,
-        series: result.items,
-        instanceName
-      };
-    }
+    await processManualRunInstances(
+      sonarrInstances,
+      'sonarr',
+      sonarrService.getSeries.bind(sonarrService),
+      sonarrService.filterSeries.bind(sonarrService),
+      (s) => s.id,
+      (s) => s.title,
+      sonarrService.getTagId.bind(sonarrService),
+      results
+    );
 
     logger.info('✅ Manual run preview completed');
     res.json(results);
@@ -396,24 +431,23 @@ searchRouter.post('/automatic-run-preview', async (req, res) => {
   try {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
+    const unattended = config.scheduler?.unattended || false;
 
-    // Process Radarr - use same config as manual run
+    // Process Radarr - use scheduler's unattended setting
     const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    
     for (const radarrConfig of radarrInstances) {
-      const instanceName = (radarrConfig as any).name || 'Radarr';
-      const instanceId = (radarrConfig as any).id || 'radarr-1';
-      // Use the exact same config as manual run - no modifications
+      const { instanceName, instanceId } = getInstanceInfo(radarrConfig, 'radarr');
+      const unattendedConfig = { ...radarrConfig, unattended };
       const result = await processManualRun(
         instanceName,
-        radarrConfig,
+        unattendedConfig,
         radarrService.getMovies.bind(radarrService),
         radarrService.filterMovies.bind(radarrService),
         (m) => m.id,
         (m) => m.title,
         radarrService.getTagId.bind(radarrService)
       );
-      const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
+      const resultKey = getResultKey(instanceId, 'radarr', radarrInstances.length);
       results[resultKey] = {
         ...result,
         movies: result.items,
@@ -421,23 +455,21 @@ searchRouter.post('/automatic-run-preview', async (req, res) => {
       };
     }
 
-    // Process Sonarr - use same config as manual run
+    // Process Sonarr - use scheduler's unattended setting
     const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    
     for (const sonarrConfig of sonarrInstances) {
-      const instanceName = (sonarrConfig as any).name || 'Sonarr';
-      const instanceId = (sonarrConfig as any).id || 'sonarr-1';
-      // Use the exact same config as manual run - no modifications
+      const { instanceName, instanceId } = getInstanceInfo(sonarrConfig, 'sonarr');
+      const unattendedConfig = { ...sonarrConfig, unattended };
       const result = await processManualRun(
         instanceName,
-        sonarrConfig,
+        unattendedConfig,
         sonarrService.getSeries.bind(sonarrService),
         sonarrService.filterSeries.bind(sonarrService),
         (s) => s.id,
         (s) => s.title,
         sonarrService.getTagId.bind(sonarrService)
       );
-      const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
+      const resultKey = getResultKey(instanceId, 'sonarr', sonarrInstances.length);
       results[resultKey] = {
         ...result,
         series: result.items,

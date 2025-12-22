@@ -1,7 +1,7 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
-import { testStarrConnection } from '../utils/starrUtils.js';
+import { testStarrConnection, getConfiguredInstances } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const statusRouter = express.Router();
@@ -32,37 +32,36 @@ statusRouter.get('/', async (req, res) => {
       return { connected, configured: true };
     };
 
-    // Check Radarr instances
-    if (Array.isArray(config.applications.radarr)) {
-      for (const instance of config.applications.radarr) {
-        const instanceId = instance.id || 'radarr-1';
-        const instanceName = instance.name || `Radarr ${instance.instanceId || '1'}`;
-        const instanceStatus = await checkAppStatus(instanceName, instance);
-        status[instanceId] = {
-          ...instanceStatus,
-          instanceName,
-          instanceId: instance.instanceId
-        };
+    // Helper to check instances for an app
+    const checkInstances = async (appType: 'radarr' | 'sonarr', defaultName: string) => {
+      const instances = getConfiguredInstances(config.applications[appType]);
+      
+      if (instances.length === 0) {
+        // Legacy single instance
+        const appConfig = config.applications[appType];
+        if (appConfig && !Array.isArray(appConfig) && appConfig.url && appConfig.apiKey) {
+          status[appType] = await checkAppStatus(defaultName, appConfig);
+        }
+      } else {
+        // Multiple instances
+        for (const instance of instances) {
+          const instanceId = (instance as any).id || `${appType}-1`;
+          const instanceName = (instance as any).name || `${defaultName} ${(instance as any).instanceId || '1'}`;
+          const instanceStatus = await checkAppStatus(instanceName, instance);
+          status[instanceId] = {
+            ...instanceStatus,
+            instanceName,
+            instanceId: (instance as any).instanceId
+          };
+        }
       }
-    } else {
-      status.radarr = await checkAppStatus('Radarr', config.applications.radarr);
-    }
+    };
+
+    // Check Radarr instances
+    await checkInstances('radarr', 'Radarr');
 
     // Check Sonarr instances
-    if (Array.isArray(config.applications.sonarr)) {
-      for (const instance of config.applications.sonarr) {
-        const instanceId = instance.id || 'sonarr-1';
-        const instanceName = instance.name || `Sonarr ${instance.instanceId || '1'}`;
-        const instanceStatus = await checkAppStatus(instanceName, instance);
-        status[instanceId] = {
-          ...instanceStatus,
-          instanceName,
-          instanceId: instance.instanceId
-        };
-      }
-    } else {
-      status.sonarr = await checkAppStatus('Sonarr', config.applications.sonarr);
-    }
+    await checkInstances('sonarr', 'Sonarr');
 
     // Add scheduler status
     const schedulerStatus = schedulerService.getStatus();

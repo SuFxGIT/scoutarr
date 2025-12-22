@@ -1,5 +1,8 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
+import { radarrService } from '../services/radarrService.js';
+import { sonarrService } from '../services/sonarrService.js';
+import { testStarrConnection, createStarrClient } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const configRouter = express.Router();
@@ -53,7 +56,6 @@ configRouter.post('/test/:app', async (req, res) => {
     }
 
     // Test connection using utility function
-    const { testStarrConnection, createStarrClient } = await import('../utils/starrUtils.js');
     const connected = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
 
     if (connected) {
@@ -82,6 +84,83 @@ configRouter.post('/test/:app', async (req, res) => {
     res.status(500).json({
       error: 'Connection test failed',
       message: error.message
+    });
+  }
+});
+
+// Helper to find instance config
+function findInstanceConfig(config: any, app: string, instanceId: string): any | null {
+  const appConfig = config.applications[app as keyof typeof config.applications];
+  if (!appConfig) return null;
+  
+  const instances = Array.isArray(appConfig) ? appConfig : [appConfig];
+  return instances.find((inst: any) => inst.id === instanceId) || null;
+}
+
+// Clear tags from all media in an instance
+configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
+  const { app, instanceId } = req.params;
+  logger.info(`🧹 Clearing tags for ${app} instance ${instanceId}`);
+  try {
+    const config = configService.getConfig();
+    const instanceConfig = findInstanceConfig(config, app, instanceId);
+
+    if (!instanceConfig || !instanceConfig.url || !instanceConfig.apiKey) {
+      return res.status(400).json({ error: 'Instance not found or not configured' });
+    }
+
+    if (!instanceConfig.tagName) {
+      return res.status(400).json({ error: 'Tag name not configured for this instance' });
+    }
+
+    // Get tag ID
+    const tagId = app === 'radarr' 
+      ? await radarrService.getTagId(instanceConfig, instanceConfig.tagName)
+      : await sonarrService.getTagId(instanceConfig, instanceConfig.tagName);
+
+    if (tagId === null) {
+      return res.json({ success: true, message: 'Tag does not exist, nothing to clear' });
+    }
+
+    // Get all media
+    let allMedia: any[] = [];
+    if (app === 'radarr') {
+      allMedia = await radarrService.getMovies(instanceConfig);
+    } else {
+      allMedia = await sonarrService.getSeries(instanceConfig);
+    }
+
+    // Filter media that has the tag
+    const mediaWithTag = allMedia.filter((m: any) => m.tags && m.tags.includes(tagId));
+    
+    if (mediaWithTag.length === 0) {
+      return res.json({ success: true, message: 'No media found with this tag' });
+    }
+
+    // Get media IDs
+    const mediaIds = mediaWithTag.map((m: any) => m.id);
+
+    // Remove tag from all media
+    if (app === 'radarr') {
+      await radarrService.removeTagFromMovies(instanceConfig, mediaIds, tagId);
+    } else {
+      await sonarrService.removeTagFromSeries(instanceConfig, mediaIds, tagId);
+    }
+
+    logger.info(`✅ Cleared tag from ${mediaIds.length} ${app === 'radarr' ? 'movies' : 'series'}`);
+    res.json({ 
+      success: true, 
+      message: `Cleared tag from ${mediaIds.length} ${app === 'radarr' ? 'movies' : 'series'}`,
+      count: mediaIds.length
+    });
+  } catch (error: any) {
+    logger.error(`❌ Failed to clear tags for ${app} instance ${instanceId}`, {
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to clear tags',
+      message: error.message 
     });
   }
 });

@@ -5,7 +5,14 @@ import { radarrService } from './radarrService.js';
 import { sonarrService } from './sonarrService.js';
 import { statsService } from './statsService.js';
 import { getConfiguredInstances } from '../utils/starrUtils.js';
-import { processApplication } from '../routes/search.js';
+import { 
+  processApplication, 
+  createRadarrProcessor, 
+  createSonarrProcessor,
+  getResultKey,
+  getInstanceInfo,
+  saveStatsForResults
+} from '../routes/search.js';
 
 class SchedulerService {
   private task: cron.ScheduledTask | null = null;
@@ -42,28 +49,15 @@ class SchedulerService {
         const config = configService.getConfig();
         const results: Record<string, any> = {};
 
-        // Process Radarr
+        // Process Radarr (use scheduler's unattended setting)
         const radarrInstances = getConfiguredInstances(config.applications.radarr);
-        
+        const unattended = config.scheduler?.unattended || false;
         for (const radarrConfig of radarrInstances) {
-          const instanceName = (radarrConfig as any).name || 'Radarr';
-          const instanceId = (radarrConfig as any).id || 'radarr-1';
-          // Scheduler runs in unattended mode
-          const unattendedConfig = { ...radarrConfig, unattended: true };
-          const result = await processApplication({
-            name: instanceName,
-            config: unattendedConfig,
-            getMedia: radarrService.getMovies.bind(radarrService),
-            filterMedia: radarrService.filterMovies.bind(radarrService),
-            searchMedia: radarrService.searchMovies.bind(radarrService),
-            searchMediaOneByOne: false,
-            getTagId: radarrService.getTagId.bind(radarrService),
-            addTag: radarrService.addTagToMovies.bind(radarrService),
-            removeTag: radarrService.removeTagFromMovies.bind(radarrService),
-            getMediaId: (m) => m.id,
-            getMediaTitle: (m) => m.title
-          });
-          const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
+          const { instanceName, instanceId } = getInstanceInfo(radarrConfig, 'radarr');
+          const unattendedConfig = { ...radarrConfig, unattended };
+          const processor = createRadarrProcessor(instanceName, unattendedConfig);
+          const result = await processApplication(processor);
+          const resultKey = getResultKey(instanceId, 'radarr', radarrInstances.length);
           results[resultKey] = {
             ...result,
             movies: result.items,
@@ -71,32 +65,14 @@ class SchedulerService {
           };
         }
 
-        // Process Sonarr
+        // Process Sonarr (use scheduler's unattended setting)
         const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-        
         for (const sonarrConfig of sonarrInstances) {
-          const instanceName = (sonarrConfig as any).name || 'Sonarr';
-          const instanceId = (sonarrConfig as any).id || 'sonarr-1';
-          // Scheduler runs in unattended mode
-          const unattendedConfig = { ...sonarrConfig, unattended: true };
-          const result = await processApplication({
-            name: instanceName,
-            config: unattendedConfig,
-            getMedia: sonarrService.getSeries.bind(sonarrService),
-            filterMedia: sonarrService.filterSeries.bind(sonarrService),
-            searchMedia: async (cfg, seriesIds) => {
-              if (seriesIds.length > 0) {
-                await sonarrService.searchSeries(cfg, seriesIds[0]);
-              }
-            },
-            searchMediaOneByOne: true,
-            getTagId: sonarrService.getTagId.bind(sonarrService),
-            addTag: sonarrService.addTagToSeries.bind(sonarrService),
-            removeTag: sonarrService.removeTagFromSeries.bind(sonarrService),
-            getMediaId: (s) => s.id,
-            getMediaTitle: (s) => s.title
-          });
-          const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
+          const { instanceName, instanceId } = getInstanceInfo(sonarrConfig, 'sonarr');
+          const unattendedConfig = { ...sonarrConfig, unattended };
+          const processor = createSonarrProcessor(instanceName, unattendedConfig);
+          const result = await processApplication(processor);
+          const resultKey = getResultKey(instanceId, 'sonarr', sonarrInstances.length);
           results[resultKey] = {
             ...result,
             series: result.items,
@@ -105,21 +81,7 @@ class SchedulerService {
         }
 
         // Save stats for successful searches
-        for (const [app, result] of Object.entries(results)) {
-          if (result.success && result.searched && result.searched > 0) {
-            const items = result.movies || result.series || result.items || [];
-            // Use the app key directly as the instance key (it's already the instance ID for multi-instance)
-            // For single instance, it's just 'radarr' or 'sonarr'
-            // For multi-instance, it's 'radarr-1766427071907' or 'sonarr-1766427071907'
-            const instanceKey = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app : undefined;
-            await statsService.addUpgrade(
-              app.split('-')[0], // Use app type (e.g., 'radarr', 'sonarr')
-              result.searched, 
-              items,
-              instanceKey // Use full instance ID as key (e.g., 'radarr-1766427071907')
-            );
-          }
-        }
+        await saveStatsForResults(results);
 
         logger.info('✅ Scheduled search completed', { 
           results: Object.keys(results).map(app => ({

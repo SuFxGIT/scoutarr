@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   Flex,
-  Container,
   Heading,
   Button,
   Card,
@@ -229,7 +228,6 @@ function Settings() {
       monitored: true,
       movieStatus: 'released' as const,
       qualityProfileName: '',
-      unattended: false,
       enabled: true
     } : {
       id: newId,
@@ -243,7 +241,6 @@ function Settings() {
       monitored: true,
       seriesStatus: '',
       qualityProfileName: '',
-      unattended: false,
       enabled: true
     };
     
@@ -289,27 +286,23 @@ function Settings() {
 
   if (loading) {
     return (
-      <Container size="3" style={{ padding: '2rem' }}>
-        <Flex align="center" justify="center" gap="3">
-          <Spinner size="3" />
-          <Text>Loading configuration...</Text>
-        </Flex>
-      </Container>
+      <Flex align="center" justify="center" gap="3" style={{ padding: '2rem' }}>
+        <Spinner size="3" />
+        <Text>Loading configuration...</Text>
+      </Flex>
     );
   }
 
   if (!config) {
     return (
-      <Container size="3" style={{ padding: '2rem' }}>
-        <Callout.Root color="red">
-          <Callout.Text>Failed to load configuration</Callout.Text>
-          <Callout.Text size="1" style={{ marginTop: '0.5rem' }}>
-            <Button size="2" variant="soft" onClick={loadConfig}>
-              Retry
-            </Button>
-          </Callout.Text>
-        </Callout.Root>
-      </Container>
+      <Callout.Root color="red" style={{ padding: '2rem' }}>
+        <Callout.Text>Failed to load configuration</Callout.Text>
+        <Callout.Text size="1" style={{ marginTop: '0.5rem' }}>
+          <Button size="2" variant="soft" onClick={loadConfig}>
+            Retry
+          </Button>
+        </Callout.Text>
+      </Callout.Root>
     );
   }
 
@@ -635,15 +628,25 @@ function Settings() {
                                 </Tooltip>
                               </Flex>
 
+                              <Separator />
+
                               <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Unattended Mode</Text>
-                                <Tooltip content="When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.">
-                                  <span>
-                                    <Switch
-                                      checked={instance.unattended ?? false}
-                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'unattended', checked)}
-                                    />
-                                  </span>
+                                <Text size="2" weight="medium">Clear Tags</Text>
+                                <Tooltip content="Removes the configured tag from all movies in this Radarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
+                                  <Button
+                                    variant="outline"
+                                    size="2"
+                                    color="red"
+                                    onClick={async () => {
+                                      try {
+                                        await axios.post(`/api/config/clear-tags/radarr/${instance.id}`);
+                                      } catch (error: any) {
+                                        console.error('Failed to clear tags:', error);
+                                      }
+                                    }}
+                                  >
+                                    Clear Tags
+                                  </Button>
                                 </Tooltip>
                               </Flex>
                             </Flex>
@@ -845,15 +848,25 @@ function Settings() {
                                 </Tooltip>
                               </Flex>
 
+                              <Separator />
+
                               <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Unattended Mode</Text>
-                                <Tooltip content="When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.">
-                                  <span>
-                                    <Switch
-                                      checked={instance.unattended ?? false}
-                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'unattended', checked)}
-                                    />
-                                  </span>
+                                <Text size="2" weight="medium">Clear Tags</Text>
+                                <Tooltip content="Removes the configured tag from all series in this Sonarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
+                                  <Button
+                                    variant="outline"
+                                    size="2"
+                                    color="red"
+                                    onClick={async () => {
+                                      try {
+                                        await axios.post(`/api/config/clear-tags/sonarr/${instance.id}`);
+                                      } catch (error: any) {
+                                        console.error('Failed to clear tags:', error);
+                                      }
+                                    }}
+                                  >
+                                    Clear Tags
+                                  </Button>
                                 </Tooltip>
                               </Flex>
                             </Flex>
@@ -916,26 +929,52 @@ function Settings() {
                 <Heading size="5">Scheduler Configuration</Heading>
                 <Separator />
 
-                <Flex direction="column" gap="1">
-                  <Switch
-                    checked={config.scheduler?.enabled || false}
-                    onCheckedChange={(checked) => {
-                      if (!config.scheduler) {
-                        setConfig({
-                          ...config,
-                          scheduler: { enabled: checked, schedule: '0 */6 * * *' }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          scheduler: { ...config.scheduler, enabled: checked }
-                        });
-                      }
-                    }}
-                  />
-                  <Text size="2" color="gray">
-                    Enable Scheduler - When enabled, searches will run automatically according to the schedule below.
-                  </Text>
+                <Flex direction="row" align="center" justify="between" gap="2">
+                  <Text size="2" weight="medium">Enable Scheduler</Text>
+                  <Tooltip content="When enabled, searches will run automatically according to the schedule below.">
+                    <span>
+                      <Switch
+                        checked={config.scheduler?.enabled || false}
+                        onCheckedChange={(checked) => {
+                          if (!config.scheduler) {
+                            setConfig({
+                              ...config,
+                              scheduler: { enabled: checked, schedule: '0 */6 * * *', unattended: false }
+                            });
+                          } else {
+                            setConfig({
+                              ...config,
+                              scheduler: { ...config.scheduler, enabled: checked }
+                            });
+                          }
+                        }}
+                      />
+                    </span>
+                  </Tooltip>
+                </Flex>
+
+                <Flex direction="row" align="center" justify="between" gap="2">
+                  <Text size="2" weight="medium">Unattended Mode</Text>
+                  <Tooltip content="When enabled, the scheduler will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation without manual intervention.">
+                    <span>
+                      <Switch
+                        checked={config.scheduler?.unattended || false}
+                        onCheckedChange={(checked) => {
+                          if (!config.scheduler) {
+                            setConfig({
+                              ...config,
+                              scheduler: { enabled: false, schedule: '0 */6 * * *', unattended: checked }
+                            });
+                          } else {
+                            setConfig({
+                              ...config,
+                              scheduler: { ...config.scheduler, unattended: checked }
+                            });
+                          }
+                        }}
+                      />
+                    </span>
+                  </Tooltip>
                 </Flex>
 
                 <Flex direction="column" gap="1">
@@ -950,7 +989,7 @@ function Settings() {
                       if (!config.scheduler) {
                         setConfig({
                           ...config,
-                          scheduler: { enabled: false, schedule }
+                          scheduler: { enabled: false, schedule, unattended: false }
                         });
                       } else {
                         setConfig({

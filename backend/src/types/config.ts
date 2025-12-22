@@ -16,7 +16,6 @@ export interface RadarrInstance {
   monitored: boolean;
   movieStatus: 'announced' | 'in cinemas' | 'released';
   qualityProfileName: string;
-  unattended: boolean;
   enabled?: boolean;
 }
 
@@ -32,7 +31,6 @@ export interface SonarrInstance {
   monitored: boolean;
   seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
   qualityProfileName: string;
-  unattended: boolean;
   enabled?: boolean;
 }
 
@@ -46,7 +44,6 @@ export interface RadarrConfig {
   monitored: boolean;
   movieStatus: 'announced' | 'in cinemas' | 'released';
   qualityProfileName: string;
-  unattended: boolean;
 }
 
 export interface SonarrConfig {
@@ -58,7 +55,6 @@ export interface SonarrConfig {
   monitored: boolean;
   seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
   qualityProfileName: string;
-  unattended: boolean;
 }
 
 export interface LidarrConfig {
@@ -95,6 +91,7 @@ export interface ApplicationsConfig {
 export interface SchedulerConfig {
   enabled: boolean;
   schedule: string; // Cron expression (e.g., "0 */6 * * *" for every 6 hours)
+  unattended: boolean; // When enabled, automatically removes tags and re-filters when no media is found
 }
 
 export interface Config {

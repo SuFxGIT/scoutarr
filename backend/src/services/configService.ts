@@ -63,8 +63,7 @@ class ConfigService {
           ignoreTag: '',
           monitored: true,
           movieStatus: 'released',
-          qualityProfileName: '',
-          unattended: false
+          qualityProfileName: ''
         },
         sonarr: {
           url: '',
@@ -74,8 +73,7 @@ class ConfigService {
           ignoreTag: '',
           monitored: true,
           seriesStatus: '',
-          qualityProfileName: '',
-          unattended: false
+          qualityProfileName: ''
         },
         lidarr: {
           url: '',
@@ -85,8 +83,7 @@ class ConfigService {
           ignoreTag: '',
           monitored: true,
           artistStatus: '',
-          qualityProfileName: '',
-          unattended: false
+          qualityProfileName: ''
         },
         readarr: {
           url: '',
@@ -96,13 +93,13 @@ class ConfigService {
           ignoreTag: '',
           monitored: true,
           authorStatus: '',
-          qualityProfileName: '',
-          unattended: false
+          qualityProfileName: ''
         }
       },
       scheduler: {
         enabled: false,
-        schedule: '0 */6 * * *' // Every 6 hours by default
+        schedule: '0 */6 * * *', // Every 6 hours by default
+        unattended: false
       }
     };
 
