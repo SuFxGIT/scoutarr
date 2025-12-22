@@ -412,95 +412,94 @@ function Dashboard() {
           </Flex>
         </Card>
 
-        {stats && (
-          <Card>
-            <Flex direction="column" gap="3">
-              <Flex align="center" justify="between">
-                <Heading size="5">Upgrade Statistics</Heading>
-                <Button variant="ghost" size="2" onClick={loadStats}>
-                  <ReloadIcon /> Refresh
-                </Button>
-              </Flex>
-              <Separator />
-              <Flex gap="3" wrap="wrap">
-                <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
-                  <Flex direction="column" gap="2">
-                    <Text size="2" color="gray">Total Upgrades</Text>
-                    <Heading size="7">{stats.totalUpgrades}</Heading>
-                  </Flex>
-                </Card>
-                {Object.entries(stats.upgradesByInstance || {}).map(([instanceKey, count]) => {
-                  // Parse instance key: format is "app-instanceId" (e.g., "radarr-1766427071907") or just "app" for legacy
-                  let displayName: string;
-                  if (instanceKey.includes('-') && instanceKey !== 'radarr' && instanceKey !== 'sonarr') {
-                    // It's an instance-specific key like "radarr-1766427071907"
-                    const parts = instanceKey.split('-');
-                    const app = parts[0];
-                    // Find matching status entry (status uses the same key format)
-                    const status = connectionStatus[instanceKey];
-                    if (status) {
-                      // Use instance name if available, otherwise use instance number
-                      const instanceName = status.instanceName;
-                      const instanceNum = status.instanceId;
-                      displayName = instanceName 
-                        ? `${app.charAt(0).toUpperCase() + app.slice(1)} (${instanceName})`
-                        : `${app.charAt(0).toUpperCase() + app.slice(1)} ${instanceNum || '1'}`;
-                    } else {
-                      // Fallback if status not found
-                      displayName = `${app.charAt(0).toUpperCase() + app.slice(1)}`;
-                    }
-                  } else {
-                    // Legacy single-instance key
-                    displayName = instanceKey.charAt(0).toUpperCase() + instanceKey.slice(1);
-                  }
-                  return (
-                    <Card key={instanceKey} variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
-                      <Flex direction="column" gap="2">
-                        <Text size="2" color="gray">{displayName}</Text>
-                        <Heading size="7">{count}</Heading>
-                      </Flex>
-                    </Card>
-                  );
-                })}
-              </Flex>
-              {stats.lastUpgrade && (
-                <Text size="2" color="gray">
-                  Last upgrade: {formatDate(stats.lastUpgrade)}
-                </Text>
-              )}
-              {stats.recentUpgrades.length > 0 && (
-                <Flex direction="column" gap="2" mt="2">
-                  <Text size="3" weight="bold">Recent Upgrades</Text>
-                  <Flex direction="column" gap="1" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {stats.recentUpgrades.slice(0, 10).map((upgrade, idx) => (
-                      <Card key={idx} variant="surface" size="1">
-                        <Flex direction="column" gap="1">
-                          <Flex align="center" justify="between">
-                            <Badge size="1" style={{ textTransform: 'capitalize' }}>
-                              {upgrade.instance 
-                                ? `${upgrade.application} (${upgrade.instance})`
-                                : upgrade.application}
-                            </Badge>
-                            <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
-                          </Flex>
-                          <Text size="2">
-                            {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
-                          </Text>
-                          {upgrade.items.length > 0 && (
-                            <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
-                              {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
-                              {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
-                            </Text>
-                          )}
-                        </Flex>
-                      </Card>
-                    ))}
-                  </Flex>
+        {stats && (() => {
+          // Calculate Radarr and Sonarr totals from upgradesByInstance
+          let radarrTotal = 0;
+          let sonarrTotal = 0;
+          
+          Object.entries(stats.upgradesByInstance || {}).forEach(([instanceKey, count]) => {
+            if (instanceKey.startsWith('radarr')) {
+              radarrTotal += count as number;
+            } else if (instanceKey.startsWith('sonarr')) {
+              sonarrTotal += count as number;
+            }
+          });
+          
+          // Fallback to upgradesByApplication if upgradesByInstance is empty
+          if (radarrTotal === 0 && sonarrTotal === 0) {
+            radarrTotal = stats.upgradesByApplication?.radarr || 0;
+            sonarrTotal = stats.upgradesByApplication?.sonarr || 0;
+          }
+          
+          return (
+            <Card>
+              <Flex direction="column" gap="3">
+                <Flex align="center" justify="between">
+                  <Heading size="5">Upgrade Statistics</Heading>
+                  <Button variant="ghost" size="2" onClick={loadStats}>
+                    <ReloadIcon /> Refresh
+                  </Button>
                 </Flex>
-              )}
-            </Flex>
-          </Card>
-        )}
+                <Separator />
+                <Flex gap="3" wrap="wrap" justify="center">
+                  <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                    <Flex direction="column" gap="2" align="center" justify="center">
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Radarr</Text>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{radarrTotal}</Heading>
+                    </Flex>
+                  </Card>
+                  <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                    <Flex direction="column" gap="2" align="center" justify="center">
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Total Upgrades</Text>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{stats.totalUpgrades}</Heading>
+                    </Flex>
+                  </Card>
+                  <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                    <Flex direction="column" gap="2" align="center" justify="center">
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Sonarr</Text>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{sonarrTotal}</Heading>
+                    </Flex>
+                  </Card>
+                </Flex>
+                {stats.lastUpgrade && (
+                  <Text size="2" color="gray">
+                    Last upgrade: {formatDate(stats.lastUpgrade)}
+                  </Text>
+                )}
+                {stats.recentUpgrades.length > 0 && (
+                  <Flex direction="column" gap="2" mt="2">
+                    <Text size="3" weight="bold">Recent Upgrades</Text>
+                    <Flex direction="column" gap="1" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {stats.recentUpgrades.slice(0, 10).map((upgrade, idx) => (
+                        <Card key={idx} variant="surface" size="1">
+                          <Flex direction="column" gap="1">
+                            <Flex align="center" justify="between">
+                              <Badge size="1" style={{ textTransform: 'capitalize' }}>
+                                {upgrade.instance 
+                                  ? `${upgrade.application} (${upgrade.instance})`
+                                  : upgrade.application}
+                              </Badge>
+                              <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
+                            </Flex>
+                            <Text size="2">
+                              {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
+                            </Text>
+                            {upgrade.items.length > 0 && (
+                              <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
+                                {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
+                                {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
+                              </Text>
+                            )}
+                          </Flex>
+                        </Card>
+                      ))}
+                    </Flex>
+                  </Flex>
+                )}
+              </Flex>
+            </Card>
+          );
+        })()}
 
         {renderAutomaticRunPreview()}
         {renderResults(manualRunResults, 'Manual Run')}
