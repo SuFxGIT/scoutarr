@@ -1,12 +1,23 @@
 {
-  "totalUpgrades": 2,
+  "totalUpgrades": 3,
   "upgradesByApplication": {
-    "radarr": 2
+    "radarr": 3
   },
   "upgradesByInstance": {
-    "radarr": 2
+    "radarr": 3
   },
   "recentUpgrades": [
+    {
+      "timestamp": "2025-12-22T20:50:00.312Z",
+      "application": "radarr",
+      "count": 1,
+      "items": [
+        {
+          "id": 421,
+          "title": "Dune"
+        }
+      ]
+    },
     {
       "timestamp": "2025-12-22T20:40:00.348Z",
       "application": "radarr",
@@ -30,5 +41,5 @@
       ]
     }
   ],
-  "lastUpgrade": "2025-12-22T20:40:00.348Z"
+  "lastUpgrade": "2025-12-22T20:50:00.312Z"
 }

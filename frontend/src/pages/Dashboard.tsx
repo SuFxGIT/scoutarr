@@ -48,6 +48,7 @@ function Dashboard() {
   const [schedulerHistory, setSchedulerHistory] = useState<Array<{ timestamp: string; results: any; success: boolean; error?: string }>>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null; nextRun: string | null } | null>(null);
+  const [showAllUpgrades, setShowAllUpgrades] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -388,16 +389,15 @@ function Dashboard() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
-        <Card>
-          <Flex direction="column" gap="3">
-            <Flex align="center" justify="between">
-              <Heading size="5">Connection Status</Heading>
-              <Button variant="ghost" size="2" onClick={loadStatus}>
+        <Card style={{ padding: '0.5rem' }}>
+          <Flex direction="column" gap="1" align="center">
+            <Flex align="center" justify="between" style={{ width: '100%', marginBottom: '-0.25rem' }}>
+              <div style={{ flex: 1 }}></div>
+              <Button variant="ghost" size="1" onClick={loadStatus}>
                 <ReloadIcon /> Refresh
               </Button>
             </Flex>
-            <Separator />
-            <Flex gap="3" wrap="wrap">
+            <Flex gap="2" wrap="wrap" justify="center" style={{ margin: 0, padding: 0, width: '100%' }}>
               {Object.entries(connectionStatus)
                 .filter(([app]) => app !== 'scheduler') // Exclude scheduler from connection status
                 .map(([app, status]: [string, any]) => {
@@ -516,36 +516,123 @@ function Dashboard() {
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
                 <Heading size="5">Recent Upgrades</Heading>
-                <Button variant="ghost" size="2" onClick={loadStats}>
-                  <ReloadIcon /> Refresh
-                </Button>
+                <Flex gap="2">
+                  <Button 
+                    variant="ghost" 
+                    size="2" 
+                    onClick={() => setShowAllUpgrades(!showAllUpgrades)}
+                  >
+                    {showAllUpgrades ? 'Show Recent' : 'View All'}
+                  </Button>
+                  <Button variant="ghost" size="2" onClick={loadStats}>
+                    <ReloadIcon /> Refresh
+                  </Button>
+                </Flex>
               </Flex>
               <Separator />
-              <Flex direction="column" gap="2" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {stats.recentUpgrades.slice(0, 20).map((upgrade, idx) => (
-                  <Card key={idx} variant="surface" size="1">
-                    <Flex direction="column" gap="1">
-                      <Flex align="center" justify="between">
-                        <Badge size="1" style={{ textTransform: 'capitalize' }}>
-                          {upgrade.instance 
-                            ? `${upgrade.application} (${upgrade.instance})`
-                            : upgrade.application}
-                        </Badge>
-                        <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
-                      </Flex>
-                      <Text size="2">
-                        {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
-                      </Text>
-                      {upgrade.items.length > 0 && (
-                        <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
-                          {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
-                          {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
+              {showAllUpgrades ? (
+                <Flex direction="column" gap="2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {stats.recentUpgrades.map((upgrade, idx) => (
+                    <Card key={idx} variant="surface" size="1">
+                      <Flex direction="column" gap="1">
+                        <Flex align="center" justify="between">
+                          <Badge size="1" style={{ textTransform: 'capitalize' }}>
+                            {upgrade.instance 
+                              ? `${upgrade.application} (${upgrade.instance})`
+                              : upgrade.application}
+                          </Badge>
+                          <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
+                        </Flex>
+                        <Text size="2">
+                          {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
                         </Text>
-                      )}
-                    </Flex>
-                  </Card>
-                ))}
-              </Flex>
+                        {upgrade.items.length > 0 && (
+                          <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
+                            {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
+                            {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
+                          </Text>
+                        )}
+                      </Flex>
+                    </Card>
+                  ))}
+                </Flex>
+              ) : (
+                <div
+                  style={{
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    scrollBehavior: 'smooth',
+                    WebkitOverflowScrolling: 'touch',
+                    paddingBottom: '0.5rem'
+                  }}
+                >
+                  <Flex 
+                    gap="3" 
+                    style={{ 
+                      flexWrap: 'nowrap',
+                      minWidth: 'max-content'
+                    }}
+                  >
+                    {stats.recentUpgrades.slice(0, 15).map((upgrade, idx) => (
+                      <Card 
+                        key={idx} 
+                        variant="surface" 
+                        style={{ 
+                          minWidth: '100px',
+                          maxWidth: '100px',
+                          flexShrink: 0,
+                          padding: '0.25rem'
+                        }}
+                      >
+                        <Flex direction="column" gap="0" style={{ justifyContent: 'flex-start', padding: 0 }}>
+                          <Badge 
+                            size="1" 
+                            style={{ 
+                              textTransform: 'capitalize', 
+                              alignSelf: 'center',
+                              marginBottom: '0.25rem',
+                              fontSize: '0.6rem'
+                            }}
+                          >
+                            {upgrade.application}
+                          </Badge>
+                          {upgrade.items.length > 0 ? (
+                            <Text 
+                              size="1" 
+                              weight="medium"
+                              style={{ 
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                lineHeight: '1.1',
+                                wordBreak: 'break-word',
+                                margin: 0,
+                                padding: 0
+                              }}
+                              title={upgrade.items[0].title}
+                            >
+                              {upgrade.items[0].title}
+                            </Text>
+                          ) : (
+                            <Text size="1" color="gray" style={{ textAlign: 'center', margin: 0, padding: 0 }}>
+                              No items
+                            </Text>
+                          )}
+                          <Text size="1" color="gray" style={{ textAlign: 'center', fontSize: '0.6rem', margin: 0, padding: 0, marginTop: '0.25rem' }}>
+                            {new Date(upgrade.timestamp).toLocaleDateString()}
+                          </Text>
+                          <Text size="1" color="gray" style={{ textAlign: 'center', fontSize: '0.6rem', margin: 0, padding: 0, marginTop: '0.125rem' }}>
+                            {new Date(upgrade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </Flex>
+                      </Card>
+                    ))}
+                  </Flex>
+                </div>
+              )}
             </Flex>
           </Card>
         )}

@@ -118,8 +118,9 @@ class StatsService {
       stats.upgradesByInstance[instanceKey] = 
         (stats.upgradesByInstance[instanceKey] || 0) + count;
       
-      // Add to recent upgrades (keep last 100 entries)
+      // Add to recent upgrades (keep last 15 entries for display, but store more for "View All")
       stats.recentUpgrades.unshift(entry);
+      // Keep up to 100 entries for "View All" functionality, but display only shows 15
       if (stats.recentUpgrades.length > 100) {
         stats.recentUpgrades = stats.recentUpgrades.slice(0, 100);
       }
