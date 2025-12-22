@@ -48,9 +48,11 @@ class SchedulerService {
         for (const radarrConfig of radarrInstances) {
           const instanceName = (radarrConfig as any).name || 'Radarr';
           const instanceId = (radarrConfig as any).id || 'radarr-1';
+          // Scheduler runs in unattended mode
+          const unattendedConfig = { ...radarrConfig, unattended: true };
           const result = await processApplication({
             name: instanceName,
-            config: radarrConfig,
+            config: unattendedConfig,
             getMedia: radarrService.getMovies.bind(radarrService),
             filterMedia: radarrService.filterMovies.bind(radarrService),
             searchMedia: radarrService.searchMovies.bind(radarrService),
@@ -75,9 +77,11 @@ class SchedulerService {
         for (const sonarrConfig of sonarrInstances) {
           const instanceName = (sonarrConfig as any).name || 'Sonarr';
           const instanceId = (sonarrConfig as any).id || 'sonarr-1';
+          // Scheduler runs in unattended mode
+          const unattendedConfig = { ...sonarrConfig, unattended: true };
           const result = await processApplication({
             name: instanceName,
-            config: sonarrConfig,
+            config: unattendedConfig,
             getMedia: sonarrService.getSeries.bind(sonarrService),
             filterMedia: sonarrService.filterSeries.bind(sonarrService),
             searchMedia: async (cfg, seriesIds) => {
@@ -104,13 +108,15 @@ class SchedulerService {
         for (const [app, result] of Object.entries(results)) {
           if (result.success && result.searched && result.searched > 0) {
             const items = result.movies || result.series || result.items || [];
-            const instanceName = result.instanceName;
-            const instanceId = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app.split('-').slice(1).join('-') : undefined;
+            // Use the app key directly as the instance key (it's already the instance ID for multi-instance)
+            // For single instance, it's just 'radarr' or 'sonarr'
+            // For multi-instance, it's 'radarr-1766427071907' or 'sonarr-1766427071907'
+            const instanceKey = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app : undefined;
             await statsService.addUpgrade(
-              instanceName || app, 
+              app.split('-')[0], // Use app type (e.g., 'radarr', 'sonarr')
               result.searched, 
               items,
-              instanceId || instanceName
+              instanceKey // Use full instance ID as key (e.g., 'radarr-1766427071907')
             );
           }
         }

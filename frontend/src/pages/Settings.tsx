@@ -210,6 +210,11 @@ function Settings() {
   const addInstance = (app: 'radarr' | 'sonarr') => {
     if (!config) return;
     const instances = getInstances(app);
+    // Limit to 4 instances per app
+    if (instances.length >= 4) {
+      alert(`Maximum of 4 ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
+      return;
+    }
     const newId = `${app}-${Date.now()}`;
     const nextInstanceId = getNextInstanceId(app, instances);
     const defaultConfig = app === 'radarr' ? {
@@ -224,7 +229,8 @@ function Settings() {
       monitored: true,
       movieStatus: 'released' as const,
       qualityProfileName: '',
-      unattended: false
+      unattended: false,
+      enabled: true
     } : {
       id: newId,
       instanceId: nextInstanceId,
@@ -237,7 +243,8 @@ function Settings() {
       monitored: true,
       seriesStatus: '',
       qualityProfileName: '',
-      unattended: false
+      unattended: false,
+      enabled: true
     };
     
     setConfig({
@@ -445,19 +452,22 @@ function Settings() {
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
                 <Heading size="5">Radarr</Heading>
-                <Button onClick={() => addInstance('radarr')}>
+                <Button 
+                  onClick={() => addInstance('radarr')}
+                  disabled={getInstances('radarr').length >= 4}
+                >
                   <PlusIcon /> Add
                 </Button>
               </Flex>
               
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {getInstances('radarr').map((instance, idx) => {
-                  const instanceKey = instance.id;
+                  const instanceKey = `radarr-${instance.id}`;
                   const isExpanded = expandedInstances.has(instanceKey);
                   const displayName = instance.name || `Radarr ${instance.instanceId || idx + 1}`;
                   
                   return (
-                    <Card key={instance.id}>
+                    <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
                       <Flex direction="column" gap="2">
                         <Collapsible.Root open={isExpanded} onOpenChange={(open) => {
                           const newExpanded = new Set(expandedInstances);
@@ -469,7 +479,20 @@ function Settings() {
                           setExpandedInstances(newExpanded);
                         }}>
                           <Collapsible.Trigger asChild>
-                            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', marginBottom: '0', cursor: 'pointer' }}>
+                            <div 
+                              style={{ 
+                                width: '100%', 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                padding: '0.75rem', 
+                                marginBottom: '0', 
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Text size="3" weight="bold">{displayName}</Text>
                                 <Flex align="center" gap="2">
@@ -494,6 +517,18 @@ function Settings() {
                           
                           <Collapsible.Content style={{ overflow: 'hidden' }}>
                             <Flex direction="column" gap="3" p="3" pt="2">
+                              <Flex direction="row" align="center" justify="between" gap="2">
+                                <Text size="2" weight="medium">Enable Instance</Text>
+                                <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
+                                  <span>
+                                    <Switch
+                                      checked={instance.enabled !== false}
+                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'enabled', checked)}
+                                    />
+                                  </span>
+                                </Tooltip>
+                              </Flex>
+                              <Separator />
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Name (optional)</Text>
                                 <Tooltip content="A friendly name to identify this instance (e.g., 'Main Radarr', '4K Radarr'). Leave empty to use default ID.">
@@ -626,19 +661,22 @@ function Settings() {
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
                 <Heading size="5">Sonarr</Heading>
-                <Button onClick={() => addInstance('sonarr')}>
+                <Button 
+                  onClick={() => addInstance('sonarr')}
+                  disabled={getInstances('sonarr').length >= 4}
+                >
                   <PlusIcon /> Add
                 </Button>
               </Flex>
               
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {getInstances('sonarr').map((instance, idx) => {
-                  const instanceKey = instance.id;
+                  const instanceKey = `sonarr-${instance.id}`;
                   const isExpanded = expandedInstances.has(instanceKey);
                   const displayName = instance.name || `Sonarr ${instance.instanceId || idx + 1}`;
                   
                   return (
-                    <Card key={instance.id}>
+                    <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
                       <Flex direction="column" gap="2">
                         <Collapsible.Root open={isExpanded} onOpenChange={(open) => {
                           const newExpanded = new Set(expandedInstances);
@@ -650,7 +688,20 @@ function Settings() {
                           setExpandedInstances(newExpanded);
                         }}>
                           <Collapsible.Trigger asChild>
-                            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', marginBottom: '0', cursor: 'pointer' }}>
+                            <div 
+                              style={{ 
+                                width: '100%', 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                padding: '0.75rem', 
+                                marginBottom: '0', 
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none'
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Text size="3" weight="bold">{displayName}</Text>
                                 <Flex align="center" gap="2">
@@ -675,6 +726,18 @@ function Settings() {
                           
                           <Collapsible.Content style={{ overflow: 'hidden' }}>
                             <Flex direction="column" gap="3" p="3" pt="2">
+                              <Flex direction="row" align="center" justify="between" gap="2">
+                                <Text size="2" weight="medium">Enable Instance</Text>
+                                <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
+                                  <span>
+                                    <Switch
+                                      checked={instance.enabled !== false}
+                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'enabled', checked)}
+                                    />
+                                  </span>
+                                </Tooltip>
+                              </Flex>
+                              <Separator />
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Name (optional)</Text>
                                 <Tooltip content="A friendly name to identify this instance (e.g., 'Main Sonarr', 'Anime Sonarr'). Leave empty to use default ID.">

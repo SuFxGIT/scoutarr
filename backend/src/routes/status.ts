@@ -1,5 +1,6 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
+import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
@@ -62,6 +63,14 @@ statusRouter.get('/', async (req, res) => {
     } else {
       status.sonarr = await checkAppStatus('Sonarr', config.applications.sonarr);
     }
+
+    // Add scheduler status
+    const schedulerStatus = schedulerService.getStatus();
+    status.scheduler = {
+      enabled: config.scheduler?.enabled || false,
+      running: schedulerStatus.running,
+      schedule: schedulerStatus.schedule
+    };
 
     res.json(status);
   } catch (error: any) {

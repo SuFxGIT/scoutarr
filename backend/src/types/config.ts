@@ -17,6 +17,7 @@ export interface RadarrInstance {
   movieStatus: 'announced' | 'in cinemas' | 'released';
   qualityProfileName: string;
   unattended: boolean;
+  enabled?: boolean;
 }
 
 export interface SonarrInstance {
@@ -32,6 +33,7 @@ export interface SonarrInstance {
   seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
   qualityProfileName: string;
   unattended: boolean;
+  enabled?: boolean;
 }
 
 // Legacy single instance configs (for backward compatibility)

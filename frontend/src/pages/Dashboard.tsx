@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Flex, 
   Heading, 
@@ -40,24 +40,57 @@ interface Stats {
 
 function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
+  const [automaticRunResults, setAutomaticRunResults] = useState<SearchResults | null>(null);
   const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
   const [lastRunResults, setLastRunResults] = useState<SearchResults | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Stats | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [logHistory, setLogHistory] = useState<Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null } | null>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadStatus();
+    loadAutomaticRun();
     loadManualRun();
     loadStats();
   }, []);
+
+  // Reload status when automatic run is refreshed to get latest scheduler status
+  useEffect(() => {
+    loadStatus();
+  }, [automaticRunResults]);
 
   const loadStatus = async () => {
     try {
       const response = await axios.get('/api/status');
       setConnectionStatus(response.data);
+      // Extract scheduler status
+      if (response.data.scheduler) {
+        setSchedulerStatus(response.data.scheduler);
+      }
     } catch (error) {
       console.error('Failed to load status:', error);
+    }
+  };
+
+  const formatAppName = (app: string) => {
+    if (app.includes('-')) {
+      const parts = app.split('-');
+      const appType = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      return appType;
+    }
+    return app.charAt(0).toUpperCase() + app.slice(1);
+  };
+
+  const loadAutomaticRun = async () => {
+    try {
+      const response = await axios.post('/api/search/automatic-run-preview');
+      setAutomaticRunResults(response.data);
+    } catch (error) {
+      console.error('Failed to load automatic run preview:', error);
     }
   };
 
@@ -93,6 +126,149 @@ function Dashboard() {
     } finally {
       setIsRunning(false);
     }
+  };
+
+  // Update log history when automatic run results change
+  useEffect(() => {
+    if (automaticRunResults) {
+      const newLogs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
+      const timestamp = new Date().toLocaleTimeString();
+      
+      // Add scheduler status log
+      const status = schedulerStatus?.enabled ? 'Enabled' : 'Disabled';
+      newLogs.push({
+        timestamp,
+        app: 'Scheduler',
+        message: `Scheduler Status: ${status}`,
+        type: schedulerStatus?.enabled ? 'success' : 'info'
+      });
+      
+      // Only show actions if scheduler is enabled
+      if (schedulerStatus?.enabled) {
+        Object.entries(automaticRunResults).forEach(([app, result]) => {
+          if (result.success) {
+            const count = result.count || 0;
+            const appName = formatAppName(app);
+            
+            // Show triggered action
+            newLogs.push({
+              timestamp,
+              app,
+              message: `${appName}: Triggered`,
+              type: 'success'
+            });
+            
+            // Show searched items
+            if (result.movies && result.movies.length > 0) {
+              newLogs.push({
+                timestamp,
+                app,
+                message: `${appName}: Searched ${result.movies.length} movies`,
+                type: 'info'
+              });
+              result.movies.forEach(movie => {
+                newLogs.push({
+                  timestamp,
+                  app,
+                  message: `  → ${movie.title}`,
+                  type: 'info'
+                });
+              });
+            }
+            if (result.series && result.series.length > 0) {
+              newLogs.push({
+                timestamp,
+                app,
+                message: `${appName}: Searched ${result.series.length} series`,
+                type: 'info'
+              });
+              result.series.forEach(series => {
+                newLogs.push({
+                  timestamp,
+                  app,
+                  message: `  → ${series.title}`,
+                  type: 'info'
+                });
+              });
+            }
+          } else {
+            newLogs.push({
+              timestamp,
+              app,
+              message: `${formatAppName(app)}: Error - ${result.error || 'Unknown error'}`,
+              type: 'error'
+            });
+          }
+        });
+      }
+      setLogHistory(prev => [...prev, ...newLogs]);
+    }
+  }, [automaticRunResults, schedulerStatus]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (autoScroll && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logHistory, autoScroll]);
+
+  const renderAutomaticRunPreview = () => {
+
+    return (
+      <Card mb="4">
+        <Flex align="center" justify="between" mb="3">
+          <Heading size="5">Automatic Run Preview Window</Heading>
+          <Flex gap="3">
+            <Button 
+              variant="outline" 
+              size="3" 
+              onClick={() => setLogHistory([])}
+            >
+              Clear History
+            </Button>
+            <Button 
+              variant="outline" 
+              size="3" 
+              onClick={loadAutomaticRun}
+            >
+              <ReloadIcon /> Refresh Preview
+            </Button>
+          </Flex>
+        </Flex>
+        <Card variant="surface" style={{ backgroundColor: '#1a1a1a', fontFamily: 'monospace' }}>
+          <div
+            ref={logContainerRef}
+            style={{
+              height: '400px',
+              overflowY: 'auto',
+              padding: '1rem',
+              fontSize: '0.875rem',
+              lineHeight: '1.5'
+            }}
+          >
+            {logHistory.length === 0 ? (
+              <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
+                No logs yet. Click "Refresh Preview" to see what the scheduler would do.
+              </Text>
+            ) : (
+              logHistory.map((log, idx) => (
+                <div key={idx} style={{ marginBottom: '0.25rem' }}>
+                  <Text 
+                    size="2" 
+                    style={{ 
+                      color: log.type === 'error' ? '#ef4444' : log.type === 'success' ? '#22c55e' : '#94a3b8',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                  >
+                    [{log.timestamp}] {formatAppName(log.app)}: {log.message}
+                  </Text>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </Card>
+    );
   };
 
   const renderResults = (results: SearchResults | null, title: string) => {
@@ -140,7 +316,7 @@ function Dashboard() {
                 {result.success ? (
                   <>
                     <Text size="2" color="gray">
-                      {title === 'Manual Run' 
+                      {title === 'Manual Run' || title === 'Automatic Run Preview Window'
                         ? `Would search ${result.count} of ${result.total} items`
                         : `Searched ${result.searched} items`
                       }
@@ -254,12 +430,29 @@ function Dashboard() {
                   </Flex>
                 </Card>
                 {Object.entries(stats.upgradesByInstance || {}).map(([instanceKey, count]) => {
-                  const [app, instance] = instanceKey.includes('-') 
-                    ? instanceKey.split('-').slice(0, 2)
-                    : [instanceKey, undefined];
-                  const displayName = instance 
-                    ? `${app.charAt(0).toUpperCase() + app.slice(1)} (${instance})`
-                    : app.charAt(0).toUpperCase() + app.slice(1);
+                  // Parse instance key: format is "app-instanceId" (e.g., "radarr-1766427071907") or just "app" for legacy
+                  let displayName: string;
+                  if (instanceKey.includes('-') && instanceKey !== 'radarr' && instanceKey !== 'sonarr') {
+                    // It's an instance-specific key like "radarr-1766427071907"
+                    const parts = instanceKey.split('-');
+                    const app = parts[0];
+                    // Find matching status entry (status uses the same key format)
+                    const status = connectionStatus[instanceKey];
+                    if (status) {
+                      // Use instance name if available, otherwise use instance number
+                      const instanceName = status.instanceName;
+                      const instanceNum = status.instanceId;
+                      displayName = instanceName 
+                        ? `${app.charAt(0).toUpperCase() + app.slice(1)} (${instanceName})`
+                        : `${app.charAt(0).toUpperCase() + app.slice(1)} ${instanceNum || '1'}`;
+                    } else {
+                      // Fallback if status not found
+                      displayName = `${app.charAt(0).toUpperCase() + app.slice(1)}`;
+                    }
+                  } else {
+                    // Legacy single-instance key
+                    displayName = instanceKey.charAt(0).toUpperCase() + instanceKey.slice(1);
+                  }
                   return (
                     <Card key={instanceKey} variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                       <Flex direction="column" gap="2">
@@ -309,6 +502,7 @@ function Dashboard() {
           </Card>
         )}
 
+        {renderAutomaticRunPreview()}
         {renderResults(manualRunResults, 'Manual Run')}
         {renderResults(lastRunResults, 'Last Run Results')}
       </Flex>

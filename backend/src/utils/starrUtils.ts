@@ -4,8 +4,8 @@ import logger from './logger.js';
 // Helper to get configured instances for an app (handles both array and single legacy format)
 export function getConfiguredInstances<T>(appConfig: T[] | any): T[] {
   return Array.isArray(appConfig)
-    ? appConfig.filter((inst: any) => inst.url && inst.apiKey)
-    : (appConfig?.url && appConfig?.apiKey ? [appConfig] : []);
+    ? appConfig.filter((inst: any) => inst.url && inst.apiKey && inst.enabled !== false)
+    : (appConfig?.url && appConfig?.apiKey && appConfig?.enabled !== false ? [appConfig] : []);
 }
 
 /**
