@@ -445,12 +445,23 @@ function Settings() {
         </Callout.Root>
 
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-          <Tabs.List>
-            <Tabs.Trigger value="radarr">Radarr</Tabs.Trigger>
-            <Tabs.Trigger value="sonarr">Sonarr</Tabs.Trigger>
-            <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
-            <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
-          </Tabs.List>
+          <Flex align="center" justify="between" gap="3">
+            <Tabs.List>
+              <Tabs.Trigger value="radarr">Radarr</Tabs.Trigger>
+              <Tabs.Trigger value="sonarr">Sonarr</Tabs.Trigger>
+              <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
+              <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
+            </Tabs.List>
+            <Button size="3" onClick={saveConfig} disabled={saving || loading}>
+              {saving ? (
+                <>
+                  <Spinner size="1" /> Saving...
+                </>
+              ) : (
+                'Save Configuration'
+              )}
+            </Button>
+          </Flex>
 
           <Tabs.Content value="radarr" style={{ paddingTop: '1rem' }}>
             <Flex direction="column" gap="3">
@@ -941,18 +952,6 @@ function Settings() {
             </Card>
           </Tabs.Content>
         </Tabs.Root>
-
-        <Flex justify="end" mt="4">
-          <Button size="3" onClick={saveConfig} disabled={saving || loading}>
-            {saving ? (
-              <>
-                <Spinner size="1" /> Saving...
-              </>
-            ) : (
-              'Save Configuration'
-            )}
-          </Button>
-        </Flex>
       </Flex>
     </div>
   );

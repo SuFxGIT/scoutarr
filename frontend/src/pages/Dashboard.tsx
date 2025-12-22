@@ -100,7 +100,27 @@ function Dashboard() {
 
     return (
       <Card mb="4">
-        <Heading size="5" mb="3">{title}</Heading>
+        <Flex align="center" justify="between" mb="3">
+          <Heading size="5">{title}</Heading>
+          {title === 'Manual Run' && (
+            <Flex gap="3">
+              <Button 
+                size="3" 
+                onClick={handleRun} 
+                disabled={isRunning}
+              >
+                <PlayIcon /> {isRunning ? 'Running...' : 'Run Search'}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="3" 
+                onClick={loadDryRun}
+              >
+                <ReloadIcon /> Refresh Preview
+              </Button>
+            </Flex>
+          )}
+        </Flex>
         <Flex direction="column" gap="3">
           {Object.entries(results).map(([app, result]) => (
             <Card key={app} variant="surface">
@@ -288,31 +308,6 @@ function Dashboard() {
             </Flex>
           </Card>
         )}
-
-        <Card>
-          <Flex direction="column" gap="3">
-            <Flex align="center" justify="between">
-              <Heading size="5">Actions</Heading>
-            </Flex>
-            <Separator />
-            <Flex gap="3">
-              <Button 
-                size="3" 
-                onClick={handleRun} 
-                disabled={isRunning}
-              >
-                <PlayIcon /> {isRunning ? 'Running...' : 'Run Search'}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="3" 
-                onClick={loadDryRun}
-              >
-                <ReloadIcon /> Refresh Preview
-              </Button>
-            </Flex>
-          </Flex>
-        </Card>
 
         {renderResults(dryRunResults, 'Manual Run')}
         {renderResults(lastRunResults, 'Last Run Results')}
