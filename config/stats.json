@@ -1,13 +1,6 @@
 {
-  "totalUpgrades": 2,
-  "upgradesByApplication": {
-    "radarr": 1,
-    "sonarr": 1
-  },
-  "upgradesByInstance": {
-    "radarr": 1,
-    "sonarr": 1
-  },
-  "recentUpgrades": [],
-  "lastUpgrade": "2025-12-22T21:41:37.189Z"
+  "totalUpgrades": 0,
+  "upgradesByApplication": {},
+  "upgradesByInstance": {},
+  "recentUpgrades": []
 }

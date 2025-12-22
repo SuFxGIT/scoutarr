@@ -50,6 +50,7 @@ function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
 
   useEffect(() => {
     loadStatus();
@@ -125,22 +126,24 @@ function Dashboard() {
       await axios.post('/api/stats/clear-recent');
       await loadStats();
       setCurrentPage(1);
+      setConfirmingClear(null);
     } catch (error: any) {
       console.error('Failed to clear recent upgrades:', error);
       alert('Failed to clear recent upgrades: ' + (error.response?.data?.error || error.message));
+      setConfirmingClear(null);
     }
   };
 
   const handleClearStats = async () => {
-    if (window.confirm('Are you sure you want to clear all statistics? This will reset all upgrade counts and recent upgrades. This action cannot be undone.')) {
-      try {
-        await axios.post('/api/stats/reset');
-        await loadStats();
-        setCurrentPage(1);
-      } catch (error: any) {
-        console.error('Failed to clear stats:', error);
-        alert('Failed to clear stats: ' + (error.response?.data?.error || error.message));
-      }
+    try {
+      await axios.post('/api/stats/reset');
+      await loadStats();
+      setCurrentPage(1);
+      setConfirmingClear(null);
+    } catch (error: any) {
+      console.error('Failed to clear stats:', error);
+      alert('Failed to clear stats: ' + (error.response?.data?.error || error.message));
+      setConfirmingClear(null);
     }
   };
 
@@ -541,14 +544,35 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Upgrade Statistics</Heading>
-                  <Button 
-                    variant="outline" 
-                    color="red"
-                    size="2" 
-                    onClick={handleClearStats}
-                  >
-                    Clear Stats
-                  </Button>
+                  {confirmingClear === 'stats' ? (
+                    <Flex gap="2" align="center">
+                      <Text size="2" color="gray">Are you sure?</Text>
+                      <Button 
+                        variant="solid" 
+                        color="red"
+                        size="2" 
+                        onClick={handleClearStats}
+                      >
+                        Confirm
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="2" 
+                        onClick={() => setConfirmingClear(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </Flex>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      color="red"
+                      size="2" 
+                      onClick={() => setConfirmingClear('stats')}
+                    >
+                      Clear Stats
+                    </Button>
+                  )}
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
@@ -603,14 +627,35 @@ function Dashboard() {
                       </Text>
                     )}
                     {totalItems > 0 && (
-                      <Button 
-                        variant="outline" 
-                        color="red"
-                        size="2" 
-                        onClick={handleClearRecentUpgrades}
-                      >
-                        Clear Recent
-                      </Button>
+                      confirmingClear === 'recent' ? (
+                        <Flex gap="2" align="center">
+                          <Text size="2" color="gray">Are you sure?</Text>
+                          <Button 
+                            variant="solid" 
+                            color="red"
+                            size="2" 
+                            onClick={handleClearRecentUpgrades}
+                          >
+                            Confirm
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="2" 
+                            onClick={() => setConfirmingClear(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </Flex>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          color="red"
+                          size="2" 
+                          onClick={() => setConfirmingClear('recent')}
+                        >
+                          Clear Recent
+                        </Button>
+                      )
                     )}
                   </Flex>
                 </Flex>

@@ -31,6 +31,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [removeInstanceError, setRemoveInstanceError] = useState<string | null>(null);
+  const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
 
   const cronPresets: Record<string, string> = {
     'every-1-min': '*/1 * * * *',
@@ -635,22 +636,45 @@ function Settings() {
 
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Clear Tags</Text>
-                                <Tooltip content="Removes the configured tag from all movies in this Radarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
-                                  <Button
-                                    variant="outline"
-                                    size="2"
-                                    color="red"
-                                    onClick={async () => {
-                                      try {
-                                        await axios.post(`/api/config/clear-tags/radarr/${instance.id}`);
-                                      } catch (error: any) {
-                                        console.error('Failed to clear tags:', error);
-                                      }
-                                    }}
-                                  >
-                                    Clear Tags
-                                  </Button>
-                                </Tooltip>
+                                {confirmingClearTags === `radarr-${instance.id}` ? (
+                                  <Flex gap="2" align="center">
+                                    <Text size="1" color="gray">Confirm?</Text>
+                                    <Button
+                                      variant="solid"
+                                      size="2"
+                                      color="red"
+                                      onClick={async () => {
+                                        try {
+                                          await axios.post(`/api/config/clear-tags/radarr/${instance.id}`);
+                                          setConfirmingClearTags(null);
+                                        } catch (error: any) {
+                                          console.error('Failed to clear tags:', error);
+                                          setConfirmingClearTags(null);
+                                        }
+                                      }}
+                                    >
+                                      Confirm
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="2"
+                                      onClick={() => setConfirmingClearTags(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </Flex>
+                                ) : (
+                                  <Tooltip content="Removes the configured tag from all movies in this Radarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
+                                    <Button
+                                      variant="outline"
+                                      size="2"
+                                      color="red"
+                                      onClick={() => setConfirmingClearTags(`radarr-${instance.id}`)}
+                                    >
+                                      Clear Tags
+                                    </Button>
+                                  </Tooltip>
+                                )}
                               </Flex>
                             </Flex>
                           </Collapsible.Content>
@@ -855,22 +879,45 @@ function Settings() {
 
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Clear Tags</Text>
-                                <Tooltip content="Removes the configured tag from all series in this Sonarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
-                                  <Button
-                                    variant="outline"
-                                    size="2"
-                                    color="red"
-                                    onClick={async () => {
-                                      try {
-                                        await axios.post(`/api/config/clear-tags/sonarr/${instance.id}`);
-                                      } catch (error: any) {
-                                        console.error('Failed to clear tags:', error);
-                                      }
-                                    }}
-                                  >
-                                    Clear Tags
-                                  </Button>
-                                </Tooltip>
+                                {confirmingClearTags === `sonarr-${instance.id}` ? (
+                                  <Flex gap="2" align="center">
+                                    <Text size="1" color="gray">Confirm?</Text>
+                                    <Button
+                                      variant="solid"
+                                      size="2"
+                                      color="red"
+                                      onClick={async () => {
+                                        try {
+                                          await axios.post(`/api/config/clear-tags/sonarr/${instance.id}`);
+                                          setConfirmingClearTags(null);
+                                        } catch (error: any) {
+                                          console.error('Failed to clear tags:', error);
+                                          setConfirmingClearTags(null);
+                                        }
+                                      }}
+                                    >
+                                      Confirm
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="2"
+                                      onClick={() => setConfirmingClearTags(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </Flex>
+                                ) : (
+                                  <Tooltip content="Removes the configured tag from all series in this Sonarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
+                                    <Button
+                                      variant="outline"
+                                      size="2"
+                                      color="red"
+                                      onClick={() => setConfirmingClearTags(`sonarr-${instance.id}`)}
+                                    >
+                                      Clear Tags
+                                    </Button>
+                                  </Tooltip>
+                                )}
                               </Flex>
                             </Flex>
                           </Collapsible.Content>
