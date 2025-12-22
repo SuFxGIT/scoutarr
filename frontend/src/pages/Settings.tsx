@@ -33,6 +33,8 @@ function Settings() {
   const [removeInstanceError, setRemoveInstanceError] = useState<string | null>(null);
 
   const cronPresets: Record<string, string> = {
+    'every-10-min': '*/10 * * * *',
+    'every-30-min': '*/30 * * * *',
     'every-hour': '0 * * * *',
     'every-6-hours': '0 */6 * * *',
     'every-12-hours': '0 */12 * * *',
@@ -1001,6 +1003,8 @@ function Settings() {
                   >
                     <Select.Trigger />
                     <Select.Content position="popper" sideOffset={5}>
+                      <Select.Item value="every-10-min">Every 10 Minutes</Select.Item>
+                      <Select.Item value="every-30-min">Every 30 Minutes</Select.Item>
                       <Select.Item value="every-hour">Every Hour</Select.Item>
                       <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>
                       <Select.Item value="every-12-hours">Every 12 Hours</Select.Item>
