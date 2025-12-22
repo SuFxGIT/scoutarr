@@ -1,12 +1,23 @@
 {
-  "totalUpgrades": 3,
+  "totalUpgrades": 4,
   "upgradesByApplication": {
-    "radarr": 3
+    "radarr": 4
   },
   "upgradesByInstance": {
-    "radarr": 3
+    "radarr": 4
   },
   "recentUpgrades": [
+    {
+      "timestamp": "2025-12-22T21:00:00.946Z",
+      "application": "radarr",
+      "count": 1,
+      "items": [
+        {
+          "id": 434,
+          "title": "Edge of Tomorrow"
+        }
+      ]
+    },
     {
       "timestamp": "2025-12-22T20:50:00.312Z",
       "application": "radarr",
@@ -41,5 +52,5 @@
       ]
     }
   ],
-  "lastUpgrade": "2025-12-22T20:50:00.312Z"
+  "lastUpgrade": "2025-12-22T21:00:00.946Z"
 }

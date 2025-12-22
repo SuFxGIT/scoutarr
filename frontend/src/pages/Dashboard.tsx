@@ -57,10 +57,11 @@ function Dashboard() {
     loadManualRun();
     loadStats();
     
-    // Poll for scheduler history and status updates every 10 seconds
+    // Poll for scheduler history, status, and stats updates every 10 seconds
     const interval = setInterval(() => {
       loadSchedulerHistory();
       loadStatus();
+      loadStats(); // Auto-refresh stats to catch scheduler-triggered upgrades
     }, 10000);
     
     return () => clearInterval(interval);
@@ -346,7 +347,9 @@ function Dashboard() {
                 {result.success ? (
                   <>
                     <Text size="2" color="gray">
-                      {title === 'Manual Run' || title === 'Automatic Run Preview Window'
+                      {title === 'Manual Run'
+                        ? `Next search ${result.count} of ${result.total} items`
+                        : title === 'Automatic Run Preview Window'
                         ? `Would search ${result.count} of ${result.total} items`
                         : `Searched ${result.searched} items`
                       }
@@ -390,14 +393,8 @@ function Dashboard() {
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
         <Card style={{ padding: '0.5rem' }}>
-          <Flex direction="column" gap="1" align="center">
-            <Flex align="center" justify="between" style={{ width: '100%', marginBottom: '-0.25rem' }}>
-              <div style={{ flex: 1 }}></div>
-              <Button variant="ghost" size="1" onClick={loadStatus}>
-                <ReloadIcon /> Refresh
-              </Button>
-            </Flex>
-            <Flex gap="2" wrap="wrap" justify="center" style={{ margin: 0, padding: 0, width: '100%' }}>
+          <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
+            <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
               {Object.entries(connectionStatus)
                 .filter(([app]) => app !== 'scheduler') // Exclude scheduler from connection status
                 .map(([app, status]: [string, any]) => {
@@ -449,6 +446,9 @@ function Dashboard() {
                 </Badge>
               )}
             </Flex>
+            <Button variant="ghost" size="1" onClick={loadStatus}>
+              <ReloadIcon /> Refresh
+            </Button>
           </Flex>
         </Card>
 
