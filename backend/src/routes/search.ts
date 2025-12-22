@@ -1,0 +1,327 @@
+import express from 'express';
+import { configService } from '../services/configService.js';
+import { radarrService } from '../services/radarrService.js';
+import { sonarrService } from '../services/sonarrService.js';
+import { statsService } from '../services/statsService.js';
+import logger from '../utils/logger.js';
+
+export const searchRouter = express.Router();
+
+// Helper function to randomly select items (matching script behavior)
+function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
+  if (count === 'max' || count === 'MAX') {
+    return items;
+  }
+  if (typeof count === 'number' && count >= items.length) {
+    return items;
+  }
+  if (items.length === 0) {
+    return items;
+  }
+  // Shuffle and take first count items (simulating Get-Random behavior)
+  const shuffled = [...items].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+// Common interface for processing applications
+interface ApplicationProcessor<TMedia> {
+  name: string;
+  config: any;
+  getMedia: (config: any) => Promise<TMedia[]>;
+  filterMedia: (config: any, media: TMedia[], unattended: boolean) => Promise<TMedia[]>;
+  searchMedia: (config: any, mediaIds: number[]) => Promise<void>;
+  searchMediaOneByOne: boolean;
+  getTagId: (config: any, tagName: string) => Promise<number | null>;
+  addTag: (config: any, mediaIds: number[], tagId: number) => Promise<void>;
+  removeTag: (config: any, mediaIds: number[], tagId: number) => Promise<void>;
+  getMediaId: (media: TMedia) => number;
+  getMediaTitle: (media: TMedia) => string;
+}
+
+// Generic function to process an application
+export async function processApplication<TMedia>(
+  processor: ApplicationProcessor<TMedia>
+): Promise<{ success: boolean; searched: number; items: Array<{ id: number; title: string }>; error?: string }> {
+  try {
+    logger.info(`Processing ${processor.name} search`, {
+      count: processor.config.count,
+      tagName: processor.config.tagName,
+      unattended: processor.config.unattended
+    });
+
+    let allMedia = await processor.getMedia(processor.config);
+    logger.debug(`📥 Fetched ${processor.name} media`, { total: allMedia.length });
+
+    let filtered = await processor.filterMedia(processor.config, allMedia, processor.config.unattended);
+    logger.debug(`🔽 Filtered ${processor.name} media`, {
+      total: allMedia.length,
+      filtered: filtered.length,
+      unattended: processor.config.unattended
+    });
+
+    // Unattended mode: if no media found, remove tag from all and re-filter
+    if (processor.config.unattended && filtered.length === 0) {
+      logger.info(`🔄 Unattended mode: No media found, removing tag from all ${processor.name} and re-filtering`);
+      const tagId = await processor.getTagId(processor.config, processor.config.tagName);
+      if (tagId !== null) {
+        const mediaWithTag = allMedia.filter(
+          m => m.monitored === processor.config.monitored && m.tags.includes(tagId)
+        );
+        if (mediaWithTag.length > 0) {
+          const mediaIds = mediaWithTag.map(processor.getMediaId);
+          await processor.removeTag(processor.config, mediaIds, tagId);
+          logger.debug(`🏷️  Removed tag from ${processor.name}`, { count: mediaIds.length });
+
+          // Re-fetch and re-filter
+          allMedia = await processor.getMedia(processor.config);
+          filtered = await processor.filterMedia(processor.config, allMedia, false);
+          logger.debug(`🔄 Re-filtered ${processor.name} after tag removal`, {
+            total: allMedia.length,
+            filtered: filtered.length
+          });
+        }
+      }
+    }
+
+    if (filtered.length === 0) {
+      logger.warn(`⚠️  No ${processor.name} found matching criteria`);
+      return {
+        success: true,
+        searched: 0,
+        items: []
+      };
+    }
+
+    // Select random media based on count
+    const toSearch = randomSelect(filtered, processor.config.count);
+    logger.debug(`🎲 Selected ${processor.name} to search`, {
+      selected: toSearch.length,
+      available: filtered.length,
+      count: processor.config.count
+    });
+
+    // Search media
+    const mediaIds = toSearch.map(processor.getMediaId);
+    if (processor.searchMediaOneByOne) {
+      // Search one at a time (Sonarr/Lidarr/Readarr)
+      for (const media of toSearch) {
+        logger.debug(`🔎 Searching ${processor.name}`, {
+          id: processor.getMediaId(media),
+          title: processor.getMediaTitle(media)
+        });
+        await processor.searchMedia(processor.config, [processor.getMediaId(media)]);
+      }
+    } else {
+      // Search all at once (Radarr)
+      await processor.searchMedia(processor.config, mediaIds);
+      logger.debug(`🔎 Triggered search for ${processor.name}`, { mediaIds, count: mediaIds.length });
+    }
+
+    // Add tag using editor endpoint
+    const tagId = await processor.getTagId(processor.config, processor.config.tagName);
+    if (tagId !== null && mediaIds.length > 0) {
+      await processor.addTag(processor.config, mediaIds, tagId);
+      logger.debug(`🏷️  Tagged ${processor.name}`, { mediaIds, tagId, count: mediaIds.length });
+    }
+
+    const items = toSearch.map(m => ({
+      id: processor.getMediaId(m),
+      title: processor.getMediaTitle(m)
+    }));
+
+    logger.info(`✅ ${processor.name} search completed`, {
+      searched: toSearch.length,
+      items: toSearch.map(processor.getMediaTitle)
+    });
+
+    return {
+      success: true,
+      searched: toSearch.length,
+      items
+    };
+  } catch (error: any) {
+    logger.error(`❌ ${processor.name} search failed`, {
+      error: error.message,
+      stack: error.stack
+    });
+    return {
+      success: false,
+      searched: 0,
+      items: [],
+      error: error.message
+    };
+  }
+}
+
+// Run search for enabled applications
+searchRouter.post('/run', async (req, res) => {
+  logger.info('🔍 Starting search operation');
+  try {
+    const config = configService.getConfig();
+    const results: Record<string, any> = {};
+
+    // Process Radarr
+    if (config.applications.radarr.enabled) {
+      const result = await processApplication({
+        name: 'Radarr',
+        config: config.applications.radarr,
+        getMedia: radarrService.getMovies.bind(radarrService),
+        filterMedia: radarrService.filterMovies.bind(radarrService),
+        searchMedia: radarrService.searchMovies.bind(radarrService),
+        searchMediaOneByOne: false,
+        getTagId: radarrService.getTagId.bind(radarrService),
+        addTag: radarrService.addTagToMovies.bind(radarrService),
+        removeTag: radarrService.removeTagFromMovies.bind(radarrService),
+        getMediaId: (m) => m.id,
+        getMediaTitle: (m) => m.title
+      });
+      results.radarr = {
+        ...result,
+        movies: result.items
+      };
+    }
+
+    // Process Sonarr
+    if (config.applications.sonarr.enabled) {
+      const result = await processApplication({
+        name: 'Sonarr',
+        config: config.applications.sonarr,
+        getMedia: sonarrService.getSeries.bind(sonarrService),
+        filterMedia: sonarrService.filterSeries.bind(sonarrService),
+        searchMedia: async (cfg, seriesIds) => {
+          // Sonarr only supports one at a time - this is called per-item in processApplication
+          if (seriesIds.length > 0) {
+            await sonarrService.searchSeries(cfg, seriesIds[0]);
+          }
+        },
+        searchMediaOneByOne: true,
+        getTagId: sonarrService.getTagId.bind(sonarrService),
+        addTag: sonarrService.addTagToSeries.bind(sonarrService),
+        removeTag: sonarrService.removeTagFromSeries.bind(sonarrService),
+        getMediaId: (s) => s.id,
+        getMediaTitle: (s) => s.title
+      });
+      results.sonarr = {
+        ...result,
+        series: result.items
+      };
+    }
+
+    logger.info('🎉 Search operation completed', {
+      results: Object.keys(results).map(app => ({
+        app,
+        success: results[app].success,
+        count: results[app].searched || 0
+      }))
+    });
+
+    // Save stats for successful searches
+    for (const [app, result] of Object.entries(results)) {
+      if (result.success && result.searched && result.searched > 0) {
+        const items = result.movies || result.series || result.items || [];
+        await statsService.addUpgrade(app, result.searched, items);
+      }
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    logger.error('❌ Search operation failed', {
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper function for dry-run
+async function processDryRun<TMedia>(
+  name: string,
+  config: any,
+  getMedia: (config: any) => Promise<TMedia[]>,
+  filterMedia: (config: any, media: TMedia[], unattended: boolean) => Promise<TMedia[]>,
+  getMediaId: (media: TMedia) => number,
+  getMediaTitle: (media: TMedia) => string
+): Promise<{ success: boolean; count: number; total: number; items: Array<{ id: number; title: string }>; error?: string }> {
+  try {
+    logger.debug(`Dry-run: Processing ${name}`, {
+      count: config.count,
+      unattended: config.unattended
+    });
+    const media = await getMedia(config);
+    const filtered = await filterMedia(config, media, config.unattended);
+    const toSearch = randomSelect(filtered, config.count);
+
+    logger.debug(`Dry-run: ${name} results`, {
+      total: media.length,
+      filtered: filtered.length,
+      toSearch: toSearch.length
+    });
+
+    return {
+      success: true,
+      count: toSearch.length,
+      total: filtered.length,
+      items: toSearch.map(m => ({ id: getMediaId(m), title: getMediaTitle(m) }))
+    };
+  } catch (error: any) {
+    logger.error(`Dry-run: ${name} failed`, { error: error.message });
+    return {
+      success: false,
+      count: 0,
+      total: 0,
+      items: [],
+      error: error.message
+    };
+  }
+}
+
+// Get items that would be searched (dry run)
+searchRouter.post('/dry-run', async (req, res) => {
+  logger.info('👀 Starting dry-run preview');
+  try {
+    const config = configService.getConfig();
+    const results: Record<string, any> = {};
+
+    // Process Radarr
+    if (config.applications.radarr.enabled) {
+      const result = await processDryRun(
+        'Radarr',
+        config.applications.radarr,
+        radarrService.getMovies.bind(radarrService),
+        radarrService.filterMovies.bind(radarrService),
+        (m) => m.id,
+        (m) => m.title
+      );
+      results.radarr = {
+        ...result,
+        movies: result.items
+      };
+    }
+
+    // Process Sonarr
+    if (config.applications.sonarr.enabled) {
+      const result = await processDryRun(
+        'Sonarr',
+        config.applications.sonarr,
+        sonarrService.getSeries.bind(sonarrService),
+        sonarrService.filterSeries.bind(sonarrService),
+        (s) => s.id,
+        (s) => s.title
+      );
+      results.sonarr = {
+        ...result,
+        series: result.items
+      };
+    }
+
+    logger.info('✅ Dry-run preview completed');
+    res.json(results);
+  } catch (error: any) {
+    logger.error('❌ Dry-run operation failed', {
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ error: error.message });
+  }
+});
+

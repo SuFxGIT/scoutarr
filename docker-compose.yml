@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  scoutarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scoutarr
+    restart: unless-stopped
+    ports:
+      - "5839:5839"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=5839
+    networks:
+      - scoutarr-network
+
+networks:
+  scoutarr-network:
+    driver: bridge
+
