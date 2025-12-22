@@ -32,3 +32,6 @@ data/
 logs/
 *.log
 
+# Reference files
+reference/
+
