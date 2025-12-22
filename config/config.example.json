@@ -6,7 +6,6 @@
   },
   "applications": {
     "radarr": {
-      "enabled": false,
       "url": "",
       "apiKey": "",
       "count": 10,
@@ -18,7 +17,6 @@
       "unattended": false
     },
     "sonarr": {
-      "enabled": false,
       "url": "",
       "apiKey": "",
       "count": 5,
@@ -30,7 +28,6 @@
       "unattended": false
     },
     "lidarr": {
-      "enabled": false,
       "url": "",
       "apiKey": "",
       "count": 5,
@@ -42,7 +39,6 @@
       "unattended": false
     },
     "readarr": {
-      "enabled": false,
       "url": "",
       "apiKey": "",
       "count": 5,

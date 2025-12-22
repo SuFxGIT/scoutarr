@@ -31,6 +31,7 @@ function Settings() {
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
+  const [removeInstanceError, setRemoveInstanceError] = useState<string | null>(null);
 
   const cronPresets: Record<string, string> = {
     'every-hour': '0 * * * *',
@@ -107,8 +108,8 @@ function Settings() {
   };
 
 
-  // Helper to get next available instance ID for an app
-  const getNextInstanceId = (app: 'radarr' | 'sonarr', instances: any[]): number => {
+  // Helper to get next available instance ID
+  const getNextInstanceId = (_app: 'radarr' | 'sonarr', instances: any[]): number => {
     const existingIds = instances
       .map(inst => inst.instanceId)
       .filter(id => typeof id === 'number')
@@ -253,9 +254,11 @@ function Settings() {
     if (!config) return;
     const instances = getInstances(app);
     if (instances.length <= 1) {
-      alert('You must have at least one instance');
+      setRemoveInstanceError('You must have at least one instance');
+      setTimeout(() => setRemoveInstanceError(null), 5000);
       return;
     }
+    setRemoveInstanceError(null);
     const updatedInstances = instances.filter(inst => inst.id !== instanceId);
     setConfig({
       ...config,
@@ -264,37 +267,6 @@ function Settings() {
         [app]: updatedInstances
       }
     });
-  };
-
-  const updateAppConfig = (app: keyof Config['applications'], field: string, value: any) => {
-    if (!config) return;
-    // For radarr/sonarr, use instance-based updates if it's an array
-    if ((app === 'radarr' || app === 'sonarr') && Array.isArray(config.applications[app])) {
-      // This is for backward compatibility - update first instance
-      const instances = config.applications[app] as any[];
-      if (instances.length > 0) {
-        updateInstanceConfig(app, instances[0].id, field, value);
-      }
-      return;
-    }
-    
-    setConfig({
-      ...config,
-      applications: {
-        ...config.applications,
-        [app]: {
-          ...config.applications[app],
-          [field]: value
-        }
-      }
-    });
-    // Clear test result when config changes
-    if (field === 'url' || field === 'apiKey' || field === 'enabled') {
-      setTestResults(prev => ({
-        ...prev,
-        [app]: { status: null, testing: false }
-      }));
-    }
   };
 
   const updateNotificationConfig = (field: string, value: string) => {
@@ -435,6 +407,12 @@ function Settings() {
         {saveMessage && (
           <Callout.Root color={saveMessage.type === 'success' ? 'green' : 'red'}>
             <Callout.Text>{saveMessage.text}</Callout.Text>
+          </Callout.Root>
+        )}
+
+        {removeInstanceError && (
+          <Callout.Root color="red" size="1">
+            <Callout.Text>{removeInstanceError}</Callout.Text>
           </Callout.Root>
         )}
 
@@ -586,10 +564,12 @@ function Settings() {
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Search Monitored Movies Only</Text>
                                 <Tooltip content="When enabled, only movies that are currently monitored will be considered for upgrades.">
-                                  <Switch
-                                    checked={instance.monitored ?? true}
-                                    onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'monitored', checked)}
-                                  />
+                                  <span>
+                                    <Switch
+                                      checked={instance.monitored ?? true}
+                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'monitored', checked)}
+                                    />
+                                  </span>
                                 </Tooltip>
                               </Flex>
 
@@ -623,10 +603,12 @@ function Settings() {
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Unattended Mode</Text>
                                 <Tooltip content="When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.">
-                                  <Switch
-                                    checked={instance.unattended ?? false}
-                                    onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'unattended', checked)}
-                                  />
+                                  <span>
+                                    <Switch
+                                      checked={instance.unattended ?? false}
+                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'unattended', checked)}
+                                    />
+                                  </span>
                                 </Tooltip>
                               </Flex>
                             </Flex>
@@ -763,10 +745,12 @@ function Settings() {
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Search Monitored Series Only</Text>
                                 <Tooltip content="When enabled, only series that are currently monitored will be considered for upgrades.">
-                                  <Switch
-                                    checked={instance.monitored ?? true}
-                                    onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'monitored', checked)}
-                                  />
+                                  <span>
+                                    <Switch
+                                      checked={instance.monitored ?? true}
+                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'monitored', checked)}
+                                    />
+                                  </span>
                                 </Tooltip>
                               </Flex>
 
@@ -801,10 +785,12 @@ function Settings() {
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Unattended Mode</Text>
                                 <Tooltip content="When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.">
-                                  <Switch
-                                    checked={instance.unattended ?? false}
-                                    onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'unattended', checked)}
-                                  />
+                                  <span>
+                                    <Switch
+                                      checked={instance.unattended ?? false}
+                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'unattended', checked)}
+                                    />
+                                  </span>
                                 </Tooltip>
                               </Flex>
                             </Flex>

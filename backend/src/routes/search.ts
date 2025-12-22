@@ -4,6 +4,7 @@ import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { statsService } from '../services/statsService.js';
 import logger from '../utils/logger.js';
+import { getConfiguredInstances } from '../utils/starrUtils.js';
 
 export const searchRouter = express.Router();
 
@@ -160,10 +161,8 @@ searchRouter.post('/run', async (req, res) => {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
 
-    // Process Radarr - handle both array (new) and single (legacy)
-    const radarrInstances = Array.isArray(config.applications.radarr) 
-      ? config.applications.radarr.filter(inst => inst.url && inst.apiKey)
-      : (config.applications.radarr.url && config.applications.radarr.apiKey ? [config.applications.radarr] : []);
+    // Process Radarr
+    const radarrInstances = getConfiguredInstances(config.applications.radarr);
     
     for (const radarrConfig of radarrInstances) {
       const instanceName = (radarrConfig as any).name || 'Radarr';
@@ -189,10 +188,8 @@ searchRouter.post('/run', async (req, res) => {
       };
     }
 
-    // Process Sonarr - handle both array (new) and single (legacy)
-    const sonarrInstances = Array.isArray(config.applications.sonarr)
-      ? config.applications.sonarr.filter(inst => inst.url && inst.apiKey)
-      : (config.applications.sonarr.url && config.applications.sonarr.apiKey ? [config.applications.sonarr] : []);
+    // Process Sonarr
+    const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
     
     for (const sonarrConfig of sonarrInstances) {
       const instanceName = (sonarrConfig as any).name || 'Sonarr';
@@ -257,8 +254,8 @@ searchRouter.post('/run', async (req, res) => {
   }
 });
 
-// Helper function for dry-run
-async function processDryRun<TMedia>(
+// Helper function for manual run preview
+async function processManualRun<TMedia>(
   name: string,
   config: any,
   getMedia: (config: any) => Promise<TMedia[]>,
@@ -267,7 +264,7 @@ async function processDryRun<TMedia>(
   getMediaTitle: (media: TMedia) => string
 ): Promise<{ success: boolean; count: number; total: number; items: Array<{ id: number; title: string }>; error?: string }> {
   try {
-    logger.debug(`Dry-run: Processing ${name}`, {
+    logger.debug(`Manual run preview: Processing ${name}`, {
       count: config.count,
       unattended: config.unattended
     });
@@ -275,7 +272,7 @@ async function processDryRun<TMedia>(
     const filtered = await filterMedia(config, media, config.unattended);
     const toSearch = randomSelect(filtered, config.count);
 
-    logger.debug(`Dry-run: ${name} results`, {
+    logger.debug(`Manual run preview: ${name} results`, {
       total: media.length,
       filtered: filtered.length,
       toSearch: toSearch.length
@@ -288,7 +285,7 @@ async function processDryRun<TMedia>(
       items: toSearch.map(m => ({ id: getMediaId(m), title: getMediaTitle(m) }))
     };
   } catch (error: any) {
-    logger.error(`Dry-run: ${name} failed`, { error: error.message });
+    logger.error(`Manual run preview: ${name} failed`, { error: error.message });
     return {
       success: false,
       count: 0,
@@ -299,22 +296,20 @@ async function processDryRun<TMedia>(
   }
 }
 
-// Get items that would be searched (dry run)
-searchRouter.post('/dry-run', async (req, res) => {
-  logger.info('👀 Starting dry-run preview');
+// Get items that would be searched (manual run preview)
+searchRouter.post('/manual-run', async (req, res) => {
+  logger.info('👀 Starting manual run preview');
   try {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
 
-    // Process Radarr - handle both array (new) and single (legacy)
-    const radarrInstances = Array.isArray(config.applications.radarr) 
-      ? config.applications.radarr.filter(inst => inst.url && inst.apiKey)
-      : (config.applications.radarr.url && config.applications.radarr.apiKey ? [config.applications.radarr] : []);
+    // Process Radarr
+    const radarrInstances = getConfiguredInstances(config.applications.radarr);
     
     for (const radarrConfig of radarrInstances) {
       const instanceName = (radarrConfig as any).name || 'Radarr';
       const instanceId = (radarrConfig as any).id || 'radarr-1';
-      const result = await processDryRun(
+      const result = await processManualRun(
         instanceName,
         radarrConfig,
         radarrService.getMovies.bind(radarrService),
@@ -330,15 +325,13 @@ searchRouter.post('/dry-run', async (req, res) => {
       };
     }
 
-    // Process Sonarr - handle both array (new) and single (legacy)
-    const sonarrInstances = Array.isArray(config.applications.sonarr)
-      ? config.applications.sonarr.filter(inst => inst.url && inst.apiKey)
-      : (config.applications.sonarr.url && config.applications.sonarr.apiKey ? [config.applications.sonarr] : []);
+    // Process Sonarr
+    const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
     
     for (const sonarrConfig of sonarrInstances) {
       const instanceName = (sonarrConfig as any).name || 'Sonarr';
       const instanceId = (sonarrConfig as any).id || 'sonarr-1';
-      const result = await processDryRun(
+      const result = await processManualRun(
         instanceName,
         sonarrConfig,
         sonarrService.getSeries.bind(sonarrService),
@@ -354,10 +347,10 @@ searchRouter.post('/dry-run', async (req, res) => {
       };
     }
 
-    logger.info('✅ Dry-run preview completed');
+    logger.info('✅ Manual run preview completed');
     res.json(results);
   } catch (error: any) {
-    logger.error('❌ Dry-run operation failed', {
+    logger.error('❌ Manual run preview failed', {
       error: error.message,
       stack: error.stack
     });

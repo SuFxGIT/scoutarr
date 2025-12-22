@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Flex, Container, Heading, Button, Separator } from '@radix-ui/themes';
+import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import { GearIcon, HomeIcon } from '@radix-ui/react-icons';

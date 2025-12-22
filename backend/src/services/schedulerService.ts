@@ -4,6 +4,8 @@ import logger from '../utils/logger.js';
 import { radarrService } from './radarrService.js';
 import { sonarrService } from './sonarrService.js';
 import { statsService } from './statsService.js';
+import { getConfiguredInstances } from '../utils/starrUtils.js';
+import { processApplication } from '../routes/search.js';
 
 class SchedulerService {
   private task: cron.ScheduledTask | null = null;
@@ -37,16 +39,11 @@ class SchedulerService {
       logger.info('⏰ Scheduled search triggered', { schedule });
 
       try {
-        // Import and use the processApplication function directly
-        const searchModule = await import('../routes/search.js');
-        const processApplication = searchModule.processApplication;
         const config = configService.getConfig();
         const results: Record<string, any> = {};
 
-        // Process Radarr - handle both array (new) and single (legacy)
-        const radarrInstances = Array.isArray(config.applications.radarr) 
-          ? config.applications.radarr.filter(inst => inst.url && inst.apiKey)
-          : (config.applications.radarr.url && config.applications.radarr.apiKey ? [config.applications.radarr] : []);
+        // Process Radarr
+        const radarrInstances = getConfiguredInstances(config.applications.radarr);
         
         for (const radarrConfig of radarrInstances) {
           const instanceName = (radarrConfig as any).name || 'Radarr';
@@ -72,10 +69,8 @@ class SchedulerService {
           };
         }
 
-        // Process Sonarr - handle both array (new) and single (legacy)
-        const sonarrInstances = Array.isArray(config.applications.sonarr)
-          ? config.applications.sonarr.filter(inst => inst.url && inst.apiKey)
-          : (config.applications.sonarr.url && config.applications.sonarr.apiKey ? [config.applications.sonarr] : []);
+        // Process Sonarr
+        const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
         
         for (const sonarrConfig of sonarrInstances) {
           const instanceName = (sonarrConfig as any).name || 'Sonarr';

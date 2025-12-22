@@ -1,6 +1,13 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from './logger.js';
 
+// Helper to get configured instances for an app (handles both array and single legacy format)
+export function getConfiguredInstances<T>(appConfig: T[] | any): T[] {
+  return Array.isArray(appConfig)
+    ? appConfig.filter((inst: any) => inst.url && inst.apiKey)
+    : (appConfig?.url && appConfig?.apiKey ? [appConfig] : []);
+}
+
 /**
  * Creates an axios client for Starr API calls
  */

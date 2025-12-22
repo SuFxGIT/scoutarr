@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { 
   Flex, 
-  Container, 
   Heading, 
   Button, 
   Card, 
   Text, 
   Badge,
   Separator,
-  AlertDialog,
   Callout
 } from '@radix-ui/themes';
 import { PlayIcon, ReloadIcon, CheckIcon, CrossCircledIcon } from '@radix-ui/react-icons';
@@ -42,14 +40,15 @@ interface Stats {
 
 function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
-  const [dryRunResults, setDryRunResults] = useState<SearchResults | null>(null);
+  const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
   const [lastRunResults, setLastRunResults] = useState<SearchResults | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Stats | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatus();
-    loadDryRun();
+    loadManualRun();
     loadStats();
   }, []);
 
@@ -62,12 +61,12 @@ function Dashboard() {
     }
   };
 
-  const loadDryRun = async () => {
+  const loadManualRun = async () => {
     try {
-      const response = await axios.post('/api/search/dry-run'); // Manual Run
-      setDryRunResults(response.data);
+      const response = await axios.post('/api/search/manual-run');
+      setManualRunResults(response.data);
     } catch (error) {
-      console.error('Failed to load dry run:', error);
+      console.error('Failed to load manual run preview:', error);
     }
   };
 
@@ -85,11 +84,12 @@ function Dashboard() {
     try {
       const response = await axios.post('/api/search/run');
       setLastRunResults(response.data);
-      await loadDryRun(); // Refresh dry run after actual run
+      await loadManualRun(); // Refresh manual run preview after actual run
       await loadStats(); // Refresh stats after actual run
+      setErrorMessage(null);
     } catch (error: any) {
       console.error('Search failed:', error);
-      alert('Search failed: ' + (error.response?.data?.error || error.message));
+      setErrorMessage('Search failed: ' + (error.response?.data?.error || error.message));
     } finally {
       setIsRunning(false);
     }
@@ -114,7 +114,7 @@ function Dashboard() {
               <Button 
                 variant="outline" 
                 size="3" 
-                onClick={loadDryRun}
+                onClick={loadManualRun}
               >
                 <ReloadIcon /> Refresh Preview
               </Button>
@@ -309,7 +309,7 @@ function Dashboard() {
           </Card>
         )}
 
-        {renderResults(dryRunResults, 'Manual Run')}
+        {renderResults(manualRunResults, 'Manual Run')}
         {renderResults(lastRunResults, 'Last Run Results')}
       </Flex>
     </div>
