@@ -1,5 +1,34 @@
 {
-  "totalUpgrades": 0,
-  "upgradesByApplication": {},
-  "recentUpgrades": []
+  "totalUpgrades": 2,
+  "upgradesByApplication": {
+    "radarr": 2
+  },
+  "upgradesByInstance": {
+    "radarr": 2
+  },
+  "recentUpgrades": [
+    {
+      "timestamp": "2025-12-22T20:40:00.348Z",
+      "application": "radarr",
+      "count": 1,
+      "items": [
+        {
+          "id": 417,
+          "title": "Bullet Train"
+        }
+      ]
+    },
+    {
+      "timestamp": "2025-12-22T20:33:09.740Z",
+      "application": "radarr",
+      "count": 1,
+      "items": [
+        {
+          "id": 419,
+          "title": "Dunkirk"
+        }
+      ]
+    }
+  ],
+  "lastUpgrade": "2025-12-22T20:40:00.348Z"
 }

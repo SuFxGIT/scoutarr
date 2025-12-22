@@ -113,6 +113,28 @@ async function processAppInstances<T>(
   }
 }
 
+// Shared function to execute search run (used by both manual and scheduled runs)
+export async function executeSearchRun(): Promise<Record<string, any>> {
+  const config = configService.getConfig();
+  const results: Record<string, any> = {};
+  
+  // Use scheduler's unattended mode setting
+  const unattended = config.scheduler?.unattended || false;
+
+  // Process Radarr
+  const radarrInstances = getConfiguredInstances(config.applications.radarr);
+  await processAppInstances(radarrInstances, 'radarr', createRadarrProcessor, results, unattended);
+
+  // Process Sonarr
+  const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
+  await processAppInstances(sonarrInstances, 'sonarr', createSonarrProcessor, results, unattended);
+
+  // Save stats for successful searches
+  await saveStatsForResults(results);
+
+  return results;
+}
+
 // Common interface for processing applications
 interface ApplicationProcessor<TMedia> {
   name: string;
@@ -247,16 +269,7 @@ export async function processApplication<TMedia>(
 searchRouter.post('/run', async (req, res) => {
   logger.info('🔍 Starting search operation');
   try {
-    const config = configService.getConfig();
-    const results: Record<string, any> = {};
-
-    // Process Radarr
-    const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    await processAppInstances(radarrInstances, 'radarr', createRadarrProcessor, results);
-
-    // Process Sonarr
-    const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    await processAppInstances(sonarrInstances, 'sonarr', createSonarrProcessor, results);
+    const results = await executeSearchRun();
 
     logger.info('🎉 Search operation completed', {
       results: Object.keys(results).map(app => ({
@@ -265,9 +278,6 @@ searchRouter.post('/run', async (req, res) => {
         count: results[app].searched || 0
       }))
     });
-
-    // Save stats for successful searches
-    await saveStatsForResults(results);
 
     res.json(results);
   } catch (error: any) {

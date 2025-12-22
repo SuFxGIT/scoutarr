@@ -57,7 +57,17 @@ class StatsService {
   async loadStats(): Promise<Stats> {
     try {
       const content = await fs.readFile(STATS_FILE, 'utf-8');
-      this.stats = JSON.parse(content) as Stats;
+      const loaded = JSON.parse(content) as Stats;
+      
+      // Ensure all required properties exist (migration for old stats files)
+      this.stats = {
+        totalUpgrades: loaded.totalUpgrades || 0,
+        upgradesByApplication: loaded.upgradesByApplication || {},
+        upgradesByInstance: loaded.upgradesByInstance || {},
+        recentUpgrades: loaded.recentUpgrades || [],
+        lastUpgrade: loaded.lastUpgrade
+      };
+      
       return this.stats;
     } catch (error: any) {
       // If file doesn't exist, create default
@@ -78,6 +88,18 @@ class StatsService {
   async addUpgrade(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
     try {
       const stats = await this.loadStats();
+      
+      // Ensure properties exist (defensive check)
+      if (!stats.upgradesByApplication) {
+        stats.upgradesByApplication = {};
+      }
+      if (!stats.upgradesByInstance) {
+        stats.upgradesByInstance = {};
+      }
+      if (!stats.recentUpgrades) {
+        stats.recentUpgrades = [];
+      }
+      
       const entry: UpgradeEntry = {
         timestamp: new Date().toISOString(),
         application: application.toLowerCase(),
@@ -86,7 +108,7 @@ class StatsService {
         items
       };
 
-      stats.totalUpgrades += count;
+      stats.totalUpgrades = (stats.totalUpgrades || 0) + count;
       const appKey = application.toLowerCase();
       stats.upgradesByApplication[appKey] = 
         (stats.upgradesByApplication[appKey] || 0) + count;

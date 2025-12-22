@@ -68,12 +68,35 @@ statusRouter.get('/', async (req, res) => {
     status.scheduler = {
       enabled: config.scheduler?.enabled || false,
       running: schedulerStatus.running,
-      schedule: schedulerStatus.schedule
+      schedule: schedulerStatus.schedule,
+      nextRun: schedulerStatus.nextRun
     };
 
     res.json(status);
   } catch (error: any) {
     logger.error('❌ Status check failed', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get scheduler run history
+statusRouter.get('/scheduler/history', async (req, res) => {
+  try {
+    const history = schedulerService.getHistory();
+    res.json(history);
+  } catch (error: any) {
+    logger.error('❌ Failed to get scheduler history', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear scheduler run history
+statusRouter.post('/scheduler/history/clear', async (req, res) => {
+  try {
+    schedulerService.clearHistory();
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('❌ Failed to clear scheduler history', { error: error.message });
     res.status(500).json({ error: error.message });
   }
 });

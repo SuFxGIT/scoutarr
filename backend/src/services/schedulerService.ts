@@ -1,22 +1,25 @@
 import cron from 'node-cron';
+import { createRequire } from 'module';
 import { configService } from './configService.js';
 import logger from '../utils/logger.js';
-import { radarrService } from './radarrService.js';
-import { sonarrService } from './sonarrService.js';
-import { statsService } from './statsService.js';
-import { getConfiguredInstances } from '../utils/starrUtils.js';
-import { 
-  processApplication, 
-  createRadarrProcessor, 
-  createSonarrProcessor,
-  getResultKey,
-  getInstanceInfo,
-  saveStatsForResults
-} from '../routes/search.js';
+import { executeSearchRun } from '../routes/search.js';
+
+// cron-parser is a CommonJS module, use createRequire to import it
+const require = createRequire(import.meta.url);
+const { parseExpression } = require('cron-parser');
+
+interface SchedulerRunHistory {
+  timestamp: string;
+  results: Record<string, any>;
+  success: boolean;
+  error?: string;
+}
 
 class SchedulerService {
   private task: cron.ScheduledTask | null = null;
   private isRunning = false;
+  private runHistory: SchedulerRunHistory[] = [];
+  private maxHistorySize = 100;
 
   async initialize(): Promise<void> {
     const config = configService.getConfig();
@@ -46,42 +49,16 @@ class SchedulerService {
       logger.info('⏰ Scheduled search triggered', { schedule });
 
       try {
-        const config = configService.getConfig();
-        const results: Record<string, any> = {};
+        // Call the same function that the "Run Search" button uses
+        const results = await executeSearchRun();
 
-        // Process Radarr (use scheduler's unattended setting)
-        const radarrInstances = getConfiguredInstances(config.applications.radarr);
-        const unattended = config.scheduler?.unattended || false;
-        for (const radarrConfig of radarrInstances) {
-          const { instanceName, instanceId } = getInstanceInfo(radarrConfig, 'radarr');
-          const unattendedConfig = { ...radarrConfig, unattended };
-          const processor = createRadarrProcessor(instanceName, unattendedConfig);
-          const result = await processApplication(processor);
-          const resultKey = getResultKey(instanceId, 'radarr', radarrInstances.length);
-          results[resultKey] = {
-            ...result,
-            movies: result.items,
-            instanceName
-          };
-        }
-
-        // Process Sonarr (use scheduler's unattended setting)
-        const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-        for (const sonarrConfig of sonarrInstances) {
-          const { instanceName, instanceId } = getInstanceInfo(sonarrConfig, 'sonarr');
-          const unattendedConfig = { ...sonarrConfig, unattended };
-          const processor = createSonarrProcessor(instanceName, unattendedConfig);
-          const result = await processApplication(processor);
-          const resultKey = getResultKey(instanceId, 'sonarr', sonarrInstances.length);
-          results[resultKey] = {
-            ...result,
-            series: result.items,
-            instanceName
-          };
-        }
-
-        // Save stats for successful searches
-        await saveStatsForResults(results);
+        // Store in history
+        const historyEntry: SchedulerRunHistory = {
+          timestamp: new Date().toISOString(),
+          results,
+          success: true
+        };
+        this.addToHistory(historyEntry);
 
         logger.info('✅ Scheduled search completed', { 
           results: Object.keys(results).map(app => ({
@@ -91,6 +68,15 @@ class SchedulerService {
           }))
         });
       } catch (error: any) {
+        // Store error in history
+        const historyEntry: SchedulerRunHistory = {
+          timestamp: new Date().toISOString(),
+          results: {},
+          success: false,
+          error: error.message
+        };
+        this.addToHistory(historyEntry);
+
         logger.error('❌ Scheduled search failed', { 
           error: error.message,
           stack: error.stack
@@ -123,10 +109,45 @@ class SchedulerService {
     }
   }
 
-  getStatus(): { running: boolean; schedule: string | null } {
+  private addToHistory(entry: SchedulerRunHistory): void {
+    this.runHistory.unshift(entry);
+    if (this.runHistory.length > this.maxHistorySize) {
+      this.runHistory = this.runHistory.slice(0, this.maxHistorySize);
+    }
+  }
+
+  getHistory(): SchedulerRunHistory[] {
+    return [...this.runHistory];
+  }
+
+  clearHistory(): void {
+    this.runHistory = [];
+  }
+
+  getNextRunTime(schedule: string): Date | null {
+    if (!schedule) {
+      return null;
+    }
+
+    try {
+      const interval = parseExpression(schedule, {
+        tz: 'UTC'
+      });
+      return interval.next().toDate();
+    } catch (error: any) {
+      logger.debug('Could not parse cron for next run time', { schedule, error: error.message });
+      return null;
+    }
+  }
+
+  getStatus(): { running: boolean; schedule: string | null; nextRun: string | null } {
+    const schedule = configService.getConfig().scheduler?.schedule || null;
+    const nextRun = schedule ? this.getNextRunTime(schedule) : null;
+    
     return {
       running: this.task !== null,
-      schedule: configService.getConfig().scheduler?.schedule || null
+      schedule,
+      nextRun: nextRun ? nextRun.toISOString() : null
     };
   }
 }

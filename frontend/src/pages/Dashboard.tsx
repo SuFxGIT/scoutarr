@@ -40,28 +40,31 @@ interface Stats {
 
 function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
-  const [automaticRunResults, setAutomaticRunResults] = useState<SearchResults | null>(null);
   const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
   const [lastRunResults, setLastRunResults] = useState<SearchResults | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Stats | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [logHistory, setLogHistory] = useState<Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const [schedulerHistory, setSchedulerHistory] = useState<Array<{ timestamp: string; results: any; success: boolean; error?: string }>>([]);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null } | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null; nextRun: string | null } | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadStatus();
-    loadAutomaticRun();
+    loadSchedulerHistory();
     loadManualRun();
     loadStats();
+    
+    // Poll for scheduler history and status updates every 10 seconds
+    const interval = setInterval(() => {
+      loadSchedulerHistory();
+      loadStatus();
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, []);
 
-  // Reload status when automatic run is refreshed to get latest scheduler status
-  useEffect(() => {
-    loadStatus();
-  }, [automaticRunResults]);
 
   const loadStatus = async () => {
     try {
@@ -85,12 +88,12 @@ function Dashboard() {
     return app.charAt(0).toUpperCase() + app.slice(1);
   };
 
-  const loadAutomaticRun = async () => {
+  const loadSchedulerHistory = async () => {
     try {
-      const response = await axios.post('/api/search/automatic-run-preview');
-      setAutomaticRunResults(response.data);
+      const response = await axios.get('/api/status/scheduler/history');
+      setSchedulerHistory(response.data);
     } catch (error) {
-      console.error('Failed to load automatic run preview:', error);
+      console.error('Failed to load scheduler history:', error);
     }
   };
 
@@ -128,71 +131,78 @@ function Dashboard() {
     }
   };
 
-  // Update log history when automatic run results change
-  useEffect(() => {
-    if (automaticRunResults) {
-      const newLogs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
-      const timestamp = new Date().toLocaleTimeString();
+  // Convert scheduler history to log format
+  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
+    const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
+    
+    // Add next run time at the top if scheduler is enabled
+    if (nextRun) {
+      const nextRunDate = new Date(nextRun);
+      const now = new Date();
+      const timeUntilNext = nextRunDate.getTime() - now.getTime();
+      const minutesUntil = Math.floor(timeUntilNext / 60000);
+      const hoursUntil = Math.floor(minutesUntil / 60);
+      const daysUntil = Math.floor(hoursUntil / 24);
       
-      // Add scheduler status log
-      const status = schedulerStatus?.enabled ? 'Enabled' : 'Disabled';
-      newLogs.push({
-        timestamp,
+      let timeString = '';
+      if (daysUntil > 0) {
+        timeString = `${daysUntil} day${daysUntil > 1 ? 's' : ''}, ${hoursUntil % 24} hour${(hoursUntil % 24) !== 1 ? 's' : ''}`;
+      } else if (hoursUntil > 0) {
+        timeString = `${hoursUntil} hour${hoursUntil > 1 ? 's' : ''}, ${minutesUntil % 60} minute${(minutesUntil % 60) !== 1 ? 's' : ''}`;
+      } else if (minutesUntil > 0) {
+        timeString = `${minutesUntil} minute${minutesUntil > 1 ? 's' : ''}`;
+      } else {
+        timeString = 'less than a minute';
+      }
+      
+      logs.push({
+        timestamp: new Date().toLocaleTimeString(),
         app: 'Scheduler',
-        message: `Scheduler Status: ${status}`,
-        type: schedulerStatus?.enabled ? 'success' : 'info'
+        message: `Next run: ${nextRunDate.toLocaleString()} (in ${timeString})`,
+        type: 'info'
       });
+    }
+    
+    history.forEach(entry => {
+      const timestamp = new Date(entry.timestamp).toLocaleTimeString();
       
-      // Only show actions if scheduler is enabled
-      if (schedulerStatus?.enabled) {
-        Object.entries(automaticRunResults).forEach(([app, result]) => {
+      if (entry.success) {
+        Object.entries(entry.results).forEach(([app, result]: [string, any]) => {
           if (result.success) {
-            const count = result.count || 0;
             const appName = formatAppName(app);
+            const searched = result.searched || 0;
             
             // Show triggered action
-            newLogs.push({
+            logs.push({
               timestamp,
               app,
-              message: `${appName}: Triggered`,
+              message: `${appName}: Triggered search for ${searched} ${result.movies ? 'movies' : 'series'}`,
               type: 'success'
             });
             
             // Show searched items
             if (result.movies && result.movies.length > 0) {
-              newLogs.push({
-                timestamp,
-                app,
-                message: `${appName}: Searched ${result.movies.length} movies`,
-                type: 'info'
-              });
-              result.movies.forEach(movie => {
-                newLogs.push({
+              result.movies.forEach((movie: any) => {
+                logs.push({
                   timestamp,
                   app,
-                  message: `  → ${movie.title}`,
+                  message: `  → Movie: ${movie.title}`,
                   type: 'info'
                 });
               });
             }
             if (result.series && result.series.length > 0) {
-              newLogs.push({
-                timestamp,
-                app,
-                message: `${appName}: Searched ${result.series.length} series`,
-                type: 'info'
-              });
-              result.series.forEach(series => {
-                newLogs.push({
+              result.series.forEach((series: any) => {
+                logs.push({
                   timestamp,
                   app,
-                  message: `  → ${series.title}`,
+                  message: `  → Series: ${series.title}`,
                   type: 'info'
                 });
               });
             }
           } else {
-            newLogs.push({
+            logs.push({
               timestamp,
               app,
               message: `${formatAppName(app)}: Error - ${result.error || 'Unknown error'}`,
@@ -200,38 +210,61 @@ function Dashboard() {
             });
           }
         });
+      } else {
+        logs.push({
+          timestamp,
+          app: 'Scheduler',
+          message: `Error: ${entry.error || 'Unknown error'}`,
+          type: 'error'
+        });
       }
-      setLogHistory(prev => [...prev, ...newLogs]);
-    }
-  }, [automaticRunResults, schedulerStatus]);
+    });
+    
+    return logs;
+  };
 
   // Auto-scroll to bottom
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [logHistory, autoScroll]);
+  }, [schedulerHistory, autoScroll]);
 
   const renderAutomaticRunPreview = () => {
+    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null);
 
     return (
       <Card mb="4">
         <Flex align="center" justify="between" mb="3">
-          <Heading size="5">Automatic Run Preview Window</Heading>
+          <Flex direction="column" gap="1">
+            <Heading size="5">Automatic Run Logs</Heading>
+            {schedulerStatus && !schedulerStatus.enabled && (
+              <Text size="2" color="gray">
+                Scheduler disabled
+              </Text>
+            )}
+          </Flex>
           <Flex gap="3">
             <Button 
               variant="outline" 
               size="3" 
-              onClick={() => setLogHistory([])}
+              onClick={async () => {
+                try {
+                  await axios.post('/api/status/scheduler/history/clear');
+                  setSchedulerHistory([]);
+                } catch (error) {
+                  console.error('Failed to clear history:', error);
+                }
+              }}
             >
               Clear History
             </Button>
             <Button 
               variant="outline" 
               size="3" 
-              onClick={loadAutomaticRun}
+              onClick={loadSchedulerHistory}
             >
-              <ReloadIcon /> Refresh Preview
+              <ReloadIcon /> Refresh
             </Button>
           </Flex>
         </Flex>
@@ -246,12 +279,12 @@ function Dashboard() {
               lineHeight: '1.5'
             }}
           >
-            {logHistory.length === 0 ? (
+            {logs.length === 0 ? (
               <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                No logs yet. Click "Refresh Preview" to see what the scheduler would do.
+                No scheduler runs yet. The scheduler will automatically trigger searches based on the schedule.
               </Text>
             ) : (
-              logHistory.map((log, idx) => (
+              logs.map((log, idx) => (
                 <div key={idx} style={{ marginBottom: '0.25rem' }}>
                   <Text 
                     size="2" 
@@ -303,11 +336,7 @@ function Dashboard() {
               <Flex direction="column" gap="2">
                 <Flex align="center" justify="between">
                   <Heading size="4" style={{ textTransform: 'capitalize' }}>{app}</Heading>
-                  {result.success ? (
-                    <Badge color="green">
-                      <CheckIcon /> Success
-                    </Badge>
-                  ) : (
+                  {!result.success && (
                     <Badge color="red">
                       <CrossCircledIcon /> Error
                     </Badge>
@@ -369,45 +398,56 @@ function Dashboard() {
             </Flex>
             <Separator />
             <Flex gap="3" wrap="wrap">
-              {Object.entries(connectionStatus).map(([app, status]: [string, any]) => {
-                // Format display name - handle instance IDs
-                let displayName = app;
-                if (app.includes('-') && app !== 'radarr' && app !== 'sonarr') {
-                  // It's an instance ID, use instanceName from status or construct from app type
-                  if (status.instanceName) {
-                    displayName = status.instanceName;
+              {Object.entries(connectionStatus)
+                .filter(([app]) => app !== 'scheduler') // Exclude scheduler from connection status
+                .map(([app, status]: [string, any]) => {
+                  // Format display name - handle instance IDs
+                  let displayName = app;
+                  if (app.includes('-') && app !== 'radarr' && app !== 'sonarr') {
+                    // It's an instance ID, use instanceName from status or construct from app type
+                    if (status.instanceName) {
+                      displayName = status.instanceName;
+                    } else {
+                      // Extract app type from ID (e.g., "sonarr-1766427071907" -> "Sonarr")
+                      const appType = app.split('-')[0];
+                      const instanceNum = status.instanceId || app.split('-').slice(1)[0]?.substring(0, 1) || '1';
+                      displayName = `${appType.charAt(0).toUpperCase() + appType.slice(1)} ${instanceNum}`;
+                    }
                   } else {
-                    // Extract app type from ID (e.g., "sonarr-1766427071907" -> "Sonarr")
-                    const appType = app.split('-')[0];
-                    const instanceNum = status.instanceId || app.split('-').slice(1)[0]?.substring(0, 1) || '1';
-                    displayName = `${appType.charAt(0).toUpperCase() + appType.slice(1)} ${instanceNum}`;
+                    displayName = app.charAt(0).toUpperCase() + app.slice(1);
                   }
-                } else {
-                  displayName = app.charAt(0).toUpperCase() + app.slice(1);
-                }
-                
-                // Determine status message
-                let statusMessage = 'Disconnected';
-                let badgeColor: 'green' | 'gray' | 'red' = 'red';
-                
-                if (status.connected) {
-                  statusMessage = 'Connected';
-                  badgeColor = 'green';
-                } else if (status.configured === false) {
-                  statusMessage = 'Not Configured';
-                  badgeColor = 'gray';
-                }
-                
-                return (
-                  <Badge 
-                    key={app} 
-                    color={badgeColor}
-                    size="2"
-                  >
-                    {displayName}: {statusMessage}
-                  </Badge>
-                );
-              })}
+                  
+                  // Determine status message
+                  let statusMessage = 'Disconnected';
+                  let badgeColor: 'green' | 'gray' | 'red' = 'red';
+                  
+                  if (status.connected) {
+                    statusMessage = 'Connected';
+                    badgeColor = 'green';
+                  } else if (status.configured === false) {
+                    statusMessage = 'Not Configured';
+                    badgeColor = 'gray';
+                  }
+                  
+                  return (
+                    <Badge 
+                      key={app} 
+                      color={badgeColor}
+                      size="2"
+                    >
+                      {displayName}: {statusMessage}
+                    </Badge>
+                  );
+                })}
+              {/* Display scheduler status separately */}
+              {schedulerStatus && (
+                <Badge 
+                  color={schedulerStatus.enabled && schedulerStatus.running ? 'green' : schedulerStatus.enabled ? 'yellow' : 'gray'}
+                  size="2"
+                >
+                  Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              )}
             </Flex>
           </Flex>
         </Card>
@@ -466,40 +506,49 @@ function Dashboard() {
                     Last upgrade: {formatDate(stats.lastUpgrade)}
                   </Text>
                 )}
-                {stats.recentUpgrades.length > 0 && (
-                  <Flex direction="column" gap="2" mt="2">
-                    <Text size="3" weight="bold">Recent Upgrades</Text>
-                    <Flex direction="column" gap="1" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                      {stats.recentUpgrades.slice(0, 10).map((upgrade, idx) => (
-                        <Card key={idx} variant="surface" size="1">
-                          <Flex direction="column" gap="1">
-                            <Flex align="center" justify="between">
-                              <Badge size="1" style={{ textTransform: 'capitalize' }}>
-                                {upgrade.instance 
-                                  ? `${upgrade.application} (${upgrade.instance})`
-                                  : upgrade.application}
-                              </Badge>
-                              <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
-                            </Flex>
-                            <Text size="2">
-                              {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
-                            </Text>
-                            {upgrade.items.length > 0 && (
-                              <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
-                                {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
-                                {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
-                              </Text>
-                            )}
-                          </Flex>
-                        </Card>
-                      ))}
-                    </Flex>
-                  </Flex>
-                )}
               </Flex>
             </Card>
           );
         })()}
+
+        {stats && stats.recentUpgrades.length > 0 && (
+          <Card>
+            <Flex direction="column" gap="3">
+              <Flex align="center" justify="between">
+                <Heading size="5">Recent Upgrades</Heading>
+                <Button variant="ghost" size="2" onClick={loadStats}>
+                  <ReloadIcon /> Refresh
+                </Button>
+              </Flex>
+              <Separator />
+              <Flex direction="column" gap="2" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {stats.recentUpgrades.slice(0, 20).map((upgrade, idx) => (
+                  <Card key={idx} variant="surface" size="1">
+                    <Flex direction="column" gap="1">
+                      <Flex align="center" justify="between">
+                        <Badge size="1" style={{ textTransform: 'capitalize' }}>
+                          {upgrade.instance 
+                            ? `${upgrade.application} (${upgrade.instance})`
+                            : upgrade.application}
+                        </Badge>
+                        <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
+                      </Flex>
+                      <Text size="2">
+                        {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'} upgraded
+                      </Text>
+                      {upgrade.items.length > 0 && (
+                        <Text size="1" color="gray" style={{ fontStyle: 'italic' }}>
+                          {upgrade.items.slice(0, 3).map(i => i.title).join(', ')}
+                          {upgrade.items.length > 3 && ` +${upgrade.items.length - 3} more`}
+                        </Text>
+                      )}
+                    </Flex>
+                  </Card>
+                ))}
+              </Flex>
+            </Flex>
+          </Card>
+        )}
 
         {renderAutomaticRunPreview()}
         {renderResults(manualRunResults, 'Manual Run')}
