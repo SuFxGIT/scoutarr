@@ -41,7 +41,6 @@ interface Stats {
 function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
   const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
-  const [lastRunResults, setLastRunResults] = useState<SearchResults | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Stats | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -54,10 +53,10 @@ function Dashboard() {
   useEffect(() => {
     loadStatus();
     loadSchedulerHistory();
-    loadManualRun();
     loadStats();
     
     // Poll for scheduler history, status, and stats updates every 10 seconds
+    // Note: Manual run preview is NOT auto-loaded or refreshed - it only updates when Run Search or Randomize is clicked
     const interval = setInterval(() => {
       loadSchedulerHistory();
       loadStatus();
@@ -120,9 +119,7 @@ function Dashboard() {
   const handleRun = async () => {
     setIsRunning(true);
     try {
-      const response = await axios.post('/api/search/run');
-      setLastRunResults(response.data);
-      await loadManualRun(); // Refresh manual run preview after actual run
+      await axios.post('/api/search/run');
       await loadStats(); // Refresh stats after actual run
       setErrorMessage(null);
     } catch (error: any) {
@@ -239,7 +236,7 @@ function Dashboard() {
       <Card mb="4">
         <Flex align="center" justify="between" mb="3">
           <Flex direction="column" gap="1">
-            <Heading size="5">Automatic Run Logs</Heading>
+            <Heading size="5">Logs</Heading>
             {schedulerStatus && !schedulerStatus.enabled && (
               <Text size="2" color="gray">
                 Scheduler disabled
@@ -247,6 +244,13 @@ function Dashboard() {
             )}
           </Flex>
           <Flex gap="3">
+            <Button 
+              size="3" 
+              onClick={handleRun} 
+              disabled={isRunning}
+            >
+              <PlayIcon /> {isRunning ? 'Running...' : 'Manually Run Now'}
+            </Button>
             <Button 
               variant="outline" 
               size="3" 
@@ -307,8 +311,6 @@ function Dashboard() {
   };
 
   const renderResults = (results: SearchResults | null, title: string) => {
-    if (!results) return null;
-
     return (
       <Card mb="4">
         <Flex align="center" justify="between" mb="3">
@@ -327,13 +329,14 @@ function Dashboard() {
                 size="3" 
                 onClick={loadManualRun}
               >
-                <ReloadIcon /> Refresh Preview
+                <ReloadIcon /> Randomize
               </Button>
             </Flex>
           )}
         </Flex>
-        <Flex direction="column" gap="3">
-          {Object.entries(results).map(([app, result]) => (
+        {results ? (
+          <Flex direction="column" gap="3">
+            {Object.entries(results).map(([app, result]) => (
             <Card key={app} variant="surface">
               <Flex direction="column" gap="2">
                 <Flex align="center" justify="between">
@@ -379,7 +382,12 @@ function Dashboard() {
               </Flex>
             </Card>
           ))}
-        </Flex>
+          </Flex>
+        ) : (
+          <Text size="2" color="gray" style={{ padding: '1rem', textAlign: 'center' }}>
+            Click "Randomize" to see what would be searched, or "Run Search" to execute the search.
+          </Text>
+        )}
       </Card>
     );
   };
@@ -446,9 +454,6 @@ function Dashboard() {
                 </Badge>
               )}
             </Flex>
-            <Button variant="ghost" size="1" onClick={loadStatus}>
-              <ReloadIcon /> Refresh
-            </Button>
           </Flex>
         </Card>
 
@@ -476,9 +481,6 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Upgrade Statistics</Heading>
-                  <Button variant="ghost" size="2" onClick={loadStats}>
-                    <ReloadIcon /> Refresh
-                  </Button>
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
@@ -523,9 +525,6 @@ function Dashboard() {
                     onClick={() => setShowAllUpgrades(!showAllUpgrades)}
                   >
                     {showAllUpgrades ? 'Show Recent' : 'View All'}
-                  </Button>
-                  <Button variant="ghost" size="2" onClick={loadStats}>
-                    <ReloadIcon /> Refresh
                   </Button>
                 </Flex>
               </Flex>
@@ -638,8 +637,6 @@ function Dashboard() {
         )}
 
         {renderAutomaticRunPreview()}
-        {renderResults(manualRunResults, 'Manual Run')}
-        {renderResults(lastRunResults, 'Last Run Results')}
       </Flex>
     </div>
   );
