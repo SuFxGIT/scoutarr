@@ -43,9 +43,7 @@ function Dashboard() {
   const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<Stats | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [schedulerHistory, setSchedulerHistory] = useState<Array<{ timestamp: string; results: any; success: boolean; error?: string }>>([]);
-  const [autoScroll, setAutoScroll] = useState(true);
   const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null; nextRun: string | null } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
@@ -121,15 +119,18 @@ function Dashboard() {
     }
   };
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleClearRecentUpgrades = async () => {
     try {
       await axios.post('/api/stats/clear-recent');
       await loadStats();
       setCurrentPage(1);
       setConfirmingClear(null);
+      setErrorMessage(null);
     } catch (error: any) {
       console.error('Failed to clear recent upgrades:', error);
-      alert('Failed to clear recent upgrades: ' + (error.response?.data?.error || error.message));
+      setErrorMessage('Failed to clear recent upgrades: ' + (error.response?.data?.error || error.message));
       setConfirmingClear(null);
     }
   };
@@ -140,9 +141,10 @@ function Dashboard() {
       await loadStats();
       setCurrentPage(1);
       setConfirmingClear(null);
+      setErrorMessage(null);
     } catch (error: any) {
       console.error('Failed to clear stats:', error);
-      alert('Failed to clear stats: ' + (error.response?.data?.error || error.message));
+      setErrorMessage('Failed to clear stats: ' + (error.response?.data?.error || error.message));
       setConfirmingClear(null);
     }
   };
@@ -152,10 +154,9 @@ function Dashboard() {
     try {
       await axios.post('/api/search/run');
       await loadStats(); // Refresh stats after actual run
-      setErrorMessage(null);
     } catch (error: any) {
       console.error('Search failed:', error);
-      setErrorMessage('Search failed: ' + (error.response?.data?.error || error.message));
+      // Error is already logged to console, and scheduler history will show it
     } finally {
       setIsRunning(false);
     }
@@ -287,10 +288,10 @@ function Dashboard() {
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
+    if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [schedulerHistory, autoScroll]);
+  }, [schedulerHistory]);
 
   const renderAutomaticRunPreview = () => {
     const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null, schedulerStatus?.enabled || false, manualRunResults);
@@ -373,88 +374,6 @@ function Dashboard() {
     );
   };
 
-  const renderResults = (results: SearchResults | null, title: string) => {
-    return (
-      <Card mb="4">
-        <Flex align="center" justify="between" mb="3">
-          <Heading size="5">{title}</Heading>
-          {title === 'Manual Run' && (
-            <Flex gap="3">
-              <Button 
-                size="3" 
-                onClick={handleRun} 
-                disabled={isRunning}
-              >
-                <PlayIcon /> {isRunning ? 'Running...' : 'Run Search'}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="3" 
-                onClick={loadManualRun}
-              >
-                <ReloadIcon /> Randomize
-              </Button>
-            </Flex>
-          )}
-        </Flex>
-        {results ? (
-          <Flex direction="column" gap="3">
-            {Object.entries(results).map(([app, result]) => (
-            <Card key={app} variant="surface">
-              <Flex direction="column" gap="2">
-                <Flex align="center" justify="between">
-                  <Heading size="4" style={{ textTransform: 'capitalize' }}>{app}</Heading>
-                  {!result.success && (
-                    <Badge color="red">
-                      <CrossCircledIcon /> Error
-                    </Badge>
-                  )}
-                </Flex>
-                {result.success ? (
-                  <>
-                    <Text size="2" color="gray">
-                      {title === 'Manual Run'
-                        ? `Next search ${result.count} of ${result.total} items`
-                        : title === 'Automatic Run Preview Window'
-                        ? `Would search ${result.count} of ${result.total} items`
-                        : `Searched ${result.searched} items`
-                      }
-                    </Text>
-                    {result.movies && result.movies.length > 0 && (
-                      <Flex direction="column" gap="1" mt="2">
-                        <Text size="2" weight="bold">Movies:</Text>
-                        {result.movies.map(movie => (
-                          <Text key={movie.id} size="2">• {movie.title}</Text>
-                        ))}
-                      </Flex>
-                    )}
-                    {result.series && result.series.length > 0 && (
-                      <Flex direction="column" gap="1" mt="2">
-                        <Text size="2" weight="bold">Series:</Text>
-                        {result.series.map(series => (
-                          <Text key={series.id} size="2">• {series.title}</Text>
-                        ))}
-                      </Flex>
-                    )}
-                  </>
-                ) : (
-                  <Callout.Root color="red">
-                    <Callout.Text>{result.error || 'Unknown error'}</Callout.Text>
-                  </Callout.Root>
-                )}
-              </Flex>
-            </Card>
-          ))}
-          </Flex>
-        ) : (
-          <Text size="2" color="gray" style={{ padding: '1rem', textAlign: 'center' }}>
-            Click "Randomize" to see what would be searched, or "Run Search" to execute the search.
-          </Text>
-        )}
-      </Card>
-    );
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
@@ -463,6 +382,11 @@ function Dashboard() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
+        {errorMessage && (
+          <Callout.Root color="red">
+            <Callout.Text>{errorMessage}</Callout.Text>
+          </Callout.Root>
+        )}
         <Card style={{ padding: '0.5rem' }}>
           <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
