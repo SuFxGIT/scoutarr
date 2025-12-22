@@ -9,7 +9,7 @@ import {
   Separator,
   Callout
 } from '@radix-ui/themes';
-import { PlayIcon, ReloadIcon, CheckIcon, CrossCircledIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ReloadIcon, CrossCircledIcon } from '@radix-ui/react-icons';
 import axios from 'axios';
 
 interface SearchResults {
@@ -134,11 +134,11 @@ function Dashboard() {
   };
 
   // Convert scheduler history to log format
-  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
+  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null, schedulerEnabled: boolean): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
     
     // Add next run time at the top if scheduler is enabled
-    if (nextRun) {
+    if (schedulerEnabled && nextRun) {
       const nextRunDate = new Date(nextRun);
       const now = new Date();
       const timeUntilNext = nextRunDate.getTime() - now.getTime();
@@ -233,7 +233,7 @@ function Dashboard() {
   }, [schedulerHistory, autoScroll]);
 
   const renderAutomaticRunPreview = () => {
-    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null);
+    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null, schedulerStatus?.enabled || false);
 
     return (
       <Card mb="4">

@@ -1,8 +1,11 @@
 import { AxiosInstance } from 'axios';
-import { SonarrConfig } from '../types/config.js';
+import { SonarrConfig, SonarrInstance } from '../types/config.js';
 import { StarrTag, StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+
+// Type that accepts both SonarrConfig and SonarrInstance
+type SonarrConfigType = SonarrConfig | SonarrInstance;
 
 export interface SonarrSeries {
   id: number;
@@ -18,11 +21,11 @@ export type SonarrTag = StarrTag;
 export type SonarrQualityProfile = StarrQualityProfile;
 
 class SonarrService {
-  private createClient(config: SonarrConfig): AxiosInstance {
+  private createClient(config: SonarrConfigType): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);
   }
 
-  async getSeries(config: SonarrConfig): Promise<SonarrSeries[]> {
+  async getSeries(config: SonarrConfigType): Promise<SonarrSeries[]> {
     try {
       const client = this.createClient(config);
       const response = await client.get<SonarrSeries[]>('/api/v3/series');
@@ -37,7 +40,7 @@ class SonarrService {
     }
   }
 
-  async getQualityProfiles(config: SonarrConfig): Promise<StarrQualityProfile[]> {
+  async getQualityProfiles(config: SonarrConfigType): Promise<StarrQualityProfile[]> {
     try {
       const client = this.createClient(config);
       const response = await client.get<StarrQualityProfile[]>('/api/v3/qualityprofile');
@@ -48,7 +51,7 @@ class SonarrService {
     }
   }
 
-  async searchSeries(config: SonarrConfig, seriesId: number): Promise<void> {
+  async searchSeries(config: SonarrConfigType, seriesId: number): Promise<void> {
     try {
       const client = this.createClient(config);
       // Sonarr only supports searching one series at a time
@@ -63,7 +66,7 @@ class SonarrService {
     }
   }
 
-  async addTagToSeries(config: SonarrConfig, seriesIds: number[], tagId: number): Promise<void> {
+  async addTagToSeries(config: SonarrConfigType, seriesIds: number[], tagId: number): Promise<void> {
     try {
       const client = this.createClient(config);
       await client.put('/api/v3/series/editor', {
@@ -78,7 +81,7 @@ class SonarrService {
     }
   }
 
-  async removeTagFromSeries(config: SonarrConfig, seriesIds: number[], tagId: number): Promise<void> {
+  async removeTagFromSeries(config: SonarrConfigType, seriesIds: number[], tagId: number): Promise<void> {
     try {
       const client = this.createClient(config);
       await client.put('/api/v3/series/editor', {
@@ -93,12 +96,12 @@ class SonarrService {
     }
   }
 
-  async getTagId(config: SonarrConfig, tagName: string): Promise<number | null> {
+  async getTagId(config: SonarrConfigType, tagName: string): Promise<number | null> {
     const client = this.createClient(config);
     return getOrCreateTagId(client, tagName, 'Sonarr');
   }
 
-  async filterSeries(config: SonarrConfig, series: SonarrSeries[], unattended: boolean = false): Promise<SonarrSeries[]> {
+  async filterSeries(config: SonarrConfigType, series: SonarrSeries[], unattended: boolean = false): Promise<SonarrSeries[]> {
     try {
       let filtered = series;
 

@@ -1,8 +1,11 @@
 import { AxiosInstance } from 'axios';
-import { RadarrConfig } from '../types/config.js';
+import { RadarrConfig, RadarrInstance } from '../types/config.js';
 import { StarrTag, StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+
+// Type that accepts both RadarrConfig and RadarrInstance
+type RadarrConfigType = RadarrConfig | RadarrInstance;
 
 export interface RadarrMovie {
   id: number;
@@ -18,11 +21,11 @@ export type RadarrTag = StarrTag;
 export type RadarrQualityProfile = StarrQualityProfile;
 
 class RadarrService {
-  private createClient(config: RadarrConfig): AxiosInstance {
+  private createClient(config: RadarrConfigType): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);
   }
 
-  async getMovies(config: RadarrConfig): Promise<RadarrMovie[]> {
+  async getMovies(config: RadarrConfigType): Promise<RadarrMovie[]> {
     try {
       const client = this.createClient(config);
       const response = await client.get<RadarrMovie[]>('/api/v3/movie');
@@ -37,7 +40,7 @@ class RadarrService {
     }
   }
 
-  async getQualityProfiles(config: RadarrConfig): Promise<StarrQualityProfile[]> {
+  async getQualityProfiles(config: RadarrConfigType): Promise<StarrQualityProfile[]> {
     try {
       const client = this.createClient(config);
       const response = await client.get<StarrQualityProfile[]>('/api/v3/qualityprofile');
@@ -48,7 +51,7 @@ class RadarrService {
     }
   }
 
-  async searchMovies(config: RadarrConfig, movieIds: number[]): Promise<void> {
+  async searchMovies(config: RadarrConfigType, movieIds: number[]): Promise<void> {
     try {
       const client = this.createClient(config);
       await client.post(`/api/v3/command`, {
@@ -62,7 +65,7 @@ class RadarrService {
     }
   }
 
-  async addTagToMovies(config: RadarrConfig, movieIds: number[], tagId: number): Promise<void> {
+  async addTagToMovies(config: RadarrConfigType, movieIds: number[], tagId: number): Promise<void> {
     try {
       const client = this.createClient(config);
       await client.put('/api/v3/movie/editor', {
@@ -77,7 +80,7 @@ class RadarrService {
     }
   }
 
-  async removeTagFromMovies(config: RadarrConfig, movieIds: number[], tagId: number): Promise<void> {
+  async removeTagFromMovies(config: RadarrConfigType, movieIds: number[], tagId: number): Promise<void> {
     try {
       const client = this.createClient(config);
       await client.put('/api/v3/movie/editor', {
@@ -92,12 +95,12 @@ class RadarrService {
     }
   }
 
-  async getTagId(config: RadarrConfig, tagName: string): Promise<number | null> {
+  async getTagId(config: RadarrConfigType, tagName: string): Promise<number | null> {
     const client = this.createClient(config);
     return getOrCreateTagId(client, tagName, 'Radarr');
   }
 
-  async filterMovies(config: RadarrConfig, movies: RadarrMovie[], unattended: boolean = false): Promise<RadarrMovie[]> {
+  async filterMovies(config: RadarrConfigType, movies: RadarrMovie[], unattended: boolean = false): Promise<RadarrMovie[]> {
     try {
       let filtered = movies;
 

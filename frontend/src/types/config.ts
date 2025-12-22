@@ -66,7 +66,6 @@ export interface LidarrConfig {
   monitored: boolean;
   artistStatus: 'continuing' | 'ended' | '';
   qualityProfileName: string;
-  unattended: boolean;
 }
 
 export interface ReadarrConfig {
@@ -78,7 +77,6 @@ export interface ReadarrConfig {
   monitored: boolean;
   authorStatus: 'continuing' | 'ended' | '';
   qualityProfileName: string;
-  unattended: boolean;
 }
 
 export interface ApplicationsConfig {
