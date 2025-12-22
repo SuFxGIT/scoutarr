@@ -4,8 +4,38 @@ export interface NotificationConfig {
   notifiarrPassthroughDiscordChannelId: string;
 }
 
+export interface RadarrInstance {
+  id: string; // Unique identifier for this instance
+  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
+  name: string; // Display name
+  url: string;
+  apiKey: string;
+  count: number | 'max' | 'MAX';
+  tagName: string;
+  ignoreTag: string;
+  monitored: boolean;
+  movieStatus: 'announced' | 'in cinemas' | 'released';
+  qualityProfileName: string;
+  unattended: boolean;
+}
+
+export interface SonarrInstance {
+  id: string; // Unique identifier for this instance
+  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
+  name: string; // Display name
+  url: string;
+  apiKey: string;
+  count: number | 'max' | 'MAX';
+  tagName: string;
+  ignoreTag: string;
+  monitored: boolean;
+  seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
+  qualityProfileName: string;
+  unattended: boolean;
+}
+
+// Legacy single instance configs (for backward compatibility)
 export interface RadarrConfig {
-  enabled: boolean;
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';
@@ -18,7 +48,6 @@ export interface RadarrConfig {
 }
 
 export interface SonarrConfig {
-  enabled: boolean;
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';
@@ -31,7 +60,6 @@ export interface SonarrConfig {
 }
 
 export interface LidarrConfig {
-  enabled: boolean;
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';
@@ -44,7 +72,6 @@ export interface LidarrConfig {
 }
 
 export interface ReadarrConfig {
-  enabled: boolean;
   url: string;
   apiKey: string;
   count: number | 'max' | 'MAX';
@@ -57,8 +84,8 @@ export interface ReadarrConfig {
 }
 
 export interface ApplicationsConfig {
-  radarr: RadarrConfig;
-  sonarr: SonarrConfig;
+  radarr: RadarrInstance[] | RadarrConfig; // Support both array (new) and single (legacy)
+  sonarr: SonarrInstance[] | SonarrConfig; // Support both array (new) and single (legacy)
   lidarr: LidarrConfig;
   readarr: ReadarrConfig;
 }

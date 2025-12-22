@@ -153,18 +153,24 @@ export async function processApplication<TMedia>(
   }
 }
 
-// Run search for enabled applications
+// Run search for all configured applications
 searchRouter.post('/run', async (req, res) => {
   logger.info('🔍 Starting search operation');
   try {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
 
-    // Process Radarr
-    if (config.applications.radarr.enabled) {
+    // Process Radarr - handle both array (new) and single (legacy)
+    const radarrInstances = Array.isArray(config.applications.radarr) 
+      ? config.applications.radarr.filter(inst => inst.url && inst.apiKey)
+      : (config.applications.radarr.url && config.applications.radarr.apiKey ? [config.applications.radarr] : []);
+    
+    for (const radarrConfig of radarrInstances) {
+      const instanceName = (radarrConfig as any).name || 'Radarr';
+      const instanceId = (radarrConfig as any).id || 'radarr-1';
       const result = await processApplication({
-        name: 'Radarr',
-        config: config.applications.radarr,
+        name: instanceName,
+        config: radarrConfig,
         getMedia: radarrService.getMovies.bind(radarrService),
         filterMedia: radarrService.filterMovies.bind(radarrService),
         searchMedia: radarrService.searchMovies.bind(radarrService),
@@ -175,17 +181,25 @@ searchRouter.post('/run', async (req, res) => {
         getMediaId: (m) => m.id,
         getMediaTitle: (m) => m.title
       });
-      results.radarr = {
+      const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
+      results[resultKey] = {
         ...result,
-        movies: result.items
+        movies: result.items,
+        instanceName
       };
     }
 
-    // Process Sonarr
-    if (config.applications.sonarr.enabled) {
+    // Process Sonarr - handle both array (new) and single (legacy)
+    const sonarrInstances = Array.isArray(config.applications.sonarr)
+      ? config.applications.sonarr.filter(inst => inst.url && inst.apiKey)
+      : (config.applications.sonarr.url && config.applications.sonarr.apiKey ? [config.applications.sonarr] : []);
+    
+    for (const sonarrConfig of sonarrInstances) {
+      const instanceName = (sonarrConfig as any).name || 'Sonarr';
+      const instanceId = (sonarrConfig as any).id || 'sonarr-1';
       const result = await processApplication({
-        name: 'Sonarr',
-        config: config.applications.sonarr,
+        name: instanceName,
+        config: sonarrConfig,
         getMedia: sonarrService.getSeries.bind(sonarrService),
         filterMedia: sonarrService.filterSeries.bind(sonarrService),
         searchMedia: async (cfg, seriesIds) => {
@@ -201,9 +215,11 @@ searchRouter.post('/run', async (req, res) => {
         getMediaId: (s) => s.id,
         getMediaTitle: (s) => s.title
       });
-      results.sonarr = {
+      const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
+      results[resultKey] = {
         ...result,
-        series: result.items
+        series: result.items,
+        instanceName
       };
     }
 
@@ -219,7 +235,15 @@ searchRouter.post('/run', async (req, res) => {
     for (const [app, result] of Object.entries(results)) {
       if (result.success && result.searched && result.searched > 0) {
         const items = result.movies || result.series || result.items || [];
-        await statsService.addUpgrade(app, result.searched, items);
+        const instanceName = result.instanceName;
+        // Extract instance ID from key if it's an instance-specific key
+        const instanceId = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app.split('-').slice(1).join('-') : undefined;
+        await statsService.addUpgrade(
+          instanceName || app, 
+          result.searched, 
+          items,
+          instanceId || instanceName
+        );
       }
     }
 
@@ -282,35 +306,51 @@ searchRouter.post('/dry-run', async (req, res) => {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
 
-    // Process Radarr
-    if (config.applications.radarr.enabled) {
+    // Process Radarr - handle both array (new) and single (legacy)
+    const radarrInstances = Array.isArray(config.applications.radarr) 
+      ? config.applications.radarr.filter(inst => inst.url && inst.apiKey)
+      : (config.applications.radarr.url && config.applications.radarr.apiKey ? [config.applications.radarr] : []);
+    
+    for (const radarrConfig of radarrInstances) {
+      const instanceName = (radarrConfig as any).name || 'Radarr';
+      const instanceId = (radarrConfig as any).id || 'radarr-1';
       const result = await processDryRun(
-        'Radarr',
-        config.applications.radarr,
+        instanceName,
+        radarrConfig,
         radarrService.getMovies.bind(radarrService),
         radarrService.filterMovies.bind(radarrService),
         (m) => m.id,
         (m) => m.title
       );
-      results.radarr = {
+      const resultKey = radarrInstances.length > 1 ? `${instanceId}` : 'radarr';
+      results[resultKey] = {
         ...result,
-        movies: result.items
+        movies: result.items,
+        instanceName
       };
     }
 
-    // Process Sonarr
-    if (config.applications.sonarr.enabled) {
+    // Process Sonarr - handle both array (new) and single (legacy)
+    const sonarrInstances = Array.isArray(config.applications.sonarr)
+      ? config.applications.sonarr.filter(inst => inst.url && inst.apiKey)
+      : (config.applications.sonarr.url && config.applications.sonarr.apiKey ? [config.applications.sonarr] : []);
+    
+    for (const sonarrConfig of sonarrInstances) {
+      const instanceName = (sonarrConfig as any).name || 'Sonarr';
+      const instanceId = (sonarrConfig as any).id || 'sonarr-1';
       const result = await processDryRun(
-        'Sonarr',
-        config.applications.sonarr,
+        instanceName,
+        sonarrConfig,
         sonarrService.getSeries.bind(sonarrService),
         sonarrService.filterSeries.bind(sonarrService),
         (s) => s.id,
         (s) => s.title
       );
-      results.sonarr = {
+      const resultKey = sonarrInstances.length > 1 ? `${instanceId}` : 'sonarr';
+      results[resultKey] = {
         ...result,
-        series: result.items
+        series: result.items,
+        instanceName
       };
     }
 

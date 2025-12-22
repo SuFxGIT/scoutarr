@@ -29,9 +29,11 @@ interface SearchResults {
 interface Stats {
   totalUpgrades: number;
   upgradesByApplication: Record<string, number>;
+  upgradesByInstance: Record<string, number>;
   recentUpgrades: Array<{
     timestamp: string;
     application: string;
+    instance?: string;
     count: number;
     items: Array<{ id: number; title: string }>;
   }>;
@@ -62,7 +64,7 @@ function Dashboard() {
 
   const loadDryRun = async () => {
     try {
-      const response = await axios.post('/api/search/dry-run');
+      const response = await axios.post('/api/search/dry-run'); // Manual Run
       setDryRunResults(response.data);
     } catch (error) {
       console.error('Failed to load dry run:', error);
@@ -118,7 +120,7 @@ function Dashboard() {
                 {result.success ? (
                   <>
                     <Text size="2" color="gray">
-                      {title === 'Dry Run' 
+                      {title === 'Manual Run' 
                         ? `Would search ${result.count} of ${result.total} items`
                         : `Searched ${result.searched} items`
                       }
@@ -161,6 +163,59 @@ function Dashboard() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
+        <Card>
+          <Flex direction="column" gap="3">
+            <Flex align="center" justify="between">
+              <Heading size="5">Connection Status</Heading>
+              <Button variant="ghost" size="2" onClick={loadStatus}>
+                <ReloadIcon /> Refresh
+              </Button>
+            </Flex>
+            <Separator />
+            <Flex gap="3" wrap="wrap">
+              {Object.entries(connectionStatus).map(([app, status]: [string, any]) => {
+                // Format display name - handle instance IDs
+                let displayName = app;
+                if (app.includes('-') && app !== 'radarr' && app !== 'sonarr') {
+                  // It's an instance ID, use instanceName from status or construct from app type
+                  if (status.instanceName) {
+                    displayName = status.instanceName;
+                  } else {
+                    // Extract app type from ID (e.g., "sonarr-1766427071907" -> "Sonarr")
+                    const appType = app.split('-')[0];
+                    const instanceNum = status.instanceId || app.split('-').slice(1)[0]?.substring(0, 1) || '1';
+                    displayName = `${appType.charAt(0).toUpperCase() + appType.slice(1)} ${instanceNum}`;
+                  }
+                } else {
+                  displayName = app.charAt(0).toUpperCase() + app.slice(1);
+                }
+                
+                // Determine status message
+                let statusMessage = 'Disconnected';
+                let badgeColor: 'green' | 'gray' | 'red' = 'red';
+                
+                if (status.connected) {
+                  statusMessage = 'Connected';
+                  badgeColor = 'green';
+                } else if (status.configured === false) {
+                  statusMessage = 'Not Configured';
+                  badgeColor = 'gray';
+                }
+                
+                return (
+                  <Badge 
+                    key={app} 
+                    color={badgeColor}
+                    size="2"
+                  >
+                    {displayName}: {statusMessage}
+                  </Badge>
+                );
+              })}
+            </Flex>
+          </Flex>
+        </Card>
+
         {stats && (
           <Card>
             <Flex direction="column" gap="3">
@@ -178,14 +233,22 @@ function Dashboard() {
                     <Heading size="7">{stats.totalUpgrades}</Heading>
                   </Flex>
                 </Card>
-                {Object.entries(stats.upgradesByApplication).map(([app, count]) => (
-                  <Card key={app} variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
-                    <Flex direction="column" gap="2">
-                      <Text size="2" color="gray" style={{ textTransform: 'capitalize' }}>{app}</Text>
-                      <Heading size="7">{count}</Heading>
-                    </Flex>
-                  </Card>
-                ))}
+                {Object.entries(stats.upgradesByInstance || {}).map(([instanceKey, count]) => {
+                  const [app, instance] = instanceKey.includes('-') 
+                    ? instanceKey.split('-').slice(0, 2)
+                    : [instanceKey, undefined];
+                  const displayName = instance 
+                    ? `${app.charAt(0).toUpperCase() + app.slice(1)} (${instance})`
+                    : app.charAt(0).toUpperCase() + app.slice(1);
+                  return (
+                    <Card key={instanceKey} variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                      <Flex direction="column" gap="2">
+                        <Text size="2" color="gray">{displayName}</Text>
+                        <Heading size="7">{count}</Heading>
+                      </Flex>
+                    </Card>
+                  );
+                })}
               </Flex>
               {stats.lastUpgrade && (
                 <Text size="2" color="gray">
@@ -201,7 +264,9 @@ function Dashboard() {
                         <Flex direction="column" gap="1">
                           <Flex align="center" justify="between">
                             <Badge size="1" style={{ textTransform: 'capitalize' }}>
-                              {upgrade.application}
+                              {upgrade.instance 
+                                ? `${upgrade.application} (${upgrade.instance})`
+                                : upgrade.application}
                             </Badge>
                             <Text size="1" color="gray">{formatDate(upgrade.timestamp)}</Text>
                           </Flex>
@@ -223,29 +288,6 @@ function Dashboard() {
             </Flex>
           </Card>
         )}
-
-        <Card>
-          <Flex direction="column" gap="3">
-            <Flex align="center" justify="between">
-              <Heading size="5">Connection Status</Heading>
-              <Button variant="ghost" size="2" onClick={loadStatus}>
-                <ReloadIcon /> Refresh
-              </Button>
-            </Flex>
-            <Separator />
-            <Flex gap="3" wrap="wrap">
-              {Object.entries(connectionStatus).map(([app, status]: [string, any]) => (
-                <Badge 
-                  key={app} 
-                  color={status.connected ? 'green' : status.configured === false ? 'gray' : 'red'}
-                  size="2"
-                >
-                  {app}: {status.connected ? 'Connected' : status.configured === false ? 'Not Configured' : 'Disconnected'}
-                </Badge>
-              ))}
-            </Flex>
-          </Flex>
-        </Card>
 
         <Card>
           <Flex direction="column" gap="3">
@@ -272,7 +314,7 @@ function Dashboard() {
           </Flex>
         </Card>
 
-        {renderResults(dryRunResults, 'Dry Run')}
+        {renderResults(dryRunResults, 'Manual Run')}
         {renderResults(lastRunResults, 'Last Run Results')}
       </Flex>
     </div>

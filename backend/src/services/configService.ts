@@ -56,7 +56,6 @@ class ConfigService {
       },
       applications: {
         radarr: {
-          enabled: false,
           url: '',
           apiKey: '',
           count: 10,
@@ -68,7 +67,6 @@ class ConfigService {
           unattended: false
         },
         sonarr: {
-          enabled: false,
           url: '',
           apiKey: '',
           count: 5,
@@ -80,7 +78,6 @@ class ConfigService {
           unattended: false
         },
         lidarr: {
-          enabled: false,
           url: '',
           apiKey: '',
           count: 5,
@@ -92,7 +89,6 @@ class ConfigService {
           unattended: false
         },
         readarr: {
-          enabled: false,
           url: '',
           apiKey: '',
           count: 5,
@@ -119,10 +115,7 @@ class ConfigService {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
       this.config = JSON.parse(content) as Config;
       logger.debug('Configuration loaded successfully', { 
-        configFile: CONFIG_FILE,
-        applications: Object.keys(this.config.applications).filter(
-          app => this.config!.applications[app as keyof typeof this.config!.applications].enabled
-        )
+        configFile: CONFIG_FILE
       });
       return this.config;
     } catch (error: any) {
@@ -140,10 +133,7 @@ class ConfigService {
       await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
       this.config = config;
       logger.info('💾 Configuration saved successfully', { 
-        configFile: CONFIG_FILE,
-        enabledApps: Object.keys(config.applications).filter(
-          app => config.applications[app as keyof typeof config.applications].enabled
-        )
+        configFile: CONFIG_FILE
       });
       
       // Restart scheduler if config changed

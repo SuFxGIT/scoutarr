@@ -15,7 +15,7 @@ import {
   Badge,
   Spinner
 } from '@radix-ui/themes';
-import { CheckIcon, CrossCircledIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon } from '@radix-ui/react-icons';
 import axios from 'axios';
 import type { Config } from '../types/config';
 
@@ -26,6 +26,7 @@ function Settings() {
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean }>>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
+  const [activeTab, setActiveTab] = useState<string>('radarr');
 
   const cronPresets: Record<string, string> = {
     'every-hour': '0 * * * *',
@@ -65,9 +66,10 @@ function Settings() {
     setLoading(true);
     try {
       const response = await axios.get('/api/config');
-      setConfig(response.data);
-      if (response.data.scheduler?.schedule) {
-        setSchedulerPreset(getPresetFromSchedule(response.data.scheduler.schedule));
+      const normalizedConfig = normalizeConfig(response.data);
+      setConfig(normalizedConfig);
+      if (normalizedConfig.scheduler?.schedule) {
+        setSchedulerPreset(getPresetFromSchedule(normalizedConfig.scheduler.schedule));
       }
       setSaveMessage(null);
     } catch (error: any) {
@@ -100,44 +102,178 @@ function Settings() {
     }
   };
 
-  const testConnection = async (app: string) => {
-    if (!config) return;
+
+  // Helper to get next available instance ID for an app
+  const getNextInstanceId = (app: 'radarr' | 'sonarr', instances: any[]): number => {
+    const existingIds = instances
+      .map(inst => inst.instanceId)
+      .filter(id => typeof id === 'number')
+      .sort((a, b) => a - b);
     
-    const appConfig = config.applications[app as keyof Config['applications']];
-    if (!appConfig || !appConfig.url || !appConfig.apiKey) {
-      setTestResults(prev => ({
-        ...prev,
-        [app]: { status: false, testing: false }
-      }));
-      return;
+    // Find the first gap or next number
+    for (let i = 1; i <= existingIds.length + 1; i++) {
+      if (!existingIds.includes(i)) {
+        return i;
+      }
     }
+    return existingIds.length + 1;
+  };
 
-    // Set testing state
-    setTestResults(prev => ({
-      ...prev,
-      [app]: { status: null, testing: true }
-    }));
-
-    try {
-      // Send current local config values to test endpoint
-      const response = await axios.post(`/api/config/test/${app}`, {
-        url: appConfig.url,
-        apiKey: appConfig.apiKey
-      });
-      setTestResults(prev => ({
-        ...prev,
-        [app]: { status: response.data.success === true, testing: false }
+  // Helper to normalize config - convert single instance to array format
+  const normalizeConfig = (config: Config): Config => {
+    const normalized = { ...config };
+    
+    // Convert Radarr to array if it's a single instance
+    if (normalized.applications.radarr && !Array.isArray(normalized.applications.radarr)) {
+      const radarr = normalized.applications.radarr as any;
+      normalized.applications.radarr = [{
+        id: 'radarr-1',
+        instanceId: 1,
+        name: '',
+        ...radarr
+      }];
+    } else if (Array.isArray(normalized.applications.radarr)) {
+      // Ensure all instances have instanceId
+      normalized.applications.radarr = normalized.applications.radarr.map((inst: any, idx: number) => ({
+        ...inst,
+        instanceId: inst.instanceId || idx + 1
       }));
-    } catch (error: any) {
+    }
+    
+    // Convert Sonarr to array if it's a single instance
+    if (normalized.applications.sonarr && !Array.isArray(normalized.applications.sonarr)) {
+      const sonarr = normalized.applications.sonarr as any;
+      normalized.applications.sonarr = [{
+        id: 'sonarr-1',
+        instanceId: 1,
+        name: '',
+        ...sonarr
+      }];
+    } else if (Array.isArray(normalized.applications.sonarr)) {
+      // Ensure all instances have instanceId
+      normalized.applications.sonarr = normalized.applications.sonarr.map((inst: any, idx: number) => ({
+        ...inst,
+        instanceId: inst.instanceId || idx + 1
+      }));
+    }
+    
+    return normalized;
+  };
+
+  // Get instances for an app (handles both array and single)
+  const getInstances = (app: 'radarr' | 'sonarr'): any[] => {
+    if (!config) return [];
+    const appConfig = config.applications[app];
+    if (Array.isArray(appConfig)) {
+      return appConfig;
+    }
+    // Legacy single instance - convert to array
+    return [{
+      id: `${app}-1`,
+      instanceId: 1,
+      name: '',
+      ...appConfig
+    }];
+  };
+
+  // Update instance config
+  const updateInstanceConfig = (app: 'radarr' | 'sonarr', instanceId: string, field: string, value: any) => {
+    if (!config) return;
+    const instances = getInstances(app);
+    const updatedInstances = instances.map(inst => 
+      inst.id === instanceId ? { ...inst, [field]: value } : inst
+    );
+    
+    setConfig({
+      ...config,
+      applications: {
+        ...config.applications,
+        [app]: updatedInstances
+      }
+    });
+    
+    // Clear test result when config changes
+    if (field === 'url' || field === 'apiKey') {
       setTestResults(prev => ({
         ...prev,
-        [app]: { status: false, testing: false }
+        [`${app}-${instanceId}`]: { status: null, testing: false }
       }));
     }
   };
 
+  // Add new instance
+  const addInstance = (app: 'radarr' | 'sonarr') => {
+    if (!config) return;
+    const instances = getInstances(app);
+    const newId = `${app}-${Date.now()}`;
+    const nextInstanceId = getNextInstanceId(app, instances);
+    const defaultConfig = app === 'radarr' ? {
+      id: newId,
+      instanceId: nextInstanceId,
+      name: '',
+      url: '',
+      apiKey: '',
+      count: 10,
+      tagName: 'upgradinatorr',
+      ignoreTag: '',
+      monitored: true,
+      movieStatus: 'released' as const,
+      qualityProfileName: '',
+      unattended: false
+    } : {
+      id: newId,
+      instanceId: nextInstanceId,
+      name: '',
+      url: '',
+      apiKey: '',
+      count: 5,
+      tagName: 'upgradinatorr',
+      ignoreTag: '',
+      monitored: true,
+      seriesStatus: '',
+      qualityProfileName: '',
+      unattended: false
+    };
+    
+    setConfig({
+      ...config,
+      applications: {
+        ...config.applications,
+        [app]: [...instances, defaultConfig]
+      }
+    });
+  };
+
+  // Remove instance
+  const removeInstance = (app: 'radarr' | 'sonarr', instanceId: string) => {
+    if (!config) return;
+    const instances = getInstances(app);
+    if (instances.length <= 1) {
+      alert('You must have at least one instance');
+      return;
+    }
+    const updatedInstances = instances.filter(inst => inst.id !== instanceId);
+    setConfig({
+      ...config,
+      applications: {
+        ...config.applications,
+        [app]: updatedInstances
+      }
+    });
+  };
+
   const updateAppConfig = (app: keyof Config['applications'], field: string, value: any) => {
     if (!config) return;
+    // For radarr/sonarr, use instance-based updates if it's an array
+    if ((app === 'radarr' || app === 'sonarr') && Array.isArray(config.applications[app])) {
+      // This is for backward compatibility - update first instance
+      const instances = config.applications[app] as any[];
+      if (instances.length > 0) {
+        updateInstanceConfig(app, instances[0].id, field, value);
+      }
+      return;
+    }
+    
     setConfig({
       ...config,
       applications: {
@@ -194,16 +330,23 @@ function Settings() {
     );
   }
 
-  const renderTestButton = (app: string) => {
-    const testResult = testResults[app];
-    const appConfig = config.applications[app as keyof Config['applications']];
+  const renderTestButton = (app: string, instanceId?: string) => {
+    const key = instanceId ? `${app}-${instanceId}` : app;
+    const testResult = testResults[key];
+    let appConfig: any;
+    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr'])) {
+      const instances = config.applications[app as 'radarr' | 'sonarr'] as any[];
+      appConfig = instances.find(inst => inst.id === instanceId);
+    } else {
+      appConfig = config.applications[app as keyof Config['applications']];
+    }
     const canTest = appConfig?.url && appConfig?.apiKey;
 
     return (
       <Flex gap="3" align="center">
         <Button
           variant="outline"
-          onClick={() => testConnection(app)}
+          onClick={() => testConnection(app, instanceId)}
           disabled={!canTest || testResult?.testing}
         >
           {testResult?.testing ? (
@@ -229,6 +372,48 @@ function Settings() {
     );
   };
 
+  const testConnection = async (app: string, instanceId?: string) => {
+    if (!config) return;
+    const key = instanceId ? `${app}-${instanceId}` : app;
+    let appConfig: any;
+    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr'])) {
+      const instances = config.applications[app as 'radarr' | 'sonarr'] as any[];
+      appConfig = instances.find(inst => inst.id === instanceId);
+    } else {
+      appConfig = config.applications[app as keyof Config['applications']];
+    }
+    if (!appConfig || !appConfig.url || !appConfig.apiKey) {
+      setTestResults(prev => ({
+        ...prev,
+        [key]: { status: false, testing: false }
+      }));
+      return;
+    }
+
+    // Set testing state
+    setTestResults(prev => ({
+      ...prev,
+      [key]: { status: null, testing: true }
+    }));
+
+    try {
+      // Send current local config values to test endpoint
+      const response = await axios.post(`/api/config/test/${app}`, {
+        url: appConfig.url,
+        apiKey: appConfig.apiKey
+      });
+      setTestResults(prev => ({
+        ...prev,
+        [key]: { status: response.data.success === true, testing: false }
+      }));
+    } catch (error: any) {
+      setTestResults(prev => ({
+        ...prev,
+        [key]: { status: false, testing: false }
+      }));
+    }
+  };
+
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
@@ -249,7 +434,7 @@ function Settings() {
           </Callout.Root>
         )}
 
-        <Tabs.Root defaultValue="radarr">
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Trigger value="radarr">Radarr</Tabs.Trigger>
             <Tabs.Trigger value="sonarr">Sonarr</Tabs.Trigger>
@@ -258,240 +443,314 @@ function Settings() {
           </Tabs.List>
 
           <Tabs.Content value="radarr" style={{ paddingTop: '1rem' }}>
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Radarr Configuration</Heading>
-                <Separator />
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    placeholder="http://localhost:7878"
-                    value={config.applications.radarr.url}
-                    onChange={(e) => updateAppConfig('radarr', 'url', e.target.value)}
-                    label="Radarr URL"
-                  />
-                  <Text size="1" color="gray">
-                    The base URL where your Radarr instance is accessible (e.g., http://localhost:7878 or https://radarr.example.com)
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    type="password"
-                    placeholder="API Key"
-                    value={config.applications.radarr.apiKey}
-                    onChange={(e) => updateAppConfig('radarr', 'apiKey', e.target.value)}
-                    label="API Key"
-                  />
-                  <Text size="1" color="gray">
-                    Your Radarr API key found in Settings → General → Security → API Key (must be 32 characters)
-                  </Text>
-                </Flex>
-
-                {renderTestButton('radarr')}
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    type="number"
-                    value={config.applications.radarr.count.toString()}
-                    onChange={(e) => updateAppConfig('radarr', 'count', parseInt(e.target.value) || 10)}
-                    label="Number of Movies to Search"
-                  />
-                  <Text size="1" color="gray">
-                    How many movies to randomly select and search for upgrades each time the script runs. Use "max" to search all matching movies.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.radarr.tagName}
-                    onChange={(e) => updateAppConfig('radarr', 'tagName', e.target.value)}
-                    label="Tag Name"
-                  />
-                  <Text size="1" color="gray">
-                    The tag name to use for tracking which movies have been searched. This tag will be created automatically if it doesn't exist.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.radarr.ignoreTag}
-                    onChange={(e) => updateAppConfig('radarr', 'ignoreTag', e.target.value)}
-                    label="Ignore Tag (optional)"
-                  />
-                  <Text size="1" color="gray">
-                    Movies with this tag will be excluded from upgrade searches. Leave empty to include all movies matching other criteria.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Switch
-                    checked={config.applications.radarr.monitored}
-                    onCheckedChange={(checked) => updateAppConfig('radarr', 'monitored', checked)}
-                  />
-                  <Text size="2" color="gray">
-                    Search Monitored Movies Only - When enabled, only movies that are currently monitored will be considered for upgrades.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Select.Root
-                    value={config.applications.radarr.movieStatus}
-                    onValueChange={(value) => updateAppConfig('radarr', 'movieStatus', value)}
-                  >
-                    <Select.Trigger label="Minimum Movie Status" />
-                    <Select.Content>
-                      <Select.Item value="announced">Announced</Select.Item>
-                      <Select.Item value="in cinemas">In Cinemas</Select.Item>
-                      <Select.Item value="released">Released</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                  <Text size="1" color="gray">
-                    Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.radarr.qualityProfileName}
-                    onChange={(e) => updateAppConfig('radarr', 'qualityProfileName', e.target.value)}
-                    label="Quality Profile Name (optional)"
-                  />
-                  <Text size="1" color="gray">
-                    Only movies using this specific quality profile will be considered. Leave empty to include all quality profiles.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Switch
-                    checked={config.applications.radarr.unattended}
-                    onCheckedChange={(checked) => updateAppConfig('radarr', 'unattended', checked)}
-                  />
-                  <Text size="2" color="gray">
-                    Unattended Mode - When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.
-                  </Text>
-                </Flex>
+            <Flex direction="column" gap="3">
+              <Flex align="center" justify="between">
+                <Heading size="5">Radarr Instances</Heading>
+                <Button onClick={() => addInstance('radarr')}>
+                  <PlusIcon /> Add Instance
+                </Button>
               </Flex>
-            </Card>
+              
+              {getInstances('radarr').map((instance, idx) => (
+                <Card key={instance.id}>
+                  <Flex direction="column" gap="4" p="4">
+                    <Flex align="center" justify="between">
+                      <Text size="3" weight="bold">
+                        {instance.name || `Radarr ${instance.instanceId || idx + 1}`}
+                      </Text>
+                      {getInstances('radarr').length > 1 && (
+                        <Button 
+                          variant="soft" 
+                          color="red" 
+                          onClick={() => removeInstance('radarr', instance.id)}
+                        >
+                          <TrashIcon /> Remove
+                        </Button>
+                      )}
+                    </Flex>
+                    <Separator />
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Instance Name (optional)</Text>
+                      <TextField.Root
+                        value={instance.name || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'name', e.target.value)}
+                        placeholder={`Radarr ${instance.instanceId || idx + 1}`}
+                      />
+                      <Text size="1" color="gray">
+                        A friendly name to identify this instance (e.g., "Main Radarr", "4K Radarr"). Leave empty to use default ID.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Radarr URL</Text>
+                      <TextField.Root
+                        placeholder="http://localhost:7878"
+                        value={instance.url || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'url', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        The base URL where your Radarr instance is accessible (e.g., http://localhost:7878 or https://radarr.example.com)
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">API Key</Text>
+                      <TextField.Root
+                        type="password"
+                        placeholder="API Key"
+                        value={instance.apiKey || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'apiKey', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Your Radarr API key found in Settings → General → Security → API Key (must be 32 characters)
+                      </Text>
+                    </Flex>
+
+                    {renderTestButton('radarr', instance.id)}
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Number of Movies to Search</Text>
+                      <TextField.Root
+                        type="number"
+                        value={(instance.count || 10).toString()}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'count', parseInt(e.target.value) || 10)}
+                      />
+                      <Text size="1" color="gray">
+                        How many movies to randomly select and search for upgrades each time the script runs. Use "max" to search all matching movies.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Tag Name</Text>
+                      <TextField.Root
+                        value={instance.tagName || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'tagName', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        The tag name to use for tracking which movies have been searched. This tag will be created automatically if it doesn't exist.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Ignore Tag (optional)</Text>
+                      <TextField.Root
+                        value={instance.ignoreTag || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'ignoreTag', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Movies with this tag will be excluded from upgrade searches. Leave empty to include all movies matching other criteria.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Switch
+                        checked={instance.monitored ?? true}
+                        onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'monitored', checked)}
+                      />
+                      <Text size="2" color="gray">
+                        Search Monitored Movies Only - When enabled, only movies that are currently monitored will be considered for upgrades.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Minimum Movie Status</Text>
+                      <Select.Root
+                        value={instance.movieStatus || 'released'}
+                        onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
+                      >
+                        <Select.Trigger />
+                        <Select.Content position="popper" sideOffset={5}>
+                          <Select.Item value="announced">Announced</Select.Item>
+                          <Select.Item value="in cinemas">In Cinemas</Select.Item>
+                          <Select.Item value="released">Released</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                      <Text size="1" color="gray">
+                        Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Quality Profile Name (optional)</Text>
+                      <TextField.Root
+                        value={instance.qualityProfileName || ''}
+                        onChange={(e) => updateInstanceConfig('radarr', instance.id, 'qualityProfileName', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Only movies using this specific quality profile will be considered. Leave empty to include all quality profiles.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Switch
+                        checked={instance.unattended ?? false}
+                        onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'unattended', checked)}
+                      />
+                      <Text size="2" color="gray">
+                        Unattended Mode - When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.
+                      </Text>
+                    </Flex>
+                  </Flex>
+                </Card>
+              ))}
+            </Flex>
           </Tabs.Content>
 
           <Tabs.Content value="sonarr" style={{ paddingTop: '1rem' }}>
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Sonarr Configuration</Heading>
-                <Separator />
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    placeholder="http://localhost:8989"
-                    value={config.applications.sonarr.url}
-                    onChange={(e) => updateAppConfig('sonarr', 'url', e.target.value)}
-                    label="Sonarr URL"
-                  />
-                  <Text size="1" color="gray">
-                    The base URL where your Sonarr instance is accessible (e.g., http://localhost:8989 or https://sonarr.example.com)
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    type="password"
-                    placeholder="API Key"
-                    value={config.applications.sonarr.apiKey}
-                    onChange={(e) => updateAppConfig('sonarr', 'apiKey', e.target.value)}
-                    label="API Key"
-                  />
-                  <Text size="1" color="gray">
-                    Your Sonarr API key found in Settings → General → Security → API Key (must be 32 characters)
-                  </Text>
-                </Flex>
-
-                {renderTestButton('sonarr')}
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    type="number"
-                    value={config.applications.sonarr.count.toString()}
-                    onChange={(e) => updateAppConfig('sonarr', 'count', parseInt(e.target.value) || 5)}
-                    label="Number of Series to Search"
-                  />
-                  <Text size="1" color="gray">
-                    How many series to randomly select and search for upgrades each time the script runs. Use "max" to search all matching series.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.sonarr.tagName}
-                    onChange={(e) => updateAppConfig('sonarr', 'tagName', e.target.value)}
-                    label="Tag Name"
-                  />
-                  <Text size="1" color="gray">
-                    The tag name to use for tracking which series have been searched. This tag will be created automatically if it doesn't exist.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.sonarr.ignoreTag}
-                    onChange={(e) => updateAppConfig('sonarr', 'ignoreTag', e.target.value)}
-                    label="Ignore Tag (optional)"
-                  />
-                  <Text size="1" color="gray">
-                    Series with this tag will be excluded from upgrade searches. Leave empty to include all series matching other criteria.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Switch
-                    checked={config.applications.sonarr.monitored}
-                    onCheckedChange={(checked) => updateAppConfig('sonarr', 'monitored', checked)}
-                  />
-                  <Text size="2" color="gray">
-                    Search Monitored Series Only - When enabled, only series that are currently monitored will be considered for upgrades.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Select.Root
-                    value={config.applications.sonarr.seriesStatus || 'any'}
-                    onValueChange={(value) => updateAppConfig('sonarr', 'seriesStatus', value === 'any' ? '' : value)}
-                  >
-                    <Select.Trigger label="Series Status (optional)" />
-                    <Select.Content>
-                      <Select.Item value="any">Any</Select.Item>
-                      <Select.Item value="continuing">Continuing</Select.Item>
-                      <Select.Item value="upcoming">Upcoming</Select.Item>
-                      <Select.Item value="ended">Ended</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                  <Text size="1" color="gray">
-                    Only series with this status will be considered for upgrades. Leave as "Any" to include all statuses.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={config.applications.sonarr.qualityProfileName}
-                    onChange={(e) => updateAppConfig('sonarr', 'qualityProfileName', e.target.value)}
-                    label="Quality Profile Name (optional)"
-                  />
-                  <Text size="1" color="gray">
-                    Only series using this specific quality profile will be considered. Leave empty to include all quality profiles.
-                  </Text>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Switch
-                    checked={config.applications.sonarr.unattended}
-                    onCheckedChange={(checked) => updateAppConfig('sonarr', 'unattended', checked)}
-                  />
-                  <Text size="2" color="gray">
-                    Unattended Mode - When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.
-                  </Text>
-                </Flex>
+            <Flex direction="column" gap="3">
+              <Flex align="center" justify="between">
+                <Heading size="5">Sonarr Instances</Heading>
+                <Button onClick={() => addInstance('sonarr')}>
+                  <PlusIcon /> Add Instance
+                </Button>
               </Flex>
-            </Card>
+              
+              {getInstances('sonarr').map((instance, idx) => (
+                <Card key={instance.id}>
+                  <Flex direction="column" gap="4" p="4">
+                    <Flex align="center" justify="between">
+                      <Text size="3" weight="bold">
+                        {instance.name || `Sonarr ${instance.instanceId || idx + 1}`}
+                      </Text>
+                      {getInstances('sonarr').length > 1 && (
+                        <Button 
+                          variant="soft" 
+                          color="red" 
+                          onClick={() => removeInstance('sonarr', instance.id)}
+                        >
+                          <TrashIcon /> Remove
+                        </Button>
+                      )}
+                    </Flex>
+                    <Separator />
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Instance Name (optional)</Text>
+                      <TextField.Root
+                        value={instance.name || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'name', e.target.value)}
+                        placeholder={`Sonarr ${instance.instanceId || idx + 1}`}
+                      />
+                      <Text size="1" color="gray">
+                        A friendly name to identify this instance (e.g., "Main Sonarr", "Anime Sonarr"). Leave empty to use default ID.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Sonarr URL</Text>
+                      <TextField.Root
+                        placeholder="http://localhost:8989"
+                        value={instance.url || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'url', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        The base URL where your Sonarr instance is accessible (e.g., http://localhost:8989 or https://sonarr.example.com)
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">API Key</Text>
+                      <TextField.Root
+                        type="password"
+                        placeholder="API Key"
+                        value={instance.apiKey || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'apiKey', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Your Sonarr API key found in Settings → General → Security → API Key (must be 32 characters)
+                      </Text>
+                    </Flex>
+
+                    {renderTestButton('sonarr', instance.id)}
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Number of Series to Search</Text>
+                      <TextField.Root
+                        type="number"
+                        value={(instance.count || 5).toString()}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'count', parseInt(e.target.value) || 5)}
+                      />
+                      <Text size="1" color="gray">
+                        How many series to randomly select and search for upgrades each time the script runs. Use "max" to search all matching series.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Tag Name</Text>
+                      <TextField.Root
+                        value={instance.tagName || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'tagName', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        The tag name to use for tracking which series have been searched. This tag will be created automatically if it doesn't exist.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Ignore Tag (optional)</Text>
+                      <TextField.Root
+                        value={instance.ignoreTag || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'ignoreTag', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Series with this tag will be excluded from upgrade searches. Leave empty to include all series matching other criteria.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Switch
+                        checked={instance.monitored ?? true}
+                        onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'monitored', checked)}
+                      />
+                      <Text size="2" color="gray">
+                        Search Monitored Series Only - When enabled, only series that are currently monitored will be considered for upgrades.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Series Status (optional)</Text>
+                      <Select.Root
+                        value={instance.seriesStatus || 'any'}
+                        onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
+                      >
+                        <Select.Trigger />
+                        <Select.Content position="popper" sideOffset={5}>
+                          <Select.Item value="any">Any</Select.Item>
+                          <Select.Item value="continuing">Continuing</Select.Item>
+                          <Select.Item value="upcoming">Upcoming</Select.Item>
+                          <Select.Item value="ended">Ended</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                      <Text size="1" color="gray">
+                        Only series with this status will be considered for upgrades. Leave as "Any" to include all statuses.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Text size="2" weight="medium">Quality Profile Name (optional)</Text>
+                      <TextField.Root
+                        value={instance.qualityProfileName || ''}
+                        onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'qualityProfileName', e.target.value)}
+                      />
+                      <Text size="1" color="gray">
+                        Only series using this specific quality profile will be considered. Leave empty to include all quality profiles.
+                      </Text>
+                    </Flex>
+
+                    <Flex direction="column" gap="1">
+                      <Switch
+                        checked={instance.unattended ?? false}
+                        onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'unattended', checked)}
+                      />
+                      <Text size="2" color="gray">
+                        Unattended Mode - When enabled, the script will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation.
+                      </Text>
+                    </Flex>
+                  </Flex>
+                </Card>
+              ))}
+            </Flex>
           </Tabs.Content>
 
           <Tabs.Content value="notifications" style={{ paddingTop: '1rem' }}>
@@ -501,10 +760,10 @@ function Settings() {
                 <Separator />
 
                 <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Discord Webhook URL (optional)</Text>
                   <TextField.Root
                     value={config.notifications.discordWebhook}
                     onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
-                    label="Discord Webhook URL (optional)"
                     placeholder="https://discord.com/api/webhooks/..."
                   />
                   <Text size="1" color="gray">
@@ -513,10 +772,10 @@ function Settings() {
                 </Flex>
 
                 <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Notifiarr Passthrough Webhook (optional)</Text>
                   <TextField.Root
                     value={config.notifications.notifiarrPassthroughWebhook}
                     onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
-                    label="Notifiarr Passthrough Webhook (optional)"
                   />
                   <Text size="1" color="gray">
                     Notifiarr passthrough webhook URL for notifications. Leave empty to disable Notifiarr notifications.
@@ -524,10 +783,10 @@ function Settings() {
                 </Flex>
 
                 <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Notifiarr Discord Channel ID (optional)</Text>
                   <TextField.Root
                     value={config.notifications.notifiarrPassthroughDiscordChannelId}
                     onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
-                    label="Notifiarr Discord Channel ID (optional)"
                   />
                   <Text size="1" color="gray">
                     Discord channel ID where Notifiarr notifications should be sent (17-19 digit number). Required if using Notifiarr webhook.
@@ -566,6 +825,7 @@ function Settings() {
                 </Flex>
 
                 <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Schedule</Text>
                   <Select.Root
                     value={schedulerPreset}
                     onValueChange={(value) => {
@@ -586,7 +846,7 @@ function Settings() {
                       }
                     }}
                   >
-                    <Select.Trigger label="Schedule" />
+                    <Select.Trigger />
                     <Select.Content position="popper" sideOffset={5}>
                       <Select.Item value="every-hour">Every Hour</Select.Item>
                       <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>

@@ -38,7 +38,6 @@ configRouter.post('/test/:app', async (req, res) => {
     if (req.body && req.body.url && req.body.apiKey) {
       // Use provided config from request body
       appConfig = {
-        enabled: true, // Assume enabled for testing
         url: req.body.url,
         apiKey: req.body.apiKey
       };

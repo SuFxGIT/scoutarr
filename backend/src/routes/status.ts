@@ -15,20 +15,53 @@ statusRouter.get('/', async (req, res) => {
     // Helper to check application status
     const checkAppStatus = async (
       appName: string,
-      appConfig: { enabled: boolean; url: string; apiKey: string }
+      appConfig: { url: string; apiKey: string }
     ) => {
-      if (appConfig.enabled && appConfig.url && appConfig.apiKey) {
-        const connected = await testStarrConnection(appConfig.url, appConfig.apiKey, appName);
-        return { connected };
-      } else {
-        logger.debug(`⚠️  ${appName} not configured`);
+      // Check if configured (has URL and API key)
+      const isConfigured = !!(appConfig.url && appConfig.apiKey);
+      
+      if (!isConfigured) {
+        logger.debug(`⚠️  ${appName} not configured (missing URL or API key)`);
         return { connected: false, configured: false };
       }
+      
+      // Test connection
+      const connected = await testStarrConnection(appConfig.url, appConfig.apiKey, appName);
+      
+      return { connected, configured: true };
     };
 
-    // Test all applications
-    status.radarr = await checkAppStatus('Radarr', config.applications.radarr);
-    status.sonarr = await checkAppStatus('Sonarr', config.applications.sonarr);
+    // Check Radarr instances
+    if (Array.isArray(config.applications.radarr)) {
+      for (const instance of config.applications.radarr) {
+        const instanceId = instance.id || 'radarr-1';
+        const instanceName = instance.name || `Radarr ${instance.instanceId || '1'}`;
+        const instanceStatus = await checkAppStatus(instanceName, instance);
+        status[instanceId] = {
+          ...instanceStatus,
+          instanceName,
+          instanceId: instance.instanceId
+        };
+      }
+    } else {
+      status.radarr = await checkAppStatus('Radarr', config.applications.radarr);
+    }
+
+    // Check Sonarr instances
+    if (Array.isArray(config.applications.sonarr)) {
+      for (const instance of config.applications.sonarr) {
+        const instanceId = instance.id || 'sonarr-1';
+        const instanceName = instance.name || `Sonarr ${instance.instanceId || '1'}`;
+        const instanceStatus = await checkAppStatus(instanceName, instance);
+        status[instanceId] = {
+          ...instanceStatus,
+          instanceName,
+          instanceId: instance.instanceId
+        };
+      }
+    } else {
+      status.sonarr = await checkAppStatus('Sonarr', config.applications.sonarr);
+    }
 
     res.json(status);
   } catch (error: any) {

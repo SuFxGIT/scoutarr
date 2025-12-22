@@ -12,6 +12,7 @@ const STATS_FILE = path.join(CONFIG_DIR, 'stats.json');
 export interface UpgradeEntry {
   timestamp: string;
   application: string;
+  instance?: string; // Instance name/ID
   count: number;
   items: Array<{ id: number; title: string }>;
 }
@@ -19,6 +20,7 @@ export interface UpgradeEntry {
 export interface Stats {
   totalUpgrades: number;
   upgradesByApplication: Record<string, number>;
+  upgradesByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
   recentUpgrades: UpgradeEntry[];
   lastUpgrade?: string;
 }
@@ -46,6 +48,7 @@ class StatsService {
     const defaultStats: Stats = {
       totalUpgrades: 0,
       upgradesByApplication: {},
+      upgradesByInstance: {},
       recentUpgrades: []
     };
     await fs.writeFile(STATS_FILE, JSON.stringify(defaultStats, null, 2));
@@ -72,19 +75,26 @@ class StatsService {
     }
   }
 
-  async addUpgrade(application: string, count: number, items: Array<{ id: number; title: string }>): Promise<void> {
+  async addUpgrade(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
     try {
       const stats = await this.loadStats();
       const entry: UpgradeEntry = {
         timestamp: new Date().toISOString(),
         application: application.toLowerCase(),
+        instance,
         count,
         items
       };
 
       stats.totalUpgrades += count;
-      stats.upgradesByApplication[application.toLowerCase()] = 
-        (stats.upgradesByApplication[application.toLowerCase()] || 0) + count;
+      const appKey = application.toLowerCase();
+      stats.upgradesByApplication[appKey] = 
+        (stats.upgradesByApplication[appKey] || 0) + count;
+      
+      // Track by instance
+      const instanceKey = instance ? `${appKey}-${instance}` : appKey;
+      stats.upgradesByInstance[instanceKey] = 
+        (stats.upgradesByInstance[instanceKey] || 0) + count;
       
       // Add to recent upgrades (keep last 100 entries)
       stats.recentUpgrades.unshift(entry);
@@ -98,6 +108,7 @@ class StatsService {
       this.stats = stats;
       logger.debug('📊 Stats updated', { 
         application,
+        instance,
         count,
         totalUpgrades: stats.totalUpgrades
       });
@@ -115,6 +126,7 @@ class StatsService {
       return {
         totalUpgrades: 0,
         upgradesByApplication: {},
+        upgradesByInstance: {},
         recentUpgrades: []
       };
     }
