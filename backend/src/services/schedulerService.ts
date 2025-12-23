@@ -131,7 +131,7 @@ class SchedulerService {
     }
   }
 
-  private addToHistory(entry: SchedulerRunHistory): void {
+  addToHistory(entry: SchedulerRunHistory): void {
     this.runHistory.unshift(entry);
     if (this.runHistory.length > this.maxHistorySize) {
       this.runHistory = this.runHistory.slice(0, this.maxHistorySize);

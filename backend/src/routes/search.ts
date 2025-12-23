@@ -3,6 +3,7 @@ import { configService } from '../services/configService.js';
 import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { statsService } from '../services/statsService.js';
+import { schedulerService } from '../services/schedulerService.js';
 import logger from '../utils/logger.js';
 import { getConfiguredInstances } from '../utils/starrUtils.js';
 
@@ -279,12 +280,39 @@ searchRouter.post('/run', async (req, res) => {
       }))
     });
 
+    // Record this manual run in the scheduler history so it appears in the dashboard logs
+    try {
+      schedulerService.addToHistory({
+        timestamp: new Date().toISOString(),
+        results,
+        success: true
+      });
+    } catch (historyError: any) {
+      logger.debug('Failed to record manual run in scheduler history', {
+        error: historyError.message
+      });
+    }
+
     res.json(results);
   } catch (error: any) {
     logger.error('❌ Search operation failed', {
       error: error.message,
       stack: error.stack
     });
+
+    // Record failed manual run in scheduler history
+    try {
+      schedulerService.addToHistory({
+        timestamp: new Date().toISOString(),
+        results: {},
+        success: false,
+        error: error.message
+      } as any);
+    } catch (historyError: any) {
+      logger.debug('Failed to record failed manual run in scheduler history', {
+        error: historyError.message
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 });
