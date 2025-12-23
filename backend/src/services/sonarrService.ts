@@ -115,69 +115,59 @@ class SonarrService {
 
       // Get tag ID for filtering
       const tagId = await this.getTagId(config, config.tagName);
-      
-      // Filter by tag presence/absence based on unattended mode
       if (tagId !== null) {
         const before = filtered.length;
-        if (unattended) {
-          // Unattended mode: only include media WITH the tag
-          filtered = filtered.filter(s => s.tags.includes(tagId));
-          logger.debug('🔽 Filtered to only include series with tag (unattended mode)', { 
+        // Always only include media WITHOUT the tag for primary selection.
+        // Unattended mode behavior (removing tags and re-filtering when no media
+        // is found) is handled at the scheduler layer, not here.
+        filtered = filtered.filter(s => !s.tags.includes(tagId));
+        logger.debug('🔽 Filtered out already tagged series', { 
+          before, 
+          after: filtered.length, 
+          tagName: config.tagName 
+        });
+      }
+
+      // Additional filters apply in both attended and unattended modes.
+      // Unattended-specific behavior is handled by the scheduler when no media is found.
+
+      // Filter by series status
+      if (config.seriesStatus) {
+        const before = filtered.length;
+        filtered = filtered.filter(s => s.status === config.seriesStatus);
+        logger.debug('🔽 Filtered by series status', { 
+          before, 
+          after: filtered.length, 
+          status: config.seriesStatus 
+        });
+      }
+
+      // Filter by quality profile
+      if (config.qualityProfileName) {
+        const profiles = await this.getQualityProfiles(config);
+        const profile = profiles.find(p => p.name === config.qualityProfileName);
+        if (profile) {
+          const before = filtered.length;
+          filtered = filtered.filter(s => s.qualityProfileId === profile.id);
+          logger.debug('🔽 Filtered by quality profile', { 
             before, 
             after: filtered.length, 
-            tagName: config.tagName 
-          });
-        } else {
-          // Normal mode: only include media WITHOUT the tag
-          filtered = filtered.filter(s => !s.tags.includes(tagId));
-          logger.debug('🔽 Filtered out already tagged series', { 
-            before, 
-            after: filtered.length, 
-            tagName: config.tagName 
+            profile: config.qualityProfileName 
           });
         }
       }
 
-      // Only apply additional filters in normal (attended) mode
-      if (!unattended) {
-        // Filter by series status
-        if (config.seriesStatus) {
+      // Filter out series with ignore tag
+      if (config.ignoreTag) {
+        const ignoreTagId = await this.getTagId(config, config.ignoreTag);
+        if (ignoreTagId !== null) {
           const before = filtered.length;
-          filtered = filtered.filter(s => s.status === config.seriesStatus);
-          logger.debug('🔽 Filtered by series status', { 
+          filtered = filtered.filter(s => !s.tags.includes(ignoreTagId));
+          logger.debug('🔽 Filtered out ignore tag', { 
             before, 
             after: filtered.length, 
-            status: config.seriesStatus 
+            ignoreTag: config.ignoreTag 
           });
-        }
-
-        // Filter by quality profile
-        if (config.qualityProfileName) {
-          const profiles = await this.getQualityProfiles(config);
-          const profile = profiles.find(p => p.name === config.qualityProfileName);
-          if (profile) {
-            const before = filtered.length;
-            filtered = filtered.filter(s => s.qualityProfileId === profile.id);
-            logger.debug('🔽 Filtered by quality profile', { 
-              before, 
-              after: filtered.length, 
-              profile: config.qualityProfileName 
-            });
-          }
-        }
-
-        // Filter out series with ignore tag
-        if (config.ignoreTag) {
-          const ignoreTagId = await this.getTagId(config, config.ignoreTag);
-          if (ignoreTagId !== null) {
-            const before = filtered.length;
-            filtered = filtered.filter(s => !s.tags.includes(ignoreTagId));
-            logger.debug('🔽 Filtered out ignore tag', { 
-              before, 
-              after: filtered.length, 
-              ignoreTag: config.ignoreTag 
-            });
-          }
         }
       }
 

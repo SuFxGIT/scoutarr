@@ -114,78 +114,68 @@ class RadarrService {
 
       // Get tag ID for filtering
       const tagId = await this.getTagId(config, config.tagName);
-      
-      // Filter by tag presence/absence based on unattended mode
       if (tagId !== null) {
         const before = filtered.length;
-        if (unattended) {
-          // Unattended mode: only include media WITH the tag
-          filtered = filtered.filter(m => m.tags.includes(tagId));
-          logger.debug('🔽 Filtered to only include movies with tag (unattended mode)', { 
+        // Always only include media WITHOUT the tag for primary selection.
+        // Unattended mode behavior (removing tags and re-filtering when no media
+        // is found) is handled at the scheduler layer, not here.
+        filtered = filtered.filter(m => !m.tags.includes(tagId));
+        logger.debug('🔽 Filtered out already tagged movies', { 
+          before, 
+          after: filtered.length, 
+          tagName: config.tagName 
+        });
+      }
+
+      // Additional filters apply in both attended and unattended modes.
+      // Unattended-specific behavior is handled by the scheduler when no media is found.
+
+      // Filter by movie status
+      if (config.movieStatus) {
+        const before = filtered.length;
+        filtered = filtered.filter(m => {
+          if (config.movieStatus === 'released') {
+            return m.status === 'released';
+          } else if (config.movieStatus === 'in cinemas') {
+            return m.status === 'inCinemas';
+          } else if (config.movieStatus === 'announced') {
+            return m.status === 'announced';
+          }
+          return true;
+        });
+        logger.debug('🔽 Filtered by movie status', { 
+          before, 
+          after: filtered.length, 
+          status: config.movieStatus 
+        });
+      }
+
+      // Filter by quality profile
+      if (config.qualityProfileName) {
+        const profiles = await this.getQualityProfiles(config);
+        const profile = profiles.find(p => p.name === config.qualityProfileName);
+        if (profile) {
+          const before = filtered.length;
+          filtered = filtered.filter(m => m.qualityProfileId === profile.id);
+          logger.debug('🔽 Filtered by quality profile', { 
             before, 
             after: filtered.length, 
-            tagName: config.tagName 
-          });
-        } else {
-          // Normal mode: only include media WITHOUT the tag
-          filtered = filtered.filter(m => !m.tags.includes(tagId));
-          logger.debug('🔽 Filtered out already tagged movies', { 
-            before, 
-            after: filtered.length, 
-            tagName: config.tagName 
+            profile: config.qualityProfileName 
           });
         }
       }
 
-      // Only apply additional filters in normal (attended) mode
-      if (!unattended) {
-        // Filter by movie status
-        if (config.movieStatus) {
+      // Filter out movies with ignore tag
+      if (config.ignoreTag) {
+        const ignoreTagId = await this.getTagId(config, config.ignoreTag);
+        if (ignoreTagId !== null) {
           const before = filtered.length;
-          filtered = filtered.filter(m => {
-            if (config.movieStatus === 'released') {
-              return m.status === 'released';
-            } else if (config.movieStatus === 'in cinemas') {
-              return m.status === 'inCinemas';
-            } else if (config.movieStatus === 'announced') {
-              return m.status === 'announced';
-            }
-            return true;
-          });
-          logger.debug('🔽 Filtered by movie status', { 
+          filtered = filtered.filter(m => !m.tags.includes(ignoreTagId));
+          logger.debug('🔽 Filtered out ignore tag', { 
             before, 
             after: filtered.length, 
-            status: config.movieStatus 
+            ignoreTag: config.ignoreTag 
           });
-        }
-
-        // Filter by quality profile
-        if (config.qualityProfileName) {
-          const profiles = await this.getQualityProfiles(config);
-          const profile = profiles.find(p => p.name === config.qualityProfileName);
-          if (profile) {
-            const before = filtered.length;
-            filtered = filtered.filter(m => m.qualityProfileId === profile.id);
-            logger.debug('🔽 Filtered by quality profile', { 
-              before, 
-              after: filtered.length, 
-              profile: config.qualityProfileName 
-            });
-          }
-        }
-
-        // Filter out movies with ignore tag
-        if (config.ignoreTag) {
-          const ignoreTagId = await this.getTagId(config, config.ignoreTag);
-          if (ignoreTagId !== null) {
-            const before = filtered.length;
-            filtered = filtered.filter(m => !m.tags.includes(ignoreTagId));
-            logger.debug('🔽 Filtered out ignore tag', { 
-              before, 
-              after: filtered.length, 
-              ignoreTag: config.ignoreTag 
-            });
-          }
         }
       }
 
