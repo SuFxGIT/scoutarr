@@ -48,21 +48,41 @@ configRouter.post('/test/:app', async (req, res) => {
   const { app } = req.params;
   logger.info(`🔌 Testing connection for ${app}`);
   try {
-    // Use config from request body if provided (for testing unsaved changes), otherwise use saved config
-    let appConfig;
-    if (req.body && req.body.url && req.body.apiKey) {
-      // Use provided config from request body
+    // Shape used for testing connections
+    let appConfig: { url: string; apiKey: string } | null = null;
+
+    // Use config from request body if provided (for testing unsaved changes)
+    if (req.body && typeof req.body.url === 'string' && typeof req.body.apiKey === 'string') {
       appConfig = {
         url: req.body.url,
         apiKey: req.body.apiKey
       };
     } else {
-      // Use saved config
+      // Fallback to saved config
       const config = configService.getConfig();
-      appConfig = config.applications[app as keyof typeof config.applications];
+      const savedConfig = config.applications[app as keyof typeof config.applications] as any;
+
+      if (Array.isArray(savedConfig)) {
+        // For Radarr/Sonarr, pick the first enabled instance with URL and API key
+        const instance = savedConfig.find(
+          (inst: any) => inst && inst.enabled !== false && inst.url && inst.apiKey
+        );
+        if (instance) {
+          appConfig = {
+            url: instance.url,
+            apiKey: instance.apiKey
+          };
+        }
+      } else if (savedConfig && savedConfig.url && savedConfig.apiKey) {
+        // Single-app style config
+        appConfig = {
+          url: savedConfig.url,
+          apiKey: savedConfig.apiKey
+        };
+      }
     }
 
-    if (!appConfig || !appConfig.url || !appConfig.apiKey) {
+    if (!appConfig) {
       logger.warn(`⚠️  ${app} is not configured`);
       return res.status(400).json({ error: 'Application URL and API Key are required' });
     }

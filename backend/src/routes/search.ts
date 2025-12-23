@@ -177,9 +177,10 @@ export async function processApplication<TMedia>(
       logger.info(`🔄 Unattended mode: No media found, removing tag from all ${processor.name} and re-filtering`);
       const tagId = await processor.getTagId(processor.config, processor.config.tagName);
       if (tagId !== null) {
-        const mediaWithTag = allMedia.filter(
-          m => m.monitored === processor.config.monitored && m.tags.includes(tagId)
-        );
+        const mediaWithTag = allMedia.filter(m => {
+          const mediaAny = m as any;
+          return mediaAny.monitored === processor.config.monitored && Array.isArray(mediaAny.tags) && mediaAny.tags.includes(tagId);
+        });
         if (mediaWithTag.length > 0) {
           const mediaIds = mediaWithTag.map(processor.getMediaId);
           await processor.removeTag(processor.config, mediaIds, tagId);
@@ -342,12 +343,13 @@ async function processManualRun<TMedia>(
       if (tagId !== null) {
         // Simulate tag removal: create a copy of media with the tag removed from tags array
         const mediaWithTagRemoved = media.map(m => {
+          const mediaAny = m as any;
           // Check if this media item has the tag and matches monitored status
-          if (m.monitored === config.monitored && (m as any).tags.includes(tagId)) {
+          if (mediaAny.monitored === config.monitored && Array.isArray(mediaAny.tags) && mediaAny.tags.includes(tagId)) {
             // Create a copy with the tag removed
             return {
               ...m,
-              tags: (m as any).tags.filter((t: number) => t !== tagId)
+              tags: mediaAny.tags.filter((t: number) => t !== tagId)
             };
           }
           return m;

@@ -1102,7 +1102,7 @@ function Settings() {
                         if (!config.scheduler) {
                           setConfig({
                             ...config,
-                            scheduler: { enabled: false, schedule: e.target.value }
+                            scheduler: { enabled: false, schedule: e.target.value, unattended: false }
                           });
                         } else {
                           setConfig({
