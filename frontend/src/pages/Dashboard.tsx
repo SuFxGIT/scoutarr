@@ -581,25 +581,11 @@ function Dashboard() {
               <Flex direction="column" gap="2">
                 <Flex align="center" justify="between">
                   <Heading size="5">Recent Triggers</Heading>
-                  <Flex gap="2" align="center">
-                    {totalItems > 0 && (
-                      <Text size="2" color="gray">
-                        Page {currentPage} of {totalPages} ({totalItems} total)
-                      </Text>
-                    )}
-                    {totalItems > 0 && (
-                      renderConfirmButtons('recent', () => clearRecentMutation.mutate()) || (
-                        <Button 
-                          variant="outline" 
-                          color="red"
-                          size="2" 
-                          onClick={() => setConfirmingClear('recent')}
-                        >
-                          Clear Recent
-                        </Button>
-                      )
-                    )}
-                  </Flex>
+                  {totalItems > 0 && totalPages > 1 && (
+                    <Text size="2" color="gray">
+                      Page {currentPage} of {totalPages} ({totalItems} total)
+                    </Text>
+                  )}
                 </Flex>
                 <Separator />
                 {totalItems === 0 ? (
