@@ -36,6 +36,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
+  const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
   const [confirmingResetConfig, setConfirmingResetConfig] = useState<boolean>(false);
   const [showIntroCallout, setShowIntroCallout] = useState(true);
   const [showHintCallout, setShowHintCallout] = useState(true);
@@ -240,10 +241,6 @@ function Settings() {
   const removeInstance = (app: 'radarr' | 'sonarr', instanceId: string) => {
     if (!config) return;
     const instances = getInstances(app);
-    if (instances.length <= 1) {
-      toast.error('You must have at least one instance');
-      return;
-    }
     const updatedInstances = instances.filter(inst => inst.id !== instanceId);
     setConfig({
       ...config,
@@ -252,6 +249,7 @@ function Settings() {
         [app]: updatedInstances
       }
     });
+    setConfirmingDeleteInstance(null);
   };
 
   const updateNotificationConfig = (field: string, value: string) => {
@@ -534,18 +532,45 @@ function Settings() {
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Text size="3" weight="bold">{displayName}</Text>
                                 <Flex align="center" gap="2">
-                                  {getInstances('radarr').length > 1 && (
-                                    <Button 
-                                      variant="soft" 
-                                      color="red" 
-                                      size="1"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeInstance('radarr', instance.id);
-                                      }}
-                                    >
-                                      <TrashIcon />
-                                    </Button>
+                                  {confirmingDeleteInstance === `radarr-${instance.id}` ? (
+                                    <Flex gap="1" align="center">
+                                      <Text size="1" color="gray">Delete?</Text>
+                                      <Button 
+                                        variant="solid" 
+                                        color="red" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeInstance('radarr', instance.id);
+                                        }}
+                                      >
+                                        Yes
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmingDeleteInstance(null);
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </Flex>
+                                  ) : (
+                                    <Tooltip content="Delete this instance">
+                                      <Button 
+                                        variant="soft" 
+                                        color="red" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmingDeleteInstance(`radarr-${instance.id}`);
+                                        }}
+                                      >
+                                        <TrashIcon />
+                                      </Button>
+                                    </Tooltip>
                                   )}
                                   {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
                                 </Flex>
@@ -772,18 +797,45 @@ function Settings() {
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Text size="3" weight="bold">{displayName}</Text>
                                 <Flex align="center" gap="2">
-                                  {getInstances('sonarr').length > 1 && (
-                                    <Button 
-                                      variant="soft" 
-                                      color="red" 
-                                      size="1"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeInstance('sonarr', instance.id);
-                                      }}
-                                    >
-                                      <TrashIcon />
-                                    </Button>
+                                  {confirmingDeleteInstance === `sonarr-${instance.id}` ? (
+                                    <Flex gap="1" align="center">
+                                      <Text size="1" color="gray">Delete?</Text>
+                                      <Button 
+                                        variant="solid" 
+                                        color="red" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeInstance('sonarr', instance.id);
+                                        }}
+                                      >
+                                        Yes
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmingDeleteInstance(null);
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </Flex>
+                                  ) : (
+                                    <Tooltip content="Delete this instance">
+                                      <Button 
+                                        variant="soft" 
+                                        color="red" 
+                                        size="1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmingDeleteInstance(`sonarr-${instance.id}`);
+                                        }}
+                                      >
+                                        <TrashIcon />
+                                      </Button>
+                                    </Tooltip>
                                   )}
                                   {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
                                 </Flex>

@@ -6,7 +6,12 @@ import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 
 function App() {
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <Flex direction="column" style={{ minHeight: '100vh' }} align="center">
         <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem 1rem 0 1rem' }}>
           <Flex align="center" justify="between" mb="2">
