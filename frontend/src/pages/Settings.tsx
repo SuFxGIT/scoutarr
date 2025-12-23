@@ -36,6 +36,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
+  const [confirmingResetConfig, setConfirmingResetConfig] = useState<boolean>(false);
   const [showIntroCallout, setShowIntroCallout] = useState(true);
   const [showHintCallout, setShowHintCallout] = useState(true);
 
@@ -112,9 +113,11 @@ function Settings() {
       toast.success('Configuration reset to defaults');
       queryClient.invalidateQueries({ queryKey: ['config'] });
       refetchConfig();
+      setConfirmingResetConfig(false);
     },
     onError: (error: unknown) => {
       toast.error('Failed to reset config: ' + getErrorMessage(error));
+      setConfirmingResetConfig(false);
     },
   });
 
@@ -202,11 +205,11 @@ function Settings() {
       name: '',
       url: '',
       apiKey: '',
-      count: 10,
+      count: 5,
       tagName: 'upgradinatorr',
       ignoreTag: '',
       monitored: true,
-      movieStatus: 'released' as const,
+      movieStatus: 'any' as const,
       qualityProfileName: '',
       enabled: true
     } : {
@@ -1007,7 +1010,7 @@ function Settings() {
           <Tabs.Content value="scheduler" style={{ paddingTop: '1rem' }}>
             <Card>
               <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Scheduler Configuration</Heading>
+                <Heading size="5">Global Schedule</Heading>
                 <Separator />
 
                 <Flex direction="row" align="center" justify="between" gap="2">
@@ -1142,7 +1145,7 @@ function Settings() {
             {/* Per-Instance Scheduling */}
             <Card>
               <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Per-Instance Scheduling</Heading>
+                <Heading size="5">Per-Instance Schedule</Heading>
                 <Separator />
                 <Text size="2" color="gray">
                   Configure individual schedules for each instance. When enabled, the instance will run searches according to its own schedule, independent of the global scheduler and other instances.
@@ -1158,7 +1161,7 @@ function Settings() {
                         <Card key={instance.id} variant="surface">
                           <Flex direction="column" gap="3" p="3">
                             <Flex direction="row" align="center" justify="between">
-                              <Text size="3" weight="medium">{instance.name || `Radarr Instance ${instance.instanceId || ''}`}</Text>
+                              <Text size="3" weight="medium">{instance.name || `Radarr ${instance.instanceId || ''}`}</Text>
                               <Flex direction="row" align="center" gap="2">
                                 <Text size="2">Enable Schedule</Text>
                                 <Switch
@@ -1248,7 +1251,7 @@ function Settings() {
                         <Card key={instance.id} variant="surface">
                           <Flex direction="column" gap="3" p="3">
                             <Flex direction="row" align="center" justify="between">
-                              <Text size="3" weight="medium">{instance.name || `Sonarr Instance ${instance.instanceId || ''}`}</Text>
+                              <Text size="3" weight="medium">{instance.name || `Sonarr ${instance.instanceId || ''}`}</Text>
                               <Flex direction="row" align="center" gap="2">
                                 <Text size="2">Enable Schedule</Text>
                                 <Switch
@@ -1348,15 +1351,38 @@ function Settings() {
                   <Text size="1" color="gray">
                     Restore the configuration file to its default values. This will remove all configured instances and custom settings.
                   </Text>
-                  <Button
-                    variant="outline"
-                    color="red"
-                    size="2"
-                    onClick={() => resetConfigMutation.mutate()}
-                    disabled={resetConfigMutation.isPending}
-                  >
-                    Reset Config
-                  </Button>
+                  {confirmingResetConfig ? (
+                    <Flex gap="2" align="center">
+                      <Text size="1" color="gray">Confirm reset?</Text>
+                      <Button
+                        variant="solid"
+                        size="2"
+                        color="red"
+                        onClick={() => resetConfigMutation.mutate()}
+                        disabled={resetConfigMutation.isPending}
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="2"
+                        onClick={() => setConfirmingResetConfig(false)}
+                        disabled={resetConfigMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </Flex>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      color="red"
+                      size="2"
+                      onClick={() => setConfirmingResetConfig(true)}
+                      disabled={resetConfigMutation.isPending}
+                    >
+                      Reset Config
+                    </Button>
+                  )}
                 </Flex>
 
                 <Separator />
