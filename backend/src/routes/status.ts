@@ -34,26 +34,25 @@ statusRouter.get('/', async (req, res) => {
 
     // Helper to check instances for an app
     const checkInstances = async (appType: 'radarr' | 'sonarr', defaultName: string) => {
-      const instances = getConfiguredInstances(config.applications[appType]);
-      
+      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+
       if (instances.length === 0) {
-        // Legacy single instance
-        const appConfig = config.applications[appType];
-        if (appConfig && !Array.isArray(appConfig) && appConfig.url && appConfig.apiKey) {
-          status[appType] = await checkAppStatus(defaultName, appConfig);
-        }
-      } else {
-        // Multiple instances
-        for (const instance of instances) {
-          const instanceId = (instance as any).id || `${appType}-1`;
-          const instanceName = (instance as any).name || `${defaultName} ${(instance as any).instanceId || '1'}`;
-          const instanceStatus = await checkAppStatus(instanceName, instance);
-          status[instanceId] = {
-            ...instanceStatus,
-            instanceName,
-            instanceId: (instance as any).instanceId
-          };
-        }
+        // No configured instances - mark app as not configured
+        status[appType] = { connected: false, configured: false };
+        return;
+      }
+
+      // Multiple instances
+      for (const instance of instances) {
+        const instanceId = (instance as any).id || `${appType}-1`;
+        const instanceName =
+          (instance as any).name || `${defaultName} ${(instance as any).instanceId || '1'}`;
+        const instanceStatus = await checkAppStatus(instanceName, instance as any);
+        status[instanceId] = {
+          ...instanceStatus,
+          instanceName,
+          instanceId: (instance as any).instanceId
+        };
       }
     };
 

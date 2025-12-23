@@ -93,7 +93,7 @@ function findInstanceConfig(config: any, app: string, instanceId: string): any |
   const appConfig = config.applications[app as keyof typeof config.applications];
   if (!appConfig) return null;
   
-  const instances = Array.isArray(appConfig) ? appConfig : [appConfig];
+  const instances = Array.isArray(appConfig) ? appConfig : [];
   return instances.find((inst: any) => inst.id === instanceId) || null;
 }
 

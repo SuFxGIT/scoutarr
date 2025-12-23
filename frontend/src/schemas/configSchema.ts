@@ -69,10 +69,8 @@ export const schedulerConfigSchema = z.object({
 export const configSchema = z.object({
   notifications: notificationConfigSchema,
   applications: z.object({
-    radarr: z.union([z.array(radarrInstanceSchema), radarrInstanceSchema]),
-    sonarr: z.union([z.array(sonarrInstanceSchema), sonarrInstanceSchema]),
-    lidarr: z.any().optional(),
-    readarr: z.any().optional(),
+    radarr: z.array(radarrInstanceSchema),
+    sonarr: z.array(sonarrInstanceSchema),
   }),
   scheduler: schedulerConfigSchema,
 });

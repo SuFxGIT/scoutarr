@@ -102,61 +102,29 @@ function Settings() {
     return existingIds.length + 1;
   };
 
-  // Helper to normalize config - convert single instance to array format
+  // Helper to normalize config - ensure instances have stable IDs and instanceIds
   const normalizeConfig = (config: Config): Config => {
     const normalized = { ...config };
     
-    // Convert Radarr to array if it's a single instance
-    if (normalized.applications.radarr && !Array.isArray(normalized.applications.radarr)) {
-      const radarr = normalized.applications.radarr as any;
-      normalized.applications.radarr = [{
-        id: 'radarr-1',
-        instanceId: 1,
-        name: '',
-        ...radarr
-      }];
-    } else if (Array.isArray(normalized.applications.radarr)) {
-      // Ensure all instances have instanceId
-      normalized.applications.radarr = normalized.applications.radarr.map((inst: any, idx: number) => ({
-        ...inst,
-        instanceId: inst.instanceId || idx + 1
-      }));
-    }
-    
-    // Convert Sonarr to array if it's a single instance
-    if (normalized.applications.sonarr && !Array.isArray(normalized.applications.sonarr)) {
-      const sonarr = normalized.applications.sonarr as any;
-      normalized.applications.sonarr = [{
-        id: 'sonarr-1',
-        instanceId: 1,
-        name: '',
-        ...sonarr
-      }];
-    } else if (Array.isArray(normalized.applications.sonarr)) {
-      // Ensure all instances have instanceId
-      normalized.applications.sonarr = normalized.applications.sonarr.map((inst: any, idx: number) => ({
-        ...inst,
-        instanceId: inst.instanceId || idx + 1
-      }));
-    }
+    // Ensure all Radarr instances have instanceId
+    normalized.applications.radarr = normalized.applications.radarr.map((inst: any, idx: number) => ({
+      ...inst,
+      instanceId: inst.instanceId || idx + 1
+    }));
+
+    // Ensure all Sonarr instances have instanceId
+    normalized.applications.sonarr = normalized.applications.sonarr.map((inst: any, idx: number) => ({
+      ...inst,
+      instanceId: inst.instanceId || idx + 1
+    }));
     
     return normalized;
   };
 
-  // Get instances for an app (handles both array and single)
+  // Get instances for an app
   const getInstances = (app: 'radarr' | 'sonarr'): any[] => {
     if (!config) return [];
-    const appConfig = config.applications[app];
-    if (Array.isArray(appConfig)) {
-      return appConfig;
-    }
-    // Legacy single instance - convert to array
-    return [{
-      id: `${app}-1`,
-      instanceId: 1,
-      name: '',
-      ...appConfig
-    }];
+    return config.applications[app] as any[];
   };
 
   // Update instance config

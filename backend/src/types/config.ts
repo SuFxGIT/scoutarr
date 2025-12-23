@@ -34,56 +34,9 @@ export interface SonarrInstance {
   enabled?: boolean;
 }
 
-// Legacy single instance configs (for backward compatibility)
-export interface RadarrConfig {
-  url: string;
-  apiKey: string;
-  count: number | 'max' | 'MAX';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  movieStatus: 'announced' | 'in cinemas' | 'released';
-  qualityProfileName: string;
-}
-
-export interface SonarrConfig {
-  url: string;
-  apiKey: string;
-  count: number | 'max' | 'MAX';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
-  qualityProfileName: string;
-}
-
-export interface LidarrConfig {
-  url: string;
-  apiKey: string;
-  count: number | 'max' | 'MAX';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  artistStatus: 'continuing' | 'ended' | '';
-  qualityProfileName: string;
-}
-
-export interface ReadarrConfig {
-  url: string;
-  apiKey: string;
-  count: number | 'max' | 'MAX';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  authorStatus: 'continuing' | 'ended' | '';
-  qualityProfileName: string;
-}
-
 export interface ApplicationsConfig {
-  radarr: RadarrInstance[] | RadarrConfig; // Support both array (new) and single (legacy)
-  sonarr: SonarrInstance[] | SonarrConfig; // Support both array (new) and single (legacy)
-  lidarr: LidarrConfig;
-  readarr: ReadarrConfig;
+  radarr: RadarrInstance[];
+  sonarr: SonarrInstance[];
 }
 
 export interface SchedulerConfig {

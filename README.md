@@ -58,27 +58,7 @@ Configuration is stored in `config/config.json`. On first run, the application w
   },
   "applications": {
     "radarr": [],
-    "sonarr": [],
-    "lidarr": {
-      "url": "",
-      "apiKey": "",
-      "count": 5,
-      "tagName": "upgradinatorr",
-      "ignoreTag": "",
-      "monitored": true,
-      "artistStatus": "",
-      "qualityProfileName": ""
-    },
-    "readarr": {
-      "url": "",
-      "apiKey": "",
-      "count": 5,
-      "tagName": "upgradinatorr",
-      "ignoreTag": "",
-      "monitored": true,
-      "authorStatus": "",
-      "qualityProfileName": ""
-    }
+    "sonarr": []
   },
   "scheduler": {
     "enabled": false,
