@@ -8,7 +8,7 @@ import {
   Badge,
   Separator
 } from '@radix-ui/themes';
-import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import humanizeDuration from 'humanize-duration';
@@ -360,7 +360,7 @@ function Dashboard() {
           </Flex>
           <Flex gap="3">
             <Button 
-              size="3" 
+              size="2" 
               onClick={() => runSearchMutation.mutate()} 
               disabled={runSearchMutation.isPending}
             >
@@ -368,18 +368,20 @@ function Dashboard() {
             </Button>
             <Button 
               variant="outline" 
-              size="3" 
+              size="2" 
               onClick={() => clearHistoryMutation.mutate()}
               disabled={clearHistoryMutation.isPending}
+              title="Clear History"
             >
-              Clear History
+              <TrashIcon />
             </Button>
             <Button 
               variant="outline" 
-              size="3" 
+              size="2" 
               onClick={() => refetchHistory()}
+              title="Refresh"
             >
-              <ReloadIcon /> Refresh
+              <ReloadIcon />
             </Button>
           </Flex>
         </Flex>
