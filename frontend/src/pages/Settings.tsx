@@ -17,7 +17,7 @@ import {
   Tooltip
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
@@ -36,6 +36,8 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
+  const [showIntroCallout, setShowIntroCallout] = useState(true);
+  const [showHintCallout, setShowHintCallout] = useState(true);
 
 
   // Load config with react-query
@@ -57,6 +59,22 @@ function Settings() {
       }
     }
   }, [loadedConfig]);
+
+  // Load persisted callout visibility once on mount
+  useEffect(() => {
+    try {
+      const introDismissed = localStorage.getItem('scoutarr_settings_intro_dismissed') === 'true';
+      const hintDismissed = localStorage.getItem('scoutarr_settings_hint_dismissed') === 'true';
+      if (introDismissed) {
+        setShowIntroCallout(false);
+      }
+      if (hintDismissed) {
+        setShowHintCallout(false);
+      }
+    } catch {
+      // Ignore storage errors and fall back to defaults
+    }
+  }, []);
 
   // Save config mutation with validation
   const saveConfigMutation = useMutation({
@@ -84,6 +102,21 @@ function Settings() {
     if (!config) return;
     saveConfigMutation.mutate(config);
   };
+
+  // Reset config mutation
+  const resetConfigMutation = useMutation({
+    mutationFn: async () => {
+      await axios.post('/api/config/reset');
+    },
+    onSuccess: () => {
+      toast.success('Configuration reset to defaults');
+      queryClient.invalidateQueries({ queryKey: ['config'] });
+      refetchConfig();
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to reset config: ' + getErrorMessage(error));
+    },
+  });
 
 
   // Helper to get next available instance ID
@@ -355,22 +388,75 @@ function Settings() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
-        <Callout.Root color="blue">
-          <Callout.Text>
-            <Text weight="bold" size="3">What is Scoutarr?</Text>
-            <br />
-            <Text size="2">
-              Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
-            </Text>
-          </Callout.Text>
-        </Callout.Root>
+        {showIntroCallout && (
+          <Callout.Root color="blue">
+            <Flex align="start" justify="between" gap="3">
+              <Callout.Text>
+                <Text weight="bold" size="3">What is Scoutarr?</Text>
+                <br />
+                <Text size="2">
+                  Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
+                </Text>
+              </Callout.Text>
+              <button
+                type="button"
+                aria-label="Dismiss intro"
+                onClick={() => {
+                  setShowIntroCallout(false);
+                  try {
+                    localStorage.setItem('scoutarr_settings_intro_dismissed', 'true');
+                  } catch {
+                    // ignore
+                  }
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  marginLeft: 'auto',
+                  marginRight: '0.25rem',
+                  marginTop: '0.25rem',
+                  cursor: 'pointer',
+                  color: 'var(--gray-11)',
+                }}
+              >
+                <Cross2Icon />
+              </button>
+            </Flex>
+          </Callout.Root>
+        )}
 
-
-        <Callout.Root color="blue" size="1">
-          <Callout.Text>
-            <Text size="1">💡 Hover over input fields to see descriptions and hints</Text>
-          </Callout.Text>
-        </Callout.Root>
+        {showHintCallout && (
+          <Callout.Root color="blue" size="1">
+            <Flex align="center" justify="between" gap="2">
+              <Callout.Text>
+                <Text size="1">💡 Hover over input fields to see descriptions and hints</Text>
+              </Callout.Text>
+              <button
+                type="button"
+                aria-label="Dismiss hint"
+                onClick={() => {
+                  setShowHintCallout(false);
+                  try {
+                    localStorage.setItem('scoutarr_settings_hint_dismissed', 'true');
+                  } catch {
+                    // ignore
+                  }
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  marginRight: '0.25rem',
+                  cursor: 'pointer',
+                  color: 'var(--gray-11)',
+                }}
+              >
+                <Cross2Icon />
+              </button>
+            </Flex>
+          </Callout.Root>
+        )}
 
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <Flex align="center" justify="between" gap="3">
@@ -379,6 +465,7 @@ function Settings() {
               <Tabs.Trigger value="sonarr">Sonarr</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
+              <Tabs.Trigger value="advanced">Advanced</Tabs.Trigger>
             </Tabs.List>
             <Flex gap="2" align="center">
               {(activeTab === 'radarr' || activeTab === 'sonarr') && (
@@ -1048,6 +1135,56 @@ function Settings() {
                           }
                         })()}
                   </Text>
+                </Flex>
+              </Flex>
+            </Card>
+          </Tabs.Content>
+
+          <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>
+            <Card>
+              <Flex direction="column" gap="4" p="4">
+                <Heading size="5">Advanced</Heading>
+                <Separator />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Reset Configuration</Text>
+                  <Text size="1" color="gray">
+                    Restore the configuration file to its default values. This will remove all configured instances and custom settings.
+                  </Text>
+                  <Button
+                    variant="outline"
+                    color="red"
+                    size="2"
+                    onClick={() => resetConfigMutation.mutate()}
+                    disabled={resetConfigMutation.isPending}
+                  >
+                    Reset Config
+                  </Button>
+                </Flex>
+
+                <Separator />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Intro Hints</Text>
+                  <Text size="1" color="gray">
+                    Show the introductory hints at the top of the Settings page again.
+                  </Text>
+                  <Button
+                    variant="outline"
+                    size="2"
+                    onClick={() => {
+                      setShowIntroCallout(true);
+                      setShowHintCallout(true);
+                      try {
+                        localStorage.removeItem('scoutarr_settings_intro_dismissed');
+                        localStorage.removeItem('scoutarr_settings_hint_dismissed');
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  >
+                    Show Intro Hints
+                  </Button>
                 </Flex>
               </Flex>
             </Card>

@@ -19,6 +19,18 @@ configRouter.get('/', async (req, res) => {
   }
 });
 
+// Reset config to default
+configRouter.post('/reset', async (_req, res) => {
+  logger.info('🔄 Config reset requested');
+  try {
+    const config = await configService.resetToDefault();
+    res.json({ success: true, config });
+  } catch (error: any) {
+    logger.error('❌ Failed to reset config', { error: error.message });
+    res.status(500).json({ error: 'Failed to reset config' });
+  }
+});
+
 // Update config
 configRouter.put('/', async (req, res) => {
   logger.info('💾 Config update requested');

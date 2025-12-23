@@ -87,6 +87,27 @@ class ConfigService {
     }
   }
 
+  async resetToDefault(): Promise<Config> {
+    try {
+      await this.createDefaultConfig();
+      const config = await this.loadConfig();
+      logger.info('🔄 Configuration reset to default', { configFile: CONFIG_FILE });
+
+      // Restart scheduler after reset
+      const { schedulerService } = await import('./schedulerService.js');
+      schedulerService.restart();
+
+      return config;
+    } catch (error: any) {
+      logger.error('❌ Error resetting configuration to default', {
+        error: error.message,
+        stack: error.stack,
+        configFile: CONFIG_FILE
+      });
+      throw error;
+    }
+  }
+
   async saveConfig(config: Config): Promise<void> {
     try {
       await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
