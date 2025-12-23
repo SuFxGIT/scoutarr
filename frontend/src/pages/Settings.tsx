@@ -18,96 +18,71 @@ import {
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import validator from 'validator';
+import cronstrue from 'cronstrue';
 import axios from 'axios';
 import type { Config } from '../types/config';
+import { configSchema } from '../schemas/configSchema';
+import { getErrorMessage } from '../utils/helpers';
+import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP } from '../utils/constants';
 
 function Settings() {
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<Config | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean }>>({});
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
   const [activeTab, setActiveTab] = useState<string>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
-  const [removeInstanceError, setRemoveInstanceError] = useState<string | null>(null);
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
 
-  const cronPresets: Record<string, string> = {
-    'every-1-min': '*/1 * * * *',
-    'every-10-min': '*/10 * * * *',
-    'every-30-min': '*/30 * * * *',
-    'every-hour': '0 * * * *',
-    'every-6-hours': '0 */6 * * *',
-    'every-12-hours': '0 */12 * * *',
-    'daily-midnight': '0 0 * * *',
-    'daily-noon': '0 12 * * *',
-    'twice-daily': '0 0,12 * * *',
-    'weekly-sunday': '0 0 * * 0',
-    'custom': ''
-  };
 
-  const getPresetFromSchedule = (schedule: string): string => {
-    for (const [preset, cron] of Object.entries(cronPresets)) {
-      if (cron === schedule) {
-        return preset;
-      }
-    }
-    return 'custom';
-  };
-
-  useEffect(() => {
-    loadConfig();
-    
-    // Reload config when page becomes visible (handles refresh)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !loading && !saving) {
-        loadConfig();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
-
-  const loadConfig = async () => {
-    setLoading(true);
-    try {
+  // Load config with react-query
+  const { data: loadedConfig, isLoading: loading, error: loadError, refetch: refetchConfig } = useQuery<Config>({
+    queryKey: ['config'],
+    queryFn: async () => {
       const response = await axios.get('/api/config');
-      const normalizedConfig = normalizeConfig(response.data);
-      setConfig(normalizedConfig);
-      if (normalizedConfig.scheduler?.schedule) {
-        setSchedulerPreset(getPresetFromSchedule(normalizedConfig.scheduler.schedule));
+      return normalizeConfig(response.data);
+    },
+    refetchOnWindowFocus: true,
+  });
+
+  // Update local config when loaded config changes
+  useEffect(() => {
+    if (loadedConfig) {
+      setConfig(loadedConfig);
+      if (loadedConfig.scheduler?.schedule) {
+        setSchedulerPreset(getPresetFromSchedule(loadedConfig.scheduler.schedule));
       }
-      setSaveMessage(null);
-    } catch (error: any) {
-      console.error('Failed to load config:', error);
-      setSaveMessage({
-        type: 'error',
-        text: 'Failed to load configuration. Please refresh the page.'
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [loadedConfig]);
+
+  // Save config mutation with validation
+  const saveConfigMutation = useMutation({
+    mutationFn: async (configToSave: Config) => {
+      // Validate config with zod
+      try {
+        configSchema.parse(configToSave);
+      } catch (error: any) {
+        const errorMessages = error.errors?.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        throw new Error(`Validation failed: ${errorMessages}`);
+      }
+      await axios.put('/api/config', configToSave);
+    },
+    onSuccess: () => {
+      toast.success('Configuration saved successfully!');
+      queryClient.invalidateQueries({ queryKey: ['config'] });
+      refetchConfig();
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to save config: ' + getErrorMessage(error));
+    },
+  });
 
   const saveConfig = async () => {
     if (!config) return;
-    setSaving(true);
-    setSaveMessage(null);
-    try {
-      await axios.put('/api/config', config);
-      setSaveMessage({ type: 'success', text: 'Configuration saved successfully!' });
-      // Reload config to ensure we have the latest from server
-      await loadConfig();
-    } catch (error: any) {
-      setSaveMessage({
-        type: 'error',
-        text: 'Failed to save config: ' + (error.response?.data?.error || error.message)
-      });
-    } finally {
-      setSaving(false);
-    }
+    saveConfigMutation.mutate(config);
   };
 
 
@@ -213,9 +188,9 @@ function Settings() {
   const addInstance = (app: 'radarr' | 'sonarr') => {
     if (!config) return;
     const instances = getInstances(app);
-    // Limit to 4 instances per app
-    if (instances.length >= 4) {
-      alert(`Maximum of 4 ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
+    // Limit instances per app
+    if (instances.length >= MAX_INSTANCES_PER_APP) {
+      toast.error(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
       return;
     }
     const newId = `${app}-${Date.now()}`;
@@ -262,11 +237,9 @@ function Settings() {
     if (!config) return;
     const instances = getInstances(app);
     if (instances.length <= 1) {
-      setRemoveInstanceError('You must have at least one instance');
-      setTimeout(() => setRemoveInstanceError(null), 5000);
+      toast.error('You must have at least one instance');
       return;
     }
-    setRemoveInstanceError(null);
     const updatedInstances = instances.filter(inst => inst.id !== instanceId);
     setConfig({
       ...config,
@@ -297,12 +270,12 @@ function Settings() {
     );
   }
 
-  if (!config) {
+  if (loadError || !config) {
     return (
       <Callout.Root color="red" style={{ padding: '2rem' }}>
         <Callout.Text>Failed to load configuration</Callout.Text>
         <Callout.Text size="1" style={{ marginTop: '0.5rem' }}>
-          <Button size="2" variant="soft" onClick={loadConfig}>
+          <Button size="2" variant="soft" onClick={() => refetchConfig()}>
             Retry
           </Button>
         </Callout.Text>
@@ -370,6 +343,16 @@ function Settings() {
       return;
     }
 
+    // Validate URL with validator library
+    if (!validator.isURL(appConfig.url, { require_protocol: true })) {
+      toast.error('Invalid URL format');
+      setTestResults(prev => ({
+        ...prev,
+        [key]: { status: false, testing: false }
+      }));
+      return;
+    }
+
     // Set testing state
     setTestResults(prev => ({
       ...prev,
@@ -382,15 +365,22 @@ function Settings() {
         url: appConfig.url,
         apiKey: appConfig.apiKey
       });
+      const success = response.data.success === true;
       setTestResults(prev => ({
         ...prev,
-        [key]: { status: response.data.success === true, testing: false }
+        [key]: { status: success, testing: false }
       }));
+      if (success) {
+        toast.success('Connection test successful');
+      } else {
+        toast.error('Connection test failed');
+      }
     } catch (error: any) {
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
       }));
+      toast.error('Connection test failed: ' + getErrorMessage(error));
     }
   };
 
@@ -408,17 +398,6 @@ function Settings() {
           </Callout.Text>
         </Callout.Root>
 
-        {saveMessage && (
-          <Callout.Root color={saveMessage.type === 'success' ? 'green' : 'red'}>
-            <Callout.Text>{saveMessage.text}</Callout.Text>
-          </Callout.Root>
-        )}
-
-        {removeInstanceError && (
-          <Callout.Root color="red" size="1">
-            <Callout.Text>{removeInstanceError}</Callout.Text>
-          </Callout.Root>
-        )}
 
         <Callout.Root color="blue" size="1">
           <Callout.Text>
@@ -434,8 +413,8 @@ function Settings() {
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
             </Tabs.List>
-            <Button size="3" onClick={saveConfig} disabled={saving || loading}>
-              {saving ? (
+            <Button size="3" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
+              {saveConfigMutation.isPending ? (
                 <>
                   <Spinner size="1" /> Saving...
                 </>
@@ -451,7 +430,7 @@ function Settings() {
                 <Heading size="5">Radarr</Heading>
                 <Button 
                   onClick={() => addInstance('radarr')}
-                  disabled={getInstances('radarr').length >= 4}
+                  disabled={getInstances('radarr').length >= MAX_INSTANCES_PER_APP}
                 >
                   <PlusIcon /> Add
                 </Button>
@@ -646,9 +625,10 @@ function Settings() {
                                       onClick={async () => {
                                         try {
                                           await axios.post(`/api/config/clear-tags/radarr/${instance.id}`);
+                                          toast.success('Tags cleared successfully');
                                           setConfirmingClearTags(null);
-                                        } catch (error: any) {
-                                          console.error('Failed to clear tags:', error);
+                                        } catch (error: unknown) {
+                                          toast.error('Failed to clear tags: ' + getErrorMessage(error));
                                           setConfirmingClearTags(null);
                                         }
                                       }}
@@ -693,7 +673,7 @@ function Settings() {
                 <Heading size="5">Sonarr</Heading>
                 <Button 
                   onClick={() => addInstance('sonarr')}
-                  disabled={getInstances('sonarr').length >= 4}
+                  disabled={getInstances('sonarr').length >= MAX_INSTANCES_PER_APP}
                 >
                   <PlusIcon /> Add
                 </Button>
@@ -889,9 +869,10 @@ function Settings() {
                                       onClick={async () => {
                                         try {
                                           await axios.post(`/api/config/clear-tags/sonarr/${instance.id}`);
+                                          toast.success('Tags cleared successfully');
                                           setConfirmingClearTags(null);
-                                        } catch (error: any) {
-                                          console.error('Failed to clear tags:', error);
+                                        } catch (error: unknown) {
+                                          toast.error('Failed to clear tags: ' + getErrorMessage(error));
                                           setConfirmingClearTags(null);
                                         }
                                       }}
@@ -1035,7 +1016,7 @@ function Settings() {
                       setSchedulerPreset(value);
                       const schedule = value === 'custom' 
                         ? (config.scheduler?.schedule || '0 */6 * * *')
-                        : cronPresets[value];
+                        : CRON_PRESETS[value];
                       if (!config.scheduler) {
                         setConfig({
                           ...config,
@@ -1085,8 +1066,24 @@ function Settings() {
                   )}
                   <Text size="1" color="gray">
                     {schedulerPreset === 'custom' 
-                      ? 'Enter a custom cron expression. Format: minute hour day month day-of-week (e.g., "0 */6 * * *" for every 6 hours)'
-                      : 'Select a predefined schedule or choose "Custom Cron Expression" to enter your own.'}
+                      ? (() => {
+                          try {
+                            const cronExpression = config.scheduler?.schedule || '0 */6 * * *';
+                            const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
+                            return `Enter a custom cron expression. Current: "${cronExpression}" (${description})`;
+                          } catch {
+                            return 'Enter a custom cron expression. Format: minute hour day month day-of-week (e.g., "0 */6 * * *" for every 6 hours)';
+                          }
+                        })()
+                      : (() => {
+                          try {
+                            const currentCron = config.scheduler?.schedule || '0 */6 * * *';
+                            const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
+                            return `Current schedule: ${description}. Select a predefined schedule or choose "Custom Cron Expression" to enter your own.`;
+                          } catch {
+                            return 'Select a predefined schedule or choose "Custom Cron Expression" to enter your own.';
+                          }
+                        })()}
                   </Text>
                 </Flex>
               </Flex>

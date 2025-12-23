@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Flex, 
   Heading, 
@@ -6,11 +6,17 @@ import {
   Card, 
   Text, 
   Badge,
-  Separator,
-  Callout
+  Separator
 } from '@radix-ui/themes';
-import { PlayIcon, ReloadIcon, CrossCircledIcon, ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import humanizeDuration from 'humanize-duration';
+import ReactPaginate from 'react-paginate';
+import { toast } from 'sonner';
 import axios from 'axios';
+import { formatAppName, getErrorMessage } from '../utils/helpers';
+import { ITEMS_PER_PAGE, REFETCH_INTERVAL } from '../utils/constants';
 
 interface SearchResults {
   [key: string]: {
@@ -38,138 +44,190 @@ interface Stats {
   lastUpgrade?: string;
 }
 
+interface StatusResponse {
+  [key: string]: any;
+  scheduler?: {
+    enabled: boolean;
+    running: boolean;
+    schedule: string | null;
+    nextRun: string | null;
+  };
+}
+
+interface SchedulerHistoryEntry {
+  timestamp: string;
+  results: any;
+  success: boolean;
+  error?: string;
+}
+
 function Dashboard() {
-  const [isRunning, setIsRunning] = useState(false);
-  const [manualRunResults, setManualRunResults] = useState<SearchResults | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<Record<string, any>>({});
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [schedulerHistory, setSchedulerHistory] = useState<Array<{ timestamp: string; results: any; success: boolean; error?: string }>>([]);
-  const [schedulerStatus, setSchedulerStatus] = useState<{ enabled: boolean; running: boolean; schedule: string | null; nextRun: string | null } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
 
-  useEffect(() => {
-    loadStatus();
-    loadSchedulerHistory();
-    loadStats();
-    
-    // Load preview of what will be triggered
-    loadManualRun();
-    
-    // Poll for scheduler history, status, stats, and preview updates every 10 seconds
-    const interval = setInterval(() => {
-      loadSchedulerHistory();
-      loadStatus();
-      loadStats(); // Auto-refresh stats to catch scheduler-triggered upgrades
-      loadManualRun(); // Refresh preview of what will be triggered
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-
-  const loadStatus = async () => {
-    try {
+  // Fetch status with auto-refresh
+  const { data: statusData } = useQuery<StatusResponse>({
+    queryKey: ['status'],
+    queryFn: async () => {
       const response = await axios.get('/api/status');
-      setConnectionStatus(response.data);
-      // Extract scheduler status
-      if (response.data.scheduler) {
-        setSchedulerStatus(response.data.scheduler);
-      }
-    } catch (error) {
-      console.error('Failed to load status:', error);
-    }
-  };
+      return response.data;
+    },
+    refetchInterval: REFETCH_INTERVAL,
+  });
 
-  const formatAppName = (app: string) => {
-    if (app.includes('-')) {
-      const parts = app.split('-');
-      const appType = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-      return appType;
-    }
-    return app.charAt(0).toUpperCase() + app.slice(1);
-  };
+  const connectionStatus = statusData || {};
+  const schedulerStatus = statusData?.scheduler || null;
 
-  const loadSchedulerHistory = async () => {
-    try {
+  // Fetch scheduler history with auto-refresh
+  const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
+    queryKey: ['schedulerHistory'],
+    queryFn: async () => {
       const response = await axios.get('/api/status/scheduler/history');
-      setSchedulerHistory(response.data);
-    } catch (error) {
-      console.error('Failed to load scheduler history:', error);
-    }
-  };
+      return response.data;
+    },
+    refetchInterval: REFETCH_INTERVAL,
+  });
 
-  const loadManualRun = async () => {
-    try {
+  // Fetch manual run preview with auto-refresh
+  const { data: manualRunResults } = useQuery<SearchResults>({
+    queryKey: ['manualRunPreview'],
+    queryFn: async () => {
       const response = await axios.post('/api/search/manual-run');
-      setManualRunResults(response.data);
-    } catch (error) {
-      console.error('Failed to load manual run preview:', error);
-    }
-  };
+      return response.data;
+    },
+    refetchInterval: REFETCH_INTERVAL,
+  });
 
-  const loadStats = async () => {
-    try {
+  // Fetch stats with auto-refresh
+  const { data: stats, refetch: refetchStats } = useQuery<Stats>({
+    queryKey: ['stats'],
+    queryFn: async () => {
       const response = await axios.get('/api/stats');
-      setStats(response.data);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
+      return response.data;
+    },
+    refetchInterval: REFETCH_INTERVAL,
+  });
+
+  // Auto-scroll to bottom when scheduler history changes
+  useEffect(() => {
+    if (logContainerRef.current && schedulerHistory.length > 0) {
+      const container = logContainerRef.current;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
-  };
+  }, [schedulerHistory]);
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const handleClearRecentUpgrades = async () => {
-    try {
-      await axios.post('/api/stats/clear-recent');
-      await loadStats();
-      setCurrentPage(1);
-      setConfirmingClear(null);
-      setErrorMessage(null);
-    } catch (error: any) {
-      console.error('Failed to clear recent upgrades:', error);
-      setErrorMessage('Failed to clear recent upgrades: ' + (error.response?.data?.error || error.message));
-      setConfirmingClear(null);
-    }
-  };
-
-  const handleClearStats = async () => {
-    try {
-      await axios.post('/api/stats/reset');
-      await loadStats();
-      setCurrentPage(1);
-      setConfirmingClear(null);
-      setErrorMessage(null);
-    } catch (error: any) {
-      console.error('Failed to clear stats:', error);
-      setErrorMessage('Failed to clear stats: ' + (error.response?.data?.error || error.message));
-      setConfirmingClear(null);
-    }
-  };
-
-  const handleRun = async () => {
-    setIsRunning(true);
-    try {
+  // Mutation for running search
+  const runSearchMutation = useMutation({
+    mutationFn: async () => {
       await axios.post('/api/search/run');
-      await loadStats(); // Refresh stats after actual run
-    } catch (error: any) {
-      console.error('Search failed:', error);
-      // Error is already logged to console, and scheduler history will show it
-    } finally {
-      setIsRunning(false);
-    }
+    },
+    onSuccess: () => {
+      toast.success('Search run completed');
+      refetchStats();
+      refetchHistory();
+    },
+    onError: (error: unknown) => {
+      toast.error('Search failed: ' + getErrorMessage(error));
+    },
+  });
+
+  // Mutation for clearing recent upgrades
+  const clearRecentMutation = useMutation({
+    mutationFn: async () => {
+      await axios.post('/api/stats/clear-recent');
+    },
+    onSuccess: () => {
+      toast.success('Recent upgrades cleared');
+      setCurrentPage(1);
+      setConfirmingClear(null);
+      refetchStats();
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to clear recent upgrades: ' + getErrorMessage(error));
+      setConfirmingClear(null);
+    },
+  });
+
+  // Mutation for clearing stats
+  const clearStatsMutation = useMutation({
+    mutationFn: async () => {
+      await axios.post('/api/stats/reset');
+    },
+    onSuccess: () => {
+      toast.success('Stats cleared');
+      setCurrentPage(1);
+      setConfirmingClear(null);
+      refetchStats();
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to clear stats: ' + getErrorMessage(error));
+      setConfirmingClear(null);
+    },
+  });
+
+  // Mutation for clearing scheduler history
+  const clearHistoryMutation = useMutation({
+    mutationFn: async () => {
+      await axios.post('/api/status/scheduler/history/clear');
+    },
+    onSuccess: () => {
+      toast.success('Scheduler history cleared');
+      refetchHistory();
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to clear history: ' + getErrorMessage(error));
+    },
+  });
+
+  // Render confirmation buttons for clear actions
+  const renderConfirmButtons = (type: 'stats' | 'recent', onConfirm: () => void) => {
+    if (confirmingClear !== type) return null;
+    
+    return (
+      <Flex gap="2" align="center">
+        <Text size="2" color="gray">Are you sure?</Text>
+        <Button 
+          variant="solid" 
+          color="red"
+          size="2" 
+          onClick={onConfirm}
+          disabled={
+            (type === 'stats' && clearStatsMutation.isPending) ||
+            (type === 'recent' && clearRecentMutation.isPending)
+          }
+        >
+          Confirm
+        </Button>
+        <Button 
+          variant="outline" 
+          size="2" 
+          onClick={() => setConfirmingClear(null)}
+        >
+          Cancel
+        </Button>
+      </Flex>
+    );
   };
 
-  // Convert scheduler history to log format
-  const convertHistoryToLogs = (history: typeof schedulerHistory, nextRun: string | null, schedulerEnabled: boolean, previewResults?: SearchResults | null): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
+  // Convert scheduler history to log format using date-fns and humanize-duration
+  const convertHistoryToLogs = (
+    history: SchedulerHistoryEntry[], 
+    nextRun: string | null, 
+    schedulerEnabled: boolean, 
+    previewResults?: SearchResults | null
+  ): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
     
     // Add preview of what will be triggered next
     if (previewResults && Object.keys(previewResults).length > 0) {
+      const now = new Date();
       logs.push({
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: format(now, 'HH:mm:ss'),
         app: 'Preview',
         message: 'Next run will trigger:',
         type: 'info'
@@ -182,7 +240,7 @@ function Dashboard() {
           const total = result.total || 0;
           
           logs.push({
-            timestamp: new Date().toLocaleTimeString(),
+            timestamp: format(now, 'HH:mm:ss'),
             app: 'Preview',
             message: `${appName}: Will search ${count} of ${total} items`,
             type: 'info'
@@ -191,7 +249,7 @@ function Dashboard() {
       });
       
       logs.push({
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: format(now, 'HH:mm:ss'),
         app: 'Preview',
         message: '---',
         type: 'info'
@@ -203,31 +261,26 @@ function Dashboard() {
       const nextRunDate = new Date(nextRun);
       const now = new Date();
       const timeUntilNext = nextRunDate.getTime() - now.getTime();
-      const minutesUntil = Math.floor(timeUntilNext / 60000);
-      const hoursUntil = Math.floor(minutesUntil / 60);
-      const daysUntil = Math.floor(hoursUntil / 24);
       
-      let timeString = '';
-      if (daysUntil > 0) {
-        timeString = `${daysUntil} day${daysUntil > 1 ? 's' : ''}, ${hoursUntil % 24} hour${(hoursUntil % 24) !== 1 ? 's' : ''}`;
-      } else if (hoursUntil > 0) {
-        timeString = `${hoursUntil} hour${hoursUntil > 1 ? 's' : ''}, ${minutesUntil % 60} minute${(minutesUntil % 60) !== 1 ? 's' : ''}`;
-      } else if (minutesUntil > 0) {
-        timeString = `${minutesUntil} minute${minutesUntil > 1 ? 's' : ''}`;
-      } else {
-        timeString = 'less than a minute';
-      }
+      // Use humanize-duration for better time formatting
+      const timeString = humanizeDuration(timeUntilNext, {
+        round: true,
+        largest: 2,
+        units: ['d', 'h', 'm'],
+        conjunction: ' and ',
+        serialComma: false,
+      }) || 'less than a minute';
       
       logs.push({
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: format(now, 'HH:mm:ss'),
         app: 'Scheduler',
-        message: `Next run: ${nextRunDate.toLocaleString()} (in ${timeString})`,
+        message: `Next run: ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
         type: 'info'
       });
     }
     
     history.forEach(entry => {
-      const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+      const timestamp = format(new Date(entry.timestamp), 'HH:mm:ss');
       
       if (entry.success) {
         Object.entries(entry.results).forEach(([app, result]: [string, any]) => {
@@ -286,15 +339,13 @@ function Dashboard() {
     return logs;
   };
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [schedulerHistory]);
-
   const renderAutomaticRunPreview = () => {
-    const logs = convertHistoryToLogs(schedulerHistory, schedulerStatus?.nextRun || null, schedulerStatus?.enabled || false, manualRunResults);
+    const logs = convertHistoryToLogs(
+      schedulerHistory, 
+      schedulerStatus?.nextRun || null, 
+      schedulerStatus?.enabled || false, 
+      manualRunResults || null
+    );
 
     return (
       <Card mb="4">
@@ -310,29 +361,23 @@ function Dashboard() {
           <Flex gap="3">
             <Button 
               size="3" 
-              onClick={handleRun} 
-              disabled={isRunning}
+              onClick={() => runSearchMutation.mutate()} 
+              disabled={runSearchMutation.isPending}
             >
-              <PlayIcon /> {isRunning ? 'Running...' : 'Manually Run Now'}
+              <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
             </Button>
             <Button 
               variant="outline" 
               size="3" 
-              onClick={async () => {
-                try {
-                  await axios.post('/api/status/scheduler/history/clear');
-                  setSchedulerHistory([]);
-                } catch (error) {
-                  console.error('Failed to clear history:', error);
-                }
-              }}
+              onClick={() => clearHistoryMutation.mutate()}
+              disabled={clearHistoryMutation.isPending}
             >
               Clear History
             </Button>
             <Button 
               variant="outline" 
               size="3" 
-              onClick={loadSchedulerHistory}
+              onClick={() => refetchHistory()}
             >
               <ReloadIcon /> Refresh
             </Button>
@@ -359,7 +404,7 @@ function Dashboard() {
                   <Text 
                     size="2" 
                     style={{ 
-                      color: log.type === 'error' ? '#ef4444' : log.type === 'success' ? '#22c55e' : '#94a3b8',
+                      color: log.type === 'error' ? 'var(--red-9)' : log.type === 'success' ? 'var(--green-9)' : 'var(--gray-9)',
                       whiteSpace: 'pre-wrap'
                     }}
                   >
@@ -374,19 +419,9 @@ function Dashboard() {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
-        {errorMessage && (
-          <Callout.Root color="red">
-            <Callout.Text>{errorMessage}</Callout.Text>
-          </Callout.Root>
-        )}
         <Card style={{ padding: '0.5rem' }}>
           <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
@@ -445,7 +480,7 @@ function Dashboard() {
         </Card>
 
         {stats && (() => {
-          // Calculate Radarr and Sonarr totals from upgradesByInstance
+          // Calculate Radarr and Sonarr totals
           let radarrTotal = 0;
           let sonarrTotal = 0;
           
@@ -468,26 +503,7 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Upgrade Statistics</Heading>
-                  {confirmingClear === 'stats' ? (
-                    <Flex gap="2" align="center">
-                      <Text size="2" color="gray">Are you sure?</Text>
-                      <Button 
-                        variant="solid" 
-                        color="red"
-                        size="2" 
-                        onClick={handleClearStats}
-                      >
-                        Confirm
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="2" 
-                        onClick={() => setConfirmingClear(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </Flex>
-                  ) : (
+                  {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
                     <Button 
                       variant="outline" 
                       color="red"
@@ -521,7 +537,7 @@ function Dashboard() {
                 </Flex>
                 {stats.lastUpgrade && (
                   <Text size="2" color="gray">
-                    Last upgrade: {formatDate(stats.lastUpgrade)}
+                    Last upgrade: {format(new Date(stats.lastUpgrade), 'PPpp')}
                   </Text>
                 )}
               </Flex>
@@ -531,12 +547,12 @@ function Dashboard() {
 
         {renderAutomaticRunPreview()}
 
-        {(() => {
-          const recentUpgrades = stats?.recentUpgrades || [];
+        {stats && (() => {
+          const recentUpgrades = stats.recentUpgrades || [];
           const totalItems = recentUpgrades.length;
-          const totalPages = Math.ceil(totalItems / itemsPerPage);
-          const startIndex = (currentPage - 1) * itemsPerPage;
-          const endIndex = startIndex + itemsPerPage;
+          const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+          const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+          const endIndex = startIndex + ITEMS_PER_PAGE;
           const currentItems = recentUpgrades.slice(startIndex, endIndex);
           
           return (
@@ -551,26 +567,7 @@ function Dashboard() {
                       </Text>
                     )}
                     {totalItems > 0 && (
-                      confirmingClear === 'recent' ? (
-                        <Flex gap="2" align="center">
-                          <Text size="2" color="gray">Are you sure?</Text>
-                          <Button 
-                            variant="solid" 
-                            color="red"
-                            size="2" 
-                            onClick={handleClearRecentUpgrades}
-                          >
-                            Confirm
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="2" 
-                            onClick={() => setConfirmingClear(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </Flex>
-                      ) : (
+                      renderConfirmButtons('recent', () => clearRecentMutation.mutate()) || (
                         <Button 
                           variant="outline" 
                           color="red"
@@ -593,8 +590,6 @@ function Dashboard() {
                     <Flex direction="column" gap="1" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                       {currentItems.map((upgrade, idx) => {
                         const timestamp = new Date(upgrade.timestamp);
-                        const dateStr = timestamp.toLocaleDateString();
-                        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         const appName = upgrade.instance 
                           ? `${upgrade.application} (${upgrade.instance})`
                           : upgrade.application;
@@ -618,8 +613,8 @@ function Dashboard() {
                             <Text size="2" weight="medium" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {itemsPreview}
                             </Text>
-                            <Text size="1" color="gray" style={{ minWidth: '60px', textAlign: 'right' }}>
-                              {dateStr} {timeStr}
+                            <Text size="1" color="gray" style={{ minWidth: '120px', textAlign: 'right' }}>
+                              {format(timestamp, 'PPp')}
                             </Text>
                             <Text size="1" color="gray" style={{ minWidth: '50px', textAlign: 'right' }}>
                               {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'}
@@ -638,19 +633,23 @@ function Dashboard() {
                         >
                           <ChevronLeftIcon /> Previous
                         </Button>
-                        <Flex gap="1" align="center">
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                            <Button
-                              key={page}
-                              variant={currentPage === page ? "solid" : "outline"}
-                              size="2"
-                              onClick={() => setCurrentPage(page)}
-                              style={{ minWidth: '2.5rem' }}
-                            >
-                              {page}
-                            </Button>
-                          ))}
-                        </Flex>
+                        <ReactPaginate
+                          pageCount={totalPages}
+                          pageRangeDisplayed={5}
+                          marginPagesDisplayed={2}
+                          onPageChange={({ selected }) => setCurrentPage(selected + 1)}
+                          forcePage={currentPage - 1}
+                          containerClassName="pagination"
+                          activeClassName="active"
+                          previousLabel={null}
+                          nextLabel={null}
+                          breakLabel={<Text size="2" style={{ padding: '0.5rem' }}>...</Text>}
+                          pageClassName="page-item"
+                          pageLinkClassName="page-link"
+                          breakClassName="page-item break-item"
+                          disabledClassName="disabled"
+                          renderOnZeroPageCount={null}
+                        />
                         <Button
                           variant="outline"
                           size="2"
@@ -673,4 +672,3 @@ function Dashboard() {
 }
 
 export default Dashboard;
-
