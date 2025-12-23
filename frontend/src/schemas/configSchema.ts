@@ -25,6 +25,8 @@ export const radarrInstanceSchema = z.object({
   movieStatus: z.enum(['announced', 'in cinemas', 'released', 'any']),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  schedule: z.string().optional(),
+  scheduleEnabled: z.boolean().optional(),
 });
 
 export const sonarrInstanceSchema = z.object({
@@ -52,6 +54,8 @@ export const sonarrInstanceSchema = z.object({
   seriesStatus: z.enum(['continuing', 'upcoming', 'ended', '']),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  schedule: z.string().optional(),
+  scheduleEnabled: z.boolean().optional(),
 });
 
 export const notificationConfigSchema = z.object({

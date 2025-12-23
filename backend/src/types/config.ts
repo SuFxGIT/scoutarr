@@ -17,6 +17,8 @@ export interface RadarrInstance {
   movieStatus: 'announced' | 'in cinemas' | 'released' | 'any';
   qualityProfileName: string;
   enabled?: boolean;
+  schedule?: string; // Cron expression for per-instance scheduling
+  scheduleEnabled?: boolean; // Enable/disable scheduling for this instance
 }
 
 export interface SonarrInstance {
@@ -32,6 +34,8 @@ export interface SonarrInstance {
   seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
   qualityProfileName: string;
   enabled?: boolean;
+  schedule?: string; // Cron expression for per-instance scheduling
+  scheduleEnabled?: boolean; // Enable/disable scheduling for this instance
 }
 
 export interface ApplicationsConfig {

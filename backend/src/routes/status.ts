@@ -68,7 +68,8 @@ statusRouter.get('/', async (req, res) => {
       enabled: config.scheduler?.enabled || false,
       running: schedulerStatus.running,
       schedule: schedulerStatus.schedule,
-      nextRun: schedulerStatus.nextRun
+      nextRun: schedulerStatus.nextRun,
+      instances: schedulerStatus.instances
     };
 
     res.json(status);

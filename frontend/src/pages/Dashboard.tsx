@@ -53,6 +53,7 @@ interface StatusResponse {
     running: boolean;
     schedule: string | null;
     nextRun: string | null;
+    instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
   };
 }
 
@@ -222,7 +223,9 @@ function Dashboard() {
     history: SchedulerHistoryEntry[], 
     nextRun: string | null, 
     schedulerEnabled: boolean, 
-    previewResults?: SearchResults | null
+    previewResults?: SearchResults | null,
+    instanceSchedules?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>,
+    connectionStatus?: StatusResponse
   ): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
     
@@ -259,13 +262,12 @@ function Dashboard() {
       });
     }
     
-    // Add next run time at the top if scheduler is enabled
+    // Add global scheduler next run time if enabled
     if (schedulerEnabled && nextRun) {
       const nextRunDate = new Date(nextRun);
       const now = new Date();
       const timeUntilNext = nextRunDate.getTime() - now.getTime();
       
-      // Use humanize-duration for better time formatting
       const timeString = humanizeDuration(timeUntilNext, {
         round: true,
         largest: 2,
@@ -277,8 +279,38 @@ function Dashboard() {
       logs.push({
         timestamp: format(now, 'HH:mm:ss'),
         app: 'Scheduler',
-        message: `Next run: ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
+        message: `Next run (Global): ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
         type: 'info'
+      });
+    }
+
+    // Add per-instance next run times
+    if (instanceSchedules && Object.keys(instanceSchedules).length > 0) {
+      const now = new Date();
+      Object.entries(instanceSchedules).forEach(([instanceKey, instanceStatus]) => {
+        if (instanceStatus.nextRun) {
+          const nextRunDate = new Date(instanceStatus.nextRun);
+          const timeUntilNext = nextRunDate.getTime() - now.getTime();
+          
+          const timeString = humanizeDuration(timeUntilNext, {
+            round: true,
+            largest: 2,
+            units: ['d', 'h', 'm'],
+            conjunction: ' and ',
+            serialComma: false,
+          }) || 'less than a minute';
+          
+          // Try to get instance name from connectionStatus if available, fallback to formatted key
+          const instanceStatusData = connectionStatus?.[instanceKey];
+          const instanceName = instanceStatusData?.instanceName || formatAppName(instanceKey);
+          
+          logs.push({
+            timestamp: format(now, 'HH:mm:ss'),
+            app: instanceKey,
+            message: `Next run (${instanceName}): ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
+            type: 'info'
+          });
+        }
       });
     }
     
@@ -347,7 +379,9 @@ function Dashboard() {
       schedulerHistory, 
       schedulerStatus?.nextRun || null, 
       schedulerStatus?.enabled || false, 
-      manualRunResults || null
+      manualRunResults || null,
+      schedulerStatus?.instances,
+      connectionStatus
     );
 
     return (

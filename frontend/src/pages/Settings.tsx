@@ -1138,6 +1138,203 @@ function Settings() {
                 </Flex>
               </Flex>
             </Card>
+
+            {/* Per-Instance Scheduling */}
+            <Card>
+              <Flex direction="column" gap="4" p="4">
+                <Heading size="5">Per-Instance Scheduling</Heading>
+                <Separator />
+                <Text size="2" color="gray">
+                  Configure individual schedules for each instance. When enabled, the instance will run searches according to its own schedule, independent of the global scheduler and other instances.
+                </Text>
+
+                {/* Radarr Instances */}
+                {getInstances('radarr').length > 0 && (
+                  <Flex direction="column" gap="3">
+                    <Heading size="4">Radarr Instances</Heading>
+                    {getInstances('radarr').map((instance) => {
+                      const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
+                      return (
+                        <Card key={instance.id} variant="surface">
+                          <Flex direction="column" gap="3" p="3">
+                            <Flex direction="row" align="center" justify="between">
+                              <Text size="3" weight="medium">{instance.name || `Radarr Instance ${instance.instanceId || ''}`}</Text>
+                              <Flex direction="row" align="center" gap="2">
+                                <Text size="2">Enable Schedule</Text>
+                                <Switch
+                                  checked={instance.scheduleEnabled || false}
+                                  onCheckedChange={(checked) => {
+                                    updateInstanceConfig('radarr', instance.id, 'scheduleEnabled', checked);
+                                    if (checked && !instance.schedule) {
+                                      updateInstanceConfig('radarr', instance.id, 'schedule', '0 */6 * * *');
+                                    }
+                                  }}
+                                />
+                              </Flex>
+                            </Flex>
+                            {instance.scheduleEnabled && (
+                              <Flex direction="column" gap="2">
+                                <Text size="2" weight="medium">Schedule</Text>
+                                <Select.Root
+                                  value={instanceSchedulePreset}
+                                  onValueChange={(value) => {
+                                    const schedule = value === 'custom' 
+                                      ? (instance.schedule || '0 */6 * * *')
+                                      : CRON_PRESETS[value];
+                                    updateInstanceConfig('radarr', instance.id, 'schedule', schedule);
+                                  }}
+                                >
+                                  <Select.Trigger />
+                                  <Select.Content position="popper" sideOffset={5}>
+                                    <Select.Item value="every-1-min">Every 1 Minute</Select.Item>
+                                    <Select.Item value="every-10-min">Every 10 Minutes</Select.Item>
+                                    <Select.Item value="every-30-min">Every 30 Minutes</Select.Item>
+                                    <Select.Item value="every-hour">Every Hour</Select.Item>
+                                    <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>
+                                    <Select.Item value="every-12-hours">Every 12 Hours</Select.Item>
+                                    <Select.Item value="daily-midnight">Daily at Midnight</Select.Item>
+                                    <Select.Item value="daily-noon">Daily at Noon</Select.Item>
+                                    <Select.Item value="twice-daily">Twice Daily (Midnight & Noon)</Select.Item>
+                                    <Select.Item value="weekly-sunday">Weekly on Sunday</Select.Item>
+                                    <Select.Item value="custom">Custom Cron Expression</Select.Item>
+                                  </Select.Content>
+                                </Select.Root>
+                                {instanceSchedulePreset === 'custom' && (
+                                  <TextField.Root
+                                    value={instance.schedule || '0 */6 * * *'}
+                                    onChange={(e) => {
+                                      updateInstanceConfig('radarr', instance.id, 'schedule', e.target.value);
+                                    }}
+                                    placeholder="0 */6 * * *"
+                                  />
+                                )}
+                                <Text size="1" color="gray">
+                                  {instanceSchedulePreset === 'custom' 
+                                    ? (() => {
+                                        try {
+                                          const cronExpression = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
+                                          return `Current: "${cronExpression}" (${description})`;
+                                        } catch {
+                                          return 'Enter a custom cron expression';
+                                        }
+                                      })()
+                                    : (() => {
+                                        try {
+                                          const currentCron = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
+                                          return description;
+                                        } catch {
+                                          return '';
+                                        }
+                                      })()}
+                                </Text>
+                              </Flex>
+                            )}
+                          </Flex>
+                        </Card>
+                      );
+                    })}
+                  </Flex>
+                )}
+
+                {/* Sonarr Instances */}
+                {getInstances('sonarr').length > 0 && (
+                  <Flex direction="column" gap="3">
+                    <Heading size="4">Sonarr Instances</Heading>
+                    {getInstances('sonarr').map((instance) => {
+                      const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
+                      return (
+                        <Card key={instance.id} variant="surface">
+                          <Flex direction="column" gap="3" p="3">
+                            <Flex direction="row" align="center" justify="between">
+                              <Text size="3" weight="medium">{instance.name || `Sonarr Instance ${instance.instanceId || ''}`}</Text>
+                              <Flex direction="row" align="center" gap="2">
+                                <Text size="2">Enable Schedule</Text>
+                                <Switch
+                                  checked={instance.scheduleEnabled || false}
+                                  onCheckedChange={(checked) => {
+                                    updateInstanceConfig('sonarr', instance.id, 'scheduleEnabled', checked);
+                                    if (checked && !instance.schedule) {
+                                      updateInstanceConfig('sonarr', instance.id, 'schedule', '0 */6 * * *');
+                                    }
+                                  }}
+                                />
+                              </Flex>
+                            </Flex>
+                            {instance.scheduleEnabled && (
+                              <Flex direction="column" gap="2">
+                                <Text size="2" weight="medium">Schedule</Text>
+                                <Select.Root
+                                  value={instanceSchedulePreset}
+                                  onValueChange={(value) => {
+                                    const schedule = value === 'custom' 
+                                      ? (instance.schedule || '0 */6 * * *')
+                                      : CRON_PRESETS[value];
+                                    updateInstanceConfig('sonarr', instance.id, 'schedule', schedule);
+                                  }}
+                                >
+                                  <Select.Trigger />
+                                  <Select.Content position="popper" sideOffset={5}>
+                                    <Select.Item value="every-1-min">Every 1 Minute</Select.Item>
+                                    <Select.Item value="every-10-min">Every 10 Minutes</Select.Item>
+                                    <Select.Item value="every-30-min">Every 30 Minutes</Select.Item>
+                                    <Select.Item value="every-hour">Every Hour</Select.Item>
+                                    <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>
+                                    <Select.Item value="every-12-hours">Every 12 Hours</Select.Item>
+                                    <Select.Item value="daily-midnight">Daily at Midnight</Select.Item>
+                                    <Select.Item value="daily-noon">Daily at Noon</Select.Item>
+                                    <Select.Item value="twice-daily">Twice Daily (Midnight & Noon)</Select.Item>
+                                    <Select.Item value="weekly-sunday">Weekly on Sunday</Select.Item>
+                                    <Select.Item value="custom">Custom Cron Expression</Select.Item>
+                                  </Select.Content>
+                                </Select.Root>
+                                {instanceSchedulePreset === 'custom' && (
+                                  <TextField.Root
+                                    value={instance.schedule || '0 */6 * * *'}
+                                    onChange={(e) => {
+                                      updateInstanceConfig('sonarr', instance.id, 'schedule', e.target.value);
+                                    }}
+                                    placeholder="0 */6 * * *"
+                                  />
+                                )}
+                                <Text size="1" color="gray">
+                                  {instanceSchedulePreset === 'custom' 
+                                    ? (() => {
+                                        try {
+                                          const cronExpression = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
+                                          return `Current: "${cronExpression}" (${description})`;
+                                        } catch {
+                                          return 'Enter a custom cron expression';
+                                        }
+                                      })()
+                                    : (() => {
+                                        try {
+                                          const currentCron = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
+                                          return description;
+                                        } catch {
+                                          return '';
+                                        }
+                                      })()}
+                                </Text>
+                              </Flex>
+                            )}
+                          </Flex>
+                        </Card>
+                      );
+                    })}
+                  </Flex>
+                )}
+
+                {getInstances('radarr').length === 0 && getInstances('sonarr').length === 0 && (
+                  <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
+                    No instances configured. Add instances in the Radarr or Sonarr tabs to configure per-instance scheduling.
+                  </Text>
+                )}
+              </Flex>
+            </Card>
           </Tabs.Content>
 
           <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>

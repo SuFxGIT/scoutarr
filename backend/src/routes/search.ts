@@ -136,6 +136,37 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
   return results;
 }
 
+// Execute search run for a single instance
+export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr', instanceId: string): Promise<Record<string, any>> {
+  const config = configService.getConfig();
+  const results: Record<string, any> = {};
+  
+  // Use scheduler's unattended mode setting (per-instance scheduling still uses global unattended mode)
+  const unattended = config.scheduler?.unattended || false;
+
+  // Find the specific instance
+  const instances = appType === 'radarr' 
+    ? getConfiguredInstances(config.applications.radarr)
+    : getConfiguredInstances(config.applications.sonarr);
+  
+  const instance = instances.find(inst => inst.id === instanceId);
+  if (!instance) {
+    throw new Error(`Instance ${instanceId} not found for ${appType}`);
+  }
+
+  // Process the single instance
+  if (appType === 'radarr') {
+    await processAppInstances([instance], 'radarr', createRadarrProcessor, results, unattended);
+  } else {
+    await processAppInstances([instance], 'sonarr', createSonarrProcessor, results, unattended);
+  }
+
+  // Save stats for successful searches
+  await saveStatsForResults(results);
+
+  return results;
+}
+
 // Common interface for processing applications
 interface ApplicationProcessor<TMedia> {
   name: string;
