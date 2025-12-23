@@ -360,8 +360,7 @@ function Settings() {
             <Text weight="bold" size="3">What is Scoutarr?</Text>
             <br />
             <Text size="2">
-              Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. 
-              It helps find better quality versions of your media by searching both forward and backward, unlike the automatic search which only looks forward.
+              Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
             </Text>
           </Callout.Text>
         </Callout.Root>
@@ -381,29 +380,34 @@ function Settings() {
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
             </Tabs.List>
-            <Button size="3" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
-              {saveConfigMutation.isPending ? (
-                <>
-                  <Spinner size="1" /> Saving...
-                </>
-              ) : (
-                'Save Configuration'
+            <Flex gap="2" align="center">
+              {(activeTab === 'radarr' || activeTab === 'sonarr') && (
+                <Button
+                  size="2"
+                  variant="outline"
+                  onClick={() => addInstance(activeTab as 'radarr' | 'sonarr')}
+                  disabled={getInstances(activeTab as 'radarr' | 'sonarr').length >= MAX_INSTANCES_PER_APP}
+                >
+                  <PlusIcon /> Add {activeTab === 'radarr' ? 'Radarr' : 'Sonarr'} Instance
+                </Button>
               )}
-            </Button>
+              <Button size="2" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
+                {saveConfigMutation.isPending ? (
+                  <>
+                    <Spinner size="1" /> Saving...
+                  </>
+                ) : (
+                  'Save Configuration'
+                )}
+              </Button>
+            </Flex>
           </Flex>
 
           <Tabs.Content value="radarr" style={{ paddingTop: '1rem' }}>
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
                 <Heading size="5">Radarr</Heading>
-                <Button 
-                  onClick={() => addInstance('radarr')}
-                  disabled={getInstances('radarr').length >= MAX_INSTANCES_PER_APP}
-                >
-                  <PlusIcon /> Add
-                </Button>
               </Flex>
-              
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {getInstances('radarr').map((instance, idx) => {
                   const instanceKey = `radarr-${instance.id}`;
@@ -521,7 +525,7 @@ function Settings() {
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Tag Name</Text>
+                                <Text size="2" weight="medium">Tag Name (optional)</Text>
                                 <Tooltip content="The tag name to use for tracking which movies have been searched. This tag will be created automatically if it doesn't exist.">
                                   <TextField.Root
                                     value={instance.tagName || ''}
@@ -553,14 +557,15 @@ function Settings() {
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Minimum Movie Status</Text>
+                                <Text size="2" weight="medium">Movie Status</Text>
                                 <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
                                   <Select.Root
-                                    value={instance.movieStatus || 'released'}
+                                    value={instance.movieStatus || 'any'}
                                     onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
                                   >
                                     <Select.Trigger />
                                     <Select.Content position="popper" sideOffset={5}>
+                                      <Select.Item value="any">Any</Select.Item>
                                       <Select.Item value="announced">Announced</Select.Item>
                                       <Select.Item value="in cinemas">In Cinemas</Select.Item>
                                       <Select.Item value="released">Released</Select.Item>
@@ -639,12 +644,6 @@ function Settings() {
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
                 <Heading size="5">Sonarr</Heading>
-                <Button 
-                  onClick={() => addInstance('sonarr')}
-                  disabled={getInstances('sonarr').length >= MAX_INSTANCES_PER_APP}
-                >
-                  <PlusIcon /> Add
-                </Button>
               </Flex>
               
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
@@ -764,7 +763,7 @@ function Settings() {
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Tag Name</Text>
+                                <Text size="2" weight="medium">Tag Name (optional)</Text>
                                 <Tooltip content="The tag name to use for tracking which series have been searched. This tag will be created automatically if it doesn't exist.">
                                   <TextField.Root
                                     value={instance.tagName || ''}
@@ -796,7 +795,7 @@ function Settings() {
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Series Status (optional)</Text>
+                                <Text size="2" weight="medium">Series Status</Text>
                                 <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
                                   <Select.Root
                                     value={instance.seriesStatus || 'any'}
@@ -887,36 +886,32 @@ function Settings() {
 
                 <Flex direction="column" gap="1">
                   <Text size="2" weight="medium">Discord Webhook URL (optional)</Text>
-                  <TextField.Root
-                    value={config.notifications.discordWebhook}
-                    onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
-                    placeholder="https://discord.com/api/webhooks/..."
-                  />
-                  <Text size="1" color="gray">
-                    Discord webhook URL to receive notifications when upgrades are performed. Leave empty to disable Discord notifications.
-                  </Text>
+                  <Tooltip content="Webhook URL where Discord notifications will be sent. Leave empty to disable.">
+                    <TextField.Root
+                      value={config.notifications.discordWebhook}
+                      onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
+                    />
+                  </Tooltip>
                 </Flex>
 
                 <Flex direction="column" gap="1">
                   <Text size="2" weight="medium">Notifiarr Passthrough Webhook (optional)</Text>
-                  <TextField.Root
-                    value={config.notifications.notifiarrPassthroughWebhook}
-                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
-                  />
-                  <Text size="1" color="gray">
-                    Notifiarr passthrough webhook URL for notifications. Leave empty to disable Notifiarr notifications.
-                  </Text>
+                  <Tooltip content="Notifiarr passthrough webhook for notifications. Leave empty to disable.">
+                    <TextField.Root
+                      value={config.notifications.notifiarrPassthroughWebhook}
+                      onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
+                    />
+                  </Tooltip>
                 </Flex>
 
                 <Flex direction="column" gap="1">
                   <Text size="2" weight="medium">Notifiarr Discord Channel ID (optional)</Text>
-                  <TextField.Root
-                    value={config.notifications.notifiarrPassthroughDiscordChannelId}
-                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
-                  />
-                  <Text size="1" color="gray">
-                    Discord channel ID where Notifiarr notifications should be sent (17-19 digit number). Required if using Notifiarr webhook.
-                  </Text>
+                  <Tooltip content="Discord channel ID for Notifiarr notifications (17–19 digits). Required if a Notifiarr webhook is set.">
+                    <TextField.Root
+                      value={config.notifications.notifiarrPassthroughDiscordChannelId}
+                      onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
+                    />
+                  </Tooltip>
                 </Flex>
               </Flex>
             </Card>

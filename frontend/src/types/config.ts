@@ -14,7 +14,7 @@ export interface RadarrInstance {
   tagName: string;
   ignoreTag: string;
   monitored: boolean;
-  movieStatus: 'announced' | 'in cinemas' | 'released';
+  movieStatus: 'announced' | 'in cinemas' | 'released' | 'any';
   qualityProfileName: string;
   enabled?: boolean;
 }

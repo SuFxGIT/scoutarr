@@ -22,7 +22,7 @@ export const radarrInstanceSchema = z.object({
   tagName: z.string().min(1, 'Tag name is required'),
   ignoreTag: z.string(),
   monitored: z.boolean(),
-  movieStatus: z.enum(['announced', 'in cinemas', 'released']),
+  movieStatus: z.enum(['announced', 'in cinemas', 'released', 'any']),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
 });

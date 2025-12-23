@@ -130,8 +130,8 @@ class RadarrService {
       // Additional filters apply in both attended and unattended modes.
       // Unattended-specific behavior is handled by the scheduler when no media is found.
 
-      // Filter by movie status
-      if (config.movieStatus) {
+      // Filter by movie status (skip when set to "any")
+      if (config.movieStatus && config.movieStatus !== 'any') {
         const before = filtered.length;
         filtered = filtered.filter(m => {
           if (config.movieStatus === 'released') {
