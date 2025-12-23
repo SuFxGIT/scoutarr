@@ -6,7 +6,9 @@ import {
   Card, 
   Text, 
   Badge,
-  Separator
+  Separator,
+  Dialog,
+  Tooltip,
 } from '@radix-ui/themes';
 import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -65,6 +67,7 @@ function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
+  const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
   // Fetch status with auto-refresh
   const { data: statusData } = useQuery<StatusResponse>({
@@ -350,39 +353,58 @@ function Dashboard() {
     return (
       <Card mb="4">
         <Flex align="center" justify="between" mb="3">
-          <Flex direction="column" gap="1">
+          <Flex align="center" gap="2">
             <Heading size="5">Logs</Heading>
-            {schedulerStatus && !schedulerStatus.enabled && (
-              <Text size="2" color="gray">
-                Scheduler disabled
-              </Text>
+            {schedulerStatus && (
+              <Badge 
+                color={
+                  schedulerStatus.enabled && schedulerStatus.running
+                    ? 'green'
+                    : schedulerStatus.enabled
+                    ? 'yellow'
+                    : 'gray'
+                }
+                size="2"
+              >
+                Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
+              </Badge>
             )}
           </Flex>
           <Flex gap="3">
-            <Button 
-              size="2" 
-              onClick={() => runSearchMutation.mutate()} 
-              disabled={runSearchMutation.isPending}
-            >
-              <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="2" 
-              onClick={() => clearHistoryMutation.mutate()}
-              disabled={clearHistoryMutation.isPending}
-              title="Clear History"
-            >
-              <TrashIcon />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="2" 
-              onClick={() => refetchHistory()}
-              title="Refresh"
-            >
-              <ReloadIcon />
-            </Button>
+            <Tooltip content="Trigger a search run immediately using the current configuration.">
+              <span>
+                <Button 
+                  size="2" 
+                  onClick={() => runSearchMutation.mutate()} 
+                  disabled={runSearchMutation.isPending}
+                >
+                  <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip content="Clear log history.">
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="2" 
+                  onClick={() => clearHistoryMutation.mutate()}
+                  disabled={clearHistoryMutation.isPending}
+                >
+                  <TrashIcon />
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip content="Refresh logs.">
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="2" 
+                  onClick={() => refetchHistory()}
+                >
+                  <ReloadIcon />
+                </Button>
+              </span>
+            </Tooltip>
           </Flex>
         </Flex>
         <Card variant="surface" style={{ backgroundColor: '#1a1a1a', fontFamily: 'monospace' }}>
@@ -468,15 +490,22 @@ function Dashboard() {
                     </Badge>
                   );
                 })}
-              {/* Display scheduler status separately */}
-              {schedulerStatus && (
-                <Badge 
-                  color={schedulerStatus.enabled && schedulerStatus.running ? 'green' : schedulerStatus.enabled ? 'yellow' : 'gray'}
-                  size="2"
-                >
-                  Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
-                </Badge>
-              )}
+            </Flex>
+            <Flex>
+              <Tooltip content="Reset all statistics and recent triggers.">
+                <span>
+                  {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
+                    <Button 
+                      variant="outline" 
+                      color="red"
+                      size="2" 
+                      onClick={() => setConfirmingClear('stats')}
+                    >
+                      Clear Data
+                    </Button>
+                  )}
+                </span>
+              </Tooltip>
             </Flex>
           </Flex>
         </Card>
@@ -504,17 +533,7 @@ function Dashboard() {
             <Card>
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
-                  <Heading size="5">Upgrade Statistics</Heading>
-                  {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
-                    <Button 
-                      variant="outline" 
-                      color="red"
-                      size="2" 
-                      onClick={() => setConfirmingClear('stats')}
-                    >
-                      Clear Stats
-                    </Button>
-                  )}
+                  <Heading size="5">Statistics</Heading>
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
@@ -526,7 +545,7 @@ function Dashboard() {
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Total Upgrades</Text>
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Total Triggered</Text>
                       <Heading size="7" style={{ textAlign: 'center' }}>{stats.totalUpgrades}</Heading>
                     </Flex>
                   </Card>
@@ -561,7 +580,7 @@ function Dashboard() {
             <Card>
               <Flex direction="column" gap="2">
                 <Flex align="center" justify="between">
-                  <Heading size="5">Recent Upgrades</Heading>
+                  <Heading size="5">Recent Triggers</Heading>
                   <Flex gap="2" align="center">
                     {totalItems > 0 && (
                       <Text size="2" color="gray">
@@ -606,8 +625,10 @@ function Dashboard() {
                             gap="2" 
                             style={{ 
                               padding: '0.5rem',
-                              borderBottom: idx < currentItems.length - 1 ? '1px solid var(--gray-6)' : 'none'
+                              borderBottom: idx < currentItems.length - 1 ? '1px solid var(--gray-6)' : 'none',
+                              cursor: 'pointer'
                             }}
+                            onClick={() => setSelectedUpgrade(upgrade)}
                           >
                             <Badge size="1" style={{ textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>
                               {appName}
@@ -668,6 +689,54 @@ function Dashboard() {
             </Card>
           );
         })()}
+
+        {/* Dialog for viewing all items in a recent upgrade entry */}
+        <Dialog.Root
+          open={!!selectedUpgrade}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedUpgrade(null);
+            }
+          }}
+        >
+          <Dialog.Content maxWidth="480px">
+            {selectedUpgrade && (
+              <Flex direction="column" gap="3">
+                <Dialog.Title>
+                  {selectedUpgrade.instance
+                    ? `${formatAppName(selectedUpgrade.application)} (${selectedUpgrade.instance})`
+                    : formatAppName(selectedUpgrade.application)}
+                </Dialog.Title>
+                <Dialog.Description>
+                  {selectedUpgrade.count} {selectedUpgrade.count === 1 ? 'item' : 'items'} triggered on{' '}
+                  {format(new Date(selectedUpgrade.timestamp), 'PPpp')}
+                </Dialog.Description>
+                <Separator />
+                {selectedUpgrade.items.length === 0 ? (
+                  <Text size="2" color="gray">
+                    No items recorded for this upgrade.
+                  </Text>
+                ) : (
+                  <Flex
+                    direction="column"
+                    gap="2"
+                    style={{ maxHeight: '320px', overflowY: 'auto' }}
+                    >
+                    {selectedUpgrade.items.map((item) => (
+                      <Text
+                        key={item.id}
+                        size="2"
+                        style={{ padding: '0.25rem 0' }}
+                      >
+                        {item.title}
+                      </Text>
+                    ))}
+                  </Flex>
+                )}
+              </Flex>
+            )}
+          </Dialog.Content>
+        </Dialog.Root>
       </Flex>
     </div>
   );
