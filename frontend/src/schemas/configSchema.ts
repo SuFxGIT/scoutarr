@@ -119,9 +119,9 @@ export const readarrInstanceSchema = z.object({
 export const notificationConfigSchema = z.object({
   discordWebhook: z.string().url('Invalid Discord webhook URL').or(z.literal('')),
   notifiarrPassthroughWebhook: z.string().url('Invalid webhook URL').or(z.literal('')),
-  notifiarrPassthroughDiscordChannelId: z.string(),
-  pushoverUserKey: z.string(),
-  pushoverApiToken: z.string(),
+  notifiarrPassthroughDiscordChannelId: z.string().default(''),
+  pushoverUserKey: z.string().default(''),
+  pushoverApiToken: z.string().default(''),
 });
 
 export const schedulerConfigSchema = z.object({

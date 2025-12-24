@@ -25,8 +25,10 @@ import cronstrue from 'cronstrue';
 import axios from 'axios';
 import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
+import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
 import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP } from '../utils/constants';
+import { AppIcon } from '../components/icons/AppIcon';
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -85,9 +87,17 @@ function Settings() {
       // Validate config with zod
       try {
         configSchema.parse(configToSave);
-      } catch (error: any) {
-        const errorMessages = error.errors?.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
-        throw new Error(`Validation failed: ${errorMessages}`);
+      } catch (error: unknown) {
+        if (error instanceof ZodError) {
+          const errorMessages = error.issues.map((e) => {
+            const path = e.path.length > 0 ? e.path.join('.') : 'root';
+            return `${path}: ${e.message}`;
+          }).join(', ');
+          throw new Error(`Validation failed: ${errorMessages}`);
+        }
+        // Fallback for non-Zod errors
+        const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
+        throw new Error(`Validation failed: ${errorMessage}`);
       }
       await axios.put('/api/config', configToSave);
     },
@@ -143,6 +153,26 @@ function Settings() {
   // Helper to normalize config - ensure instances have stable IDs and instanceIds
   const normalizeConfig = (config: Config): Config => {
     const normalized = { ...config };
+    
+    // Ensure notifications object exists with all required fields
+    if (!normalized.notifications) {
+      normalized.notifications = {
+        discordWebhook: '',
+        notifiarrPassthroughWebhook: '',
+        notifiarrPassthroughDiscordChannelId: '',
+        pushoverUserKey: '',
+        pushoverApiToken: ''
+      };
+    } else {
+      // Ensure all notification fields are strings (default to empty string if undefined)
+      normalized.notifications = {
+        discordWebhook: normalized.notifications.discordWebhook ?? '',
+        notifiarrPassthroughWebhook: normalized.notifications.notifiarrPassthroughWebhook ?? '',
+        notifiarrPassthroughDiscordChannelId: normalized.notifications.notifiarrPassthroughDiscordChannelId ?? '',
+        pushoverUserKey: normalized.notifications.pushoverUserKey ?? '',
+        pushoverApiToken: normalized.notifications.pushoverApiToken ?? ''
+      };
+    }
     
     // Ensure applications object exists
     if (!normalized.applications) {
@@ -561,10 +591,30 @@ function Settings() {
                   <Select.Root value={selectedAppType} onValueChange={(value) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
                     <Select.Trigger style={{ minWidth: '120px' }} />
                     <Select.Content position="popper" sideOffset={5}>
-                      <Select.Item value="radarr">Radarr</Select.Item>
-                      <Select.Item value="sonarr">Sonarr</Select.Item>
-                      <Select.Item value="lidarr">Lidarr</Select.Item>
-                      <Select.Item value="readarr">Readarr</Select.Item>
+                      <Select.Item value="radarr">
+                        <Flex align="center" gap="2">
+                          <AppIcon app="radarr" size={16} variant="light" />
+                          Radarr
+                        </Flex>
+                      </Select.Item>
+                      <Select.Item value="sonarr">
+                        <Flex align="center" gap="2">
+                          <AppIcon app="sonarr" size={16} variant="light" />
+                          Sonarr
+                        </Flex>
+                      </Select.Item>
+                      <Select.Item value="lidarr">
+                        <Flex align="center" gap="2">
+                          <AppIcon app="lidarr" size={16} variant="light" />
+                          Lidarr
+                        </Flex>
+                      </Select.Item>
+                      <Select.Item value="readarr">
+                        <Flex align="center" gap="2">
+                          <AppIcon app="readarr" size={16} variant="light" />
+                          Readarr
+                        </Flex>
+                      </Select.Item>
                     </Select.Content>
                   </Select.Root>
                 </Flex>
@@ -604,7 +654,10 @@ function Settings() {
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
-                                <Text size="3" weight="bold">{displayName}</Text>
+                                <Flex align="center" gap="2">
+                                  <AppIcon app={selectedAppType} size={18} variant="light" />
+                                  <Text size="3" weight="bold">{displayName}</Text>
+                                </Flex>
                                 <Flex align="center" gap="2">
                                   {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
                                     <Flex gap="1" align="center">
