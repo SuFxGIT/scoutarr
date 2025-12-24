@@ -256,8 +256,6 @@ function Settings() {
       inst.id === instanceId ? { ...inst, [field]: value } : inst
     );
     
-    const updatedInstance = updatedInstances.find(inst => inst.id === instanceId);
-    
     setConfig({
       ...config,
       applications: {
