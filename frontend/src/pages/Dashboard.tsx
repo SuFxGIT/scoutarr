@@ -326,9 +326,8 @@ function Dashboard() {
             const appName = formatAppName(app);
             const searched = result.searched || 0;
             
-            // Determine media type and plural name
+            // Determine media type
             const mediaType = result.movies ? 'movies' : result.artists ? 'artists' : result.authors ? 'authors' : 'series';
-            const mediaTypeSingular = mediaType === 'movies' ? 'movie' : mediaType === 'artists' ? 'artist' : mediaType === 'authors' ? 'author' : 'series';
             
             // Show triggered action
             logs.push({

@@ -1,0 +1,17 @@
+[1mdiff --git a/docker-compose.yml b/docker-compose.yml[m
+[1mindex 4611480..2299959 100644[m
+[1m--- a/docker-compose.yml[m
+[1m+++ b/docker-compose.yml[m
+[36m@@ -9,10 +9,10 @@[m [mservices:[m
+       - "5839:5839"[m
+     volumes:[m
+       - ./config:/app/config[m
+[31m-      - ./data:/app/data[m
+     environment:[m
+       - NODE_ENV=production[m
+[31m-      - PORT=5839[m
+[32m+[m[32m      - TZ=UTC[m
+[32m+[m[32m      - LOG_LEVEL=info[m
+     networks:[m
+       - scoutarr-network[m
+ [m

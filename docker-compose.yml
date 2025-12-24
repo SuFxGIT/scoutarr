@@ -9,10 +9,10 @@ services:
       - "5839:5839"
     volumes:
       - ./config:/app/config
-      - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - PORT=5839
+      - TZ=Asia/Kuwait
+      - LOG_LEVEL=info
     networks:
       - scoutarr-network
 
