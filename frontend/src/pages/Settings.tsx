@@ -35,7 +35,14 @@ function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
-  const [activeTab, setActiveTab] = useState<string>('applications');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const savedTab = localStorage.getItem('scoutarr_settings_active_tab');
+      return savedTab || 'applications';
+    } catch {
+      return 'applications';
+    }
+  });
   const [selectedAppType, setSelectedAppType] = useState<'radarr' | 'sonarr' | 'lidarr' | 'readarr'>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
@@ -115,6 +122,15 @@ function Settings() {
       // Ignore storage errors and fall back to defaults
     }
   }, []);
+
+  // Persist active tab to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('scoutarr_settings_active_tab', activeTab);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [activeTab]);
 
 
   // Save config mutation with validation
