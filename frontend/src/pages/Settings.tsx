@@ -33,7 +33,8 @@ function Settings() {
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
-  const [activeTab, setActiveTab] = useState<string>('radarr');
+  const [activeTab, setActiveTab] = useState<string>('applications');
+  const [selectedAppType, setSelectedAppType] = useState<'radarr' | 'sonarr' | 'lidarr' | 'readarr'>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
   const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
@@ -124,7 +125,7 @@ function Settings() {
 
 
   // Helper to get next available instance ID
-  const getNextInstanceId = (_app: 'radarr' | 'sonarr', instances: any[]): number => {
+  const getNextInstanceId = (_app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instances: any[]): number => {
     const existingIds = instances
       .map(inst => inst.instanceId)
       .filter(id => typeof id === 'number')
@@ -143,14 +144,28 @@ function Settings() {
   const normalizeConfig = (config: Config): Config => {
     const normalized = { ...config };
     
-    // Ensure all Radarr instances have instanceId
-    normalized.applications.radarr = normalized.applications.radarr.map((inst: any, idx: number) => ({
+    // Ensure applications object exists
+    if (!normalized.applications) {
+      normalized.applications = { radarr: [], sonarr: [], lidarr: [], readarr: [] };
+    }
+    
+    // Ensure all app arrays exist and normalize instances
+    normalized.applications.radarr = (normalized.applications.radarr || []).map((inst: any, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
 
-    // Ensure all Sonarr instances have instanceId
-    normalized.applications.sonarr = normalized.applications.sonarr.map((inst: any, idx: number) => ({
+    normalized.applications.sonarr = (normalized.applications.sonarr || []).map((inst: any, idx: number) => ({
+      ...inst,
+      instanceId: inst.instanceId || idx + 1
+    }));
+    
+    normalized.applications.lidarr = (normalized.applications.lidarr || []).map((inst: any, idx: number) => ({
+      ...inst,
+      instanceId: inst.instanceId || idx + 1
+    }));
+    
+    normalized.applications.readarr = (normalized.applications.readarr || []).map((inst: any, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
@@ -159,13 +174,13 @@ function Settings() {
   };
 
   // Get instances for an app
-  const getInstances = (app: 'radarr' | 'sonarr'): any[] => {
+  const getInstances = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): any[] => {
     if (!config) return [];
     return config.applications[app] as any[];
   };
 
   // Update instance config
-  const updateInstanceConfig = (app: 'radarr' | 'sonarr', instanceId: string, field: string, value: any) => {
+  const updateInstanceConfig = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, field: string, value: any) => {
     if (!config) return;
     const instances = getInstances(app);
     const updatedInstances = instances.map(inst => 
@@ -190,7 +205,7 @@ function Settings() {
   };
 
   // Add new instance
-  const addInstance = (app: 'radarr' | 'sonarr') => {
+  const addInstance = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr') => {
     if (!config) return;
     const instances = getInstances(app);
     // Limit instances per app
@@ -200,33 +215,69 @@ function Settings() {
     }
     const newId = `${app}-${Date.now()}`;
     const nextInstanceId = getNextInstanceId(app, instances);
-    const defaultConfig = app === 'radarr' ? {
-      id: newId,
-      instanceId: nextInstanceId,
-      name: '',
-      url: '',
-      apiKey: '',
-      count: 5,
-      tagName: 'upgradinatorr',
-      ignoreTag: '',
-      monitored: true,
-      movieStatus: 'any' as const,
-      qualityProfileName: '',
-      enabled: true
-    } : {
-      id: newId,
-      instanceId: nextInstanceId,
-      name: '',
-      url: '',
-      apiKey: '',
-      count: 5,
-      tagName: 'upgradinatorr',
-      ignoreTag: '',
-      monitored: true,
-      seriesStatus: '',
-      qualityProfileName: '',
-      enabled: true
-    };
+    
+    let defaultConfig: any;
+    if (app === 'radarr') {
+      defaultConfig = {
+        id: newId,
+        instanceId: nextInstanceId,
+        name: '',
+        url: '',
+        apiKey: '',
+        count: 5,
+        tagName: 'upgradinatorr',
+        ignoreTag: '',
+        monitored: true,
+        movieStatus: 'any' as const,
+        qualityProfileName: '',
+        enabled: true
+      };
+    } else if (app === 'sonarr') {
+      defaultConfig = {
+        id: newId,
+        instanceId: nextInstanceId,
+        name: '',
+        url: '',
+        apiKey: '',
+        count: 5,
+        tagName: 'upgradinatorr',
+        ignoreTag: '',
+        monitored: true,
+        seriesStatus: '',
+        qualityProfileName: '',
+        enabled: true
+      };
+    } else if (app === 'lidarr') {
+      defaultConfig = {
+        id: newId,
+        instanceId: nextInstanceId,
+        name: '',
+        url: '',
+        apiKey: '',
+        count: 5,
+        tagName: 'upgradinatorr',
+        ignoreTag: '',
+        monitored: true,
+        artistStatus: '',
+        qualityProfileName: '',
+        enabled: true
+      };
+    } else { // readarr
+      defaultConfig = {
+        id: newId,
+        instanceId: nextInstanceId,
+        name: '',
+        url: '',
+        apiKey: '',
+        count: 5,
+        tagName: 'upgradinatorr',
+        ignoreTag: '',
+        monitored: true,
+        authorStatus: '',
+        qualityProfileName: '',
+        enabled: true
+      };
+    }
     
     setConfig({
       ...config,
@@ -238,7 +289,7 @@ function Settings() {
   };
 
   // Remove instance
-  const removeInstance = (app: 'radarr' | 'sonarr', instanceId: string) => {
+  const removeInstance = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string) => {
     if (!config) return;
     const instances = getInstances(app);
     const updatedInstances = instances.filter(inst => inst.id !== instanceId);
@@ -289,8 +340,8 @@ function Settings() {
     const key = instanceId ? `${app}-${instanceId}` : app;
     const testResult = testResults[key];
     let appConfig: any;
-    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr'] as any[];
+    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
+      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as any[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
       appConfig = config.applications[app as keyof Config['applications']];
@@ -386,6 +437,17 @@ function Settings() {
     }
   };
 
+  // Helper to get app-specific labels and configuration
+  const getAppInfo = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr') => {
+    const appNames = {
+      radarr: { name: 'Radarr', mediaType: 'Movies', mediaTypePlural: 'movies', defaultPort: '7878' },
+      sonarr: { name: 'Sonarr', mediaType: 'Series', mediaTypePlural: 'series', defaultPort: '8989' },
+      lidarr: { name: 'Lidarr', mediaType: 'Artists', mediaTypePlural: 'artists', defaultPort: '8686' },
+      readarr: { name: 'Readarr', mediaType: 'Authors', mediaTypePlural: 'authors', defaultPort: '8787' }
+    };
+    return appNames[appType];
+  };
+
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
@@ -462,21 +524,20 @@ function Settings() {
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <Flex align="center" justify="between" gap="3">
             <Tabs.List>
-              <Tabs.Trigger value="radarr">Radarr</Tabs.Trigger>
-              <Tabs.Trigger value="sonarr">Sonarr</Tabs.Trigger>
+              <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
               <Tabs.Trigger value="advanced">Advanced</Tabs.Trigger>
             </Tabs.List>
             <Flex gap="2" align="center">
-              {(activeTab === 'radarr' || activeTab === 'sonarr') && (
+              {activeTab === 'applications' && (
                 <Button
                   size="2"
                   variant="outline"
-                  onClick={() => addInstance(activeTab as 'radarr' | 'sonarr')}
-                  disabled={getInstances(activeTab as 'radarr' | 'sonarr').length >= MAX_INSTANCES_PER_APP}
+                  onClick={() => addInstance(selectedAppType)}
+                  disabled={getInstances(selectedAppType).length >= MAX_INSTANCES_PER_APP}
                 >
-                  <PlusIcon /> Add {activeTab === 'radarr' ? 'Radarr' : 'Sonarr'} Instance
+                  <PlusIcon /> Add {selectedAppType.charAt(0).toUpperCase() + selectedAppType.slice(1)} Instance
                 </Button>
               )}
               <Button size="2" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
@@ -491,16 +552,29 @@ function Settings() {
             </Flex>
           </Flex>
 
-          <Tabs.Content value="radarr" style={{ paddingTop: '1rem' }}>
+          <Tabs.Content value="applications" style={{ paddingTop: '1rem' }}>
             <Flex direction="column" gap="3">
               <Flex align="center" justify="between">
-                <Heading size="5">Radarr</Heading>
+                <Heading size="5">Applications</Heading>
+                <Flex gap="2" align="center">
+                  <Text size="2">Application Type:</Text>
+                  <Select.Root value={selectedAppType} onValueChange={(value) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
+                    <Select.Trigger style={{ minWidth: '120px' }} />
+                    <Select.Content>
+                      <Select.Item value="radarr">Radarr</Select.Item>
+                      <Select.Item value="sonarr">Sonarr</Select.Item>
+                      <Select.Item value="lidarr">Lidarr</Select.Item>
+                      <Select.Item value="readarr">Readarr</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
               </Flex>
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
-                {getInstances('radarr').map((instance, idx) => {
-                  const instanceKey = `radarr-${instance.id}`;
+                {getInstances(selectedAppType).map((instance, idx) => {
+                  const appInfo = getAppInfo(selectedAppType);
+                  const instanceKey = `${selectedAppType}-${instance.id}`;
                   const isExpanded = expandedInstances.has(instanceKey);
-                  const displayName = instance.name || `Radarr ${instance.instanceId || idx + 1}`;
+                  const displayName = instance.name || `${appInfo.name} ${instance.instanceId || idx + 1}`;
                   
                   return (
                     <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
@@ -532,7 +606,7 @@ function Settings() {
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Text size="3" weight="bold">{displayName}</Text>
                                 <Flex align="center" gap="2">
-                                  {confirmingDeleteInstance === `radarr-${instance.id}` ? (
+                                  {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
                                     <Flex gap="1" align="center">
                                       <Text size="1" color="gray">Delete?</Text>
                                       <Button 
@@ -541,7 +615,7 @@ function Settings() {
                                         size="1"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          removeInstance('radarr', instance.id);
+                                          removeInstance(selectedAppType, instance.id);
                                         }}
                                       >
                                         Yes
@@ -565,7 +639,7 @@ function Settings() {
                                         size="1"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setConfirmingDeleteInstance(`radarr-${instance.id}`);
+                                          setConfirmingDeleteInstance(`${selectedAppType}-${instance.id}`);
                                         }}
                                       >
                                         <TrashIcon />
@@ -586,7 +660,7 @@ function Settings() {
                                   <span>
                                     <Switch
                                       checked={instance.enabled !== false}
-                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'enabled', checked)}
+                                      onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
                                     />
                                   </span>
                                 </Tooltip>
@@ -594,372 +668,151 @@ function Settings() {
                               <Separator />
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Name (optional)</Text>
-                                <Tooltip content="A friendly name to identify this instance (e.g., 'Main Radarr', '4K Radarr'). Leave empty to use default ID.">
+                                <Tooltip content={`A friendly name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Leave empty to use default ID.`}>
                                   <TextField.Root
                                     value={instance.name || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'name', e.target.value)}
-                                    placeholder={`Radarr ${instance.instanceId || idx + 1}`}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
+                                    placeholder={`${appInfo.name} ${instance.instanceId || idx + 1}`}
                                   />
                                 </Tooltip>
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Radarr URL</Text>
-                                <Tooltip content="The base URL where your Radarr instance is accessible (e.g., http://localhost:7878 or https://radarr.example.com)">
+                                <Text size="2" weight="medium">{appInfo.name} URL</Text>
+                                <Tooltip content={`The base URL where your ${appInfo.name} instance is accessible (e.g., http://localhost:${appInfo.defaultPort} or https://${selectedAppType}.example.com)`}>
                                   <TextField.Root
-                                    placeholder="http://localhost:7878"
+                                    placeholder={`http://localhost:${appInfo.defaultPort}`}
                                     value={instance.url || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'url', e.target.value)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
                                   />
                                 </Tooltip>
                               </Flex>
 
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">API Key</Text>
-                                <Tooltip content="Your Radarr API key found in Settings → General → Security → API Key (must be 32 characters)">
+                                <Tooltip content={`Your ${appInfo.name} API key found in Settings → General → Security → API Key (must be 32 characters)`}>
                                   <TextField.Root
                                     type="password"
                                     placeholder="API Key"
                                     value={instance.apiKey || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'apiKey', e.target.value)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
                                   />
                                 </Tooltip>
                               </Flex>
 
-                              {renderTestButton('radarr', instance.id)}
+                              {renderTestButton(selectedAppType, instance.id)}
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Number of Movies to Search</Text>
-                                <Tooltip content="How many movies to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching movies.">
-                                  <TextField.Root
-                                    type="number"
-                                    value={(instance.count || 10).toString()}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'count', parseInt(e.target.value) || 10)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Tag Name (optional)</Text>
-                                <Tooltip content="The tag name to use for tracking which movies have been searched. This tag will be created automatically if it doesn't exist.">
-                                  <TextField.Root
-                                    value={instance.tagName || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'tagName', e.target.value)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Ignore Tag (optional)</Text>
-                                <Tooltip content="Movies with this tag will be excluded from upgrade searches. Leave empty to include all movies matching other criteria.">
-                                  <TextField.Root
-                                    value={instance.ignoreTag || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'ignoreTag', e.target.value)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Search Monitored Movies Only</Text>
-                                <Tooltip content="When enabled, only movies that are currently monitored will be considered for upgrades.">
-                                  <span>
-                                    <Switch
-                                      checked={instance.monitored ?? true}
-                                      onCheckedChange={(checked) => updateInstanceConfig('radarr', instance.id, 'monitored', checked)}
-                                    />
-                                  </span>
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Movie Status</Text>
-                                <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
-                                  <Select.Root
-                                    value={instance.movieStatus || 'any'}
-                                    onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
-                                  >
-                                    <Select.Trigger />
-                                    <Select.Content position="popper" sideOffset={5}>
-                                      <Select.Item value="any">Any</Select.Item>
-                                      <Select.Item value="announced">Announced</Select.Item>
-                                      <Select.Item value="in cinemas">In Cinemas</Select.Item>
-                                      <Select.Item value="released">Released</Select.Item>
-                                    </Select.Content>
-                                  </Select.Root>
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Quality Profile Name (optional)</Text>
-                                <Tooltip content="Only movies using this specific quality profile will be considered. Leave empty to include all quality profiles.">
-                                  <TextField.Root
-                                    value={instance.qualityProfileName || ''}
-                                    onChange={(e) => updateInstanceConfig('radarr', instance.id, 'qualityProfileName', e.target.value)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Separator />
-
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Clear Tags</Text>
-                                {confirmingClearTags === `radarr-${instance.id}` ? (
-                                  <Flex gap="2" align="center">
-                                    <Text size="1" color="gray">Confirm?</Text>
-                                    <Button
-                                      variant="solid"
-                                      size="2"
-                                      color="red"
-                                      onClick={async () => {
-                                        try {
-                                          await axios.post(`/api/config/clear-tags/radarr/${instance.id}`);
-                                          toast.success('Tags cleared successfully');
-                                          setConfirmingClearTags(null);
-                                        } catch (error: unknown) {
-                                          toast.error('Failed to clear tags: ' + getErrorMessage(error));
-                                          setConfirmingClearTags(null);
-                                        }
-                                      }}
-                                    >
-                                      Confirm
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="2"
-                                      onClick={() => setConfirmingClearTags(null)}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </Flex>
-                                ) : (
-                                  <Tooltip content="Removes the configured tag from all movies in this Radarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
-                                    <Button
-                                      variant="outline"
-                                      size="2"
-                                      color="red"
-                                      onClick={() => setConfirmingClearTags(`radarr-${instance.id}`)}
-                                    >
-                                      Clear Tags
-                                    </Button>
-                                  </Tooltip>
-                                )}
-                              </Flex>
-                            </Flex>
-                          </Collapsible.Content>
-                        </Collapsible.Root>
-                      </Flex>
-                    </Card>
-                  );
-                })}
-              </Grid>
-            </Flex>
-          </Tabs.Content>
-
-          <Tabs.Content value="sonarr" style={{ paddingTop: '1rem' }}>
-            <Flex direction="column" gap="3">
-              <Flex align="center" justify="between">
-                <Heading size="5">Sonarr</Heading>
-              </Flex>
-              
-              <Grid columns={{ initial: '1', md: '2' }} gap="3">
-                {getInstances('sonarr').map((instance, idx) => {
-                  const instanceKey = `sonarr-${instance.id}`;
-                  const isExpanded = expandedInstances.has(instanceKey);
-                  const displayName = instance.name || `Sonarr ${instance.instanceId || idx + 1}`;
-                  
-                  return (
-                    <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
-                      <Flex direction="column" gap="2">
-                        <Collapsible.Root open={isExpanded} onOpenChange={(open) => {
-                          const newExpanded = new Set(expandedInstances);
-                          if (open) {
-                            newExpanded.add(instanceKey);
-                          } else {
-                            newExpanded.delete(instanceKey);
-                          }
-                          setExpandedInstances(newExpanded);
-                        }}>
-                          <Collapsible.Trigger asChild>
-                            <div 
-                              style={{ 
-                                width: '100%', 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center', 
-                                padding: '0.75rem', 
-                                marginBottom: '0', 
-                                cursor: 'pointer',
-                                userSelect: 'none',
-                                WebkitUserSelect: 'none'
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
-                                <Text size="3" weight="bold">{displayName}</Text>
-                                <Flex align="center" gap="2">
-                                  {confirmingDeleteInstance === `sonarr-${instance.id}` ? (
-                                    <Flex gap="1" align="center">
-                                      <Text size="1" color="gray">Delete?</Text>
-                                      <Button 
-                                        variant="solid" 
-                                        color="red" 
-                                        size="1"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          removeInstance('sonarr', instance.id);
-                                        }}
-                                      >
-                                        Yes
-                                      </Button>
-                                      <Button 
-                                        variant="outline" 
-                                        size="1"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setConfirmingDeleteInstance(null);
-                                        }}
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </Flex>
-                                  ) : (
-                                    <Tooltip content="Delete this instance">
-                                      <Button 
-                                        variant="soft" 
-                                        color="red" 
-                                        size="1"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setConfirmingDeleteInstance(`sonarr-${instance.id}`);
-                                        }}
-                                      >
-                                        <TrashIcon />
-                                      </Button>
-                                    </Tooltip>
-                                  )}
-                                  {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-                                </Flex>
-                              </Flex>
-                            </div>
-                          </Collapsible.Trigger>
-                          
-                          <Collapsible.Content style={{ overflow: 'hidden' }}>
-                            <Flex direction="column" gap="3" p="3" pt="2">
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Enable Instance</Text>
-                                <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
-                                  <span>
-                                    <Switch
-                                      checked={instance.enabled !== false}
-                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'enabled', checked)}
-                                    />
-                                  </span>
-                                </Tooltip>
-                              </Flex>
-                              <Separator />
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Name (optional)</Text>
-                                <Tooltip content="A friendly name to identify this instance (e.g., 'Main Sonarr', 'Anime Sonarr'). Leave empty to use default ID.">
-                                  <TextField.Root
-                                    value={instance.name || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'name', e.target.value)}
-                                    placeholder={`Sonarr ${instance.instanceId || idx + 1}`}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Sonarr URL</Text>
-                                <Tooltip content="The base URL where your Sonarr instance is accessible (e.g., http://localhost:8989 or https://sonarr.example.com)">
-                                  <TextField.Root
-                                    placeholder="http://localhost:8989"
-                                    value={instance.url || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'url', e.target.value)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">API Key</Text>
-                                <Tooltip content="Your Sonarr API key found in Settings → General → Security → API Key (must be 32 characters)">
-                                  <TextField.Root
-                                    type="password"
-                                    placeholder="API Key"
-                                    value={instance.apiKey || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'apiKey', e.target.value)}
-                                  />
-                                </Tooltip>
-                              </Flex>
-
-                              {renderTestButton('sonarr', instance.id)}
-
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Number of Series to Search</Text>
-                                <Tooltip content="How many series to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching series.">
+                                <Text size="2" weight="medium">Number of {appInfo.mediaTypePlural.charAt(0).toUpperCase() + appInfo.mediaTypePlural.slice(1)} to Search</Text>
+                                <Tooltip content={`How many ${appInfo.mediaTypePlural} to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching ${appInfo.mediaTypePlural}.`}>
                                   <TextField.Root
                                     type="number"
                                     value={(instance.count || 5).toString()}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'count', parseInt(e.target.value) || 5)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
                                   />
                                 </Tooltip>
                               </Flex>
 
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Tag Name (optional)</Text>
-                                <Tooltip content="The tag name to use for tracking which series have been searched. This tag will be created automatically if it doesn't exist.">
+                                <Tooltip content={`The tag name to use for tracking which ${appInfo.mediaTypePlural} have been searched. This tag will be created automatically if it doesn't exist.`}>
                                   <TextField.Root
                                     value={instance.tagName || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'tagName', e.target.value)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
                                   />
                                 </Tooltip>
                               </Flex>
 
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Ignore Tag (optional)</Text>
-                                <Tooltip content="Series with this tag will be excluded from upgrade searches. Leave empty to include all series matching other criteria.">
+                                <Tooltip content={`${appInfo.mediaType} with this tag will be excluded from upgrade searches. Leave empty to include all ${appInfo.mediaTypePlural} matching other criteria.`}>
                                   <TextField.Root
                                     value={instance.ignoreTag || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'ignoreTag', e.target.value)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
                                   />
                                 </Tooltip>
                               </Flex>
 
                               <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Search Monitored Series Only</Text>
-                                <Tooltip content="When enabled, only series that are currently monitored will be considered for upgrades.">
+                                <Text size="2" weight="medium">Search Monitored {appInfo.mediaType} Only</Text>
+                                <Tooltip content={`When enabled, only ${appInfo.mediaTypePlural} that are currently monitored will be considered for upgrades.`}>
                                   <span>
                                     <Switch
                                       checked={instance.monitored ?? true}
-                                      onCheckedChange={(checked) => updateInstanceConfig('sonarr', instance.id, 'monitored', checked)}
+                                      onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
                                     />
                                   </span>
                                 </Tooltip>
                               </Flex>
 
-                              <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Series Status</Text>
-                                <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
-                                  <Select.Root
-                                    value={instance.seriesStatus || 'any'}
-                                    onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
-                                  >
-                                    <Select.Trigger />
-                                    <Select.Content position="popper" sideOffset={5}>
-                                      <Select.Item value="any">Any</Select.Item>
-                                      <Select.Item value="continuing">Continuing</Select.Item>
-                                      <Select.Item value="upcoming">Upcoming</Select.Item>
-                                      <Select.Item value="ended">Ended</Select.Item>
-                                    </Select.Content>
-                                  </Select.Root>
-                                </Tooltip>
-                              </Flex>
+                              {selectedAppType === 'radarr' && (
+                                <Flex direction="column" gap="2">
+                                  <Text size="2" weight="medium">Movie Status</Text>
+                                  <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
+                                    <Select.Root
+                                      value={instance.movieStatus || 'any'}
+                                      onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
+                                    >
+                                      <Select.Trigger />
+                                      <Select.Content position="popper" sideOffset={5}>
+                                        <Select.Item value="any">Any</Select.Item>
+                                        <Select.Item value="announced">Announced</Select.Item>
+                                        <Select.Item value="in cinemas">In Cinemas</Select.Item>
+                                        <Select.Item value="released">Released</Select.Item>
+                                      </Select.Content>
+                                    </Select.Root>
+                                  </Tooltip>
+                                </Flex>
+                              )}
+                              
+                              {selectedAppType === 'sonarr' && (
+                                <Flex direction="column" gap="2">
+                                  <Text size="2" weight="medium">Series Status</Text>
+                                  <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
+                                    <Select.Root
+                                      value={instance.seriesStatus || 'any'}
+                                      onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
+                                    >
+                                      <Select.Trigger />
+                                      <Select.Content position="popper" sideOffset={5}>
+                                        <Select.Item value="any">Any</Select.Item>
+                                        <Select.Item value="continuing">Continuing</Select.Item>
+                                        <Select.Item value="upcoming">Upcoming</Select.Item>
+                                        <Select.Item value="ended">Ended</Select.Item>
+                                      </Select.Content>
+                                    </Select.Root>
+                                  </Tooltip>
+                                </Flex>
+                              )}
+
+                              {(selectedAppType === 'lidarr' || selectedAppType === 'readarr') && (
+                                <Flex direction="column" gap="2">
+                                  <Text size="2" weight="medium">{appInfo.mediaType} Status</Text>
+                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} with this status will be considered for upgrades. Leave as 'Any' to include all statuses.`}>
+                                    <Select.Root
+                                      value={selectedAppType === 'lidarr' ? (instance.artistStatus || 'any') : (instance.authorStatus || 'any')}
+                                      onValueChange={(value) => {
+                                        const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
+                                        updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);
+                                      }}
+                                    >
+                                      <Select.Trigger />
+                                      <Select.Content position="popper" sideOffset={5}>
+                                        <Select.Item value="any">Any</Select.Item>
+                                        <Select.Item value="continuing">Continuing</Select.Item>
+                                        <Select.Item value="ended">Ended</Select.Item>
+                                      </Select.Content>
+                                    </Select.Root>
+                                  </Tooltip>
+                                </Flex>
+                              )}
 
                               <Flex direction="column" gap="2">
                                 <Text size="2" weight="medium">Quality Profile Name (optional)</Text>
-                                <Tooltip content="Only series using this specific quality profile will be considered. Leave empty to include all quality profiles.">
+                                <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Leave empty to include all quality profiles.`}>
                                   <TextField.Root
                                     value={instance.qualityProfileName || ''}
-                                    onChange={(e) => updateInstanceConfig('sonarr', instance.id, 'qualityProfileName', e.target.value)}
+                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'qualityProfileName', e.target.value)}
                                   />
                                 </Tooltip>
                               </Flex>
@@ -968,7 +821,7 @@ function Settings() {
 
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Clear Tags</Text>
-                                {confirmingClearTags === `sonarr-${instance.id}` ? (
+                                {confirmingClearTags === `${selectedAppType}-${instance.id}` ? (
                                   <Flex gap="2" align="center">
                                     <Text size="1" color="gray">Confirm?</Text>
                                     <Button
@@ -977,7 +830,7 @@ function Settings() {
                                       color="red"
                                       onClick={async () => {
                                         try {
-                                          await axios.post(`/api/config/clear-tags/sonarr/${instance.id}`);
+                                          await axios.post(`/api/config/clear-tags/${selectedAppType}/${instance.id}`);
                                           toast.success('Tags cleared successfully');
                                           setConfirmingClearTags(null);
                                         } catch (error: unknown) {
@@ -997,12 +850,12 @@ function Settings() {
                                     </Button>
                                   </Flex>
                                 ) : (
-                                  <Tooltip content="Removes the configured tag from all series in this Sonarr instance. This is useful for resetting the upgrade process or clearing tags from all media at once.">
+                                  <Tooltip content={`Removes the configured tag from all ${appInfo.mediaTypePlural.toLowerCase()} in this ${appInfo.name} instance. This is useful for resetting the upgrade process or clearing tags from all media at once.`}>
                                     <Button
                                       variant="outline"
                                       size="2"
                                       color="red"
-                                      onClick={() => setConfirmingClearTags(`sonarr-${instance.id}`)}
+                                      onClick={() => setConfirmingClearTags(`${selectedAppType}-${instance.id}`)}
                                     >
                                       Clear Tags
                                     </Button>
@@ -1383,9 +1236,189 @@ function Settings() {
                   </Flex>
                 )}
 
-                {getInstances('radarr').length === 0 && getInstances('sonarr').length === 0 && (
+                {/* Lidarr Instances */}
+                {getInstances('lidarr').length > 0 && (
+                  <Flex direction="column" gap="3">
+                    <Heading size="4">Lidarr Instances</Heading>
+                    {getInstances('lidarr').map((instance) => {
+                      const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
+                      return (
+                        <Card key={instance.id} variant="surface">
+                          <Flex direction="column" gap="3" p="3">
+                            <Flex direction="row" align="center" justify="between">
+                              <Text size="3" weight="medium">{instance.name || `Lidarr ${instance.instanceId || ''}`}</Text>
+                              <Flex direction="row" align="center" gap="2">
+                                <Text size="2">Enable Schedule</Text>
+                                <Switch
+                                  checked={instance.scheduleEnabled || false}
+                                  onCheckedChange={(checked) => {
+                                    updateInstanceConfig('lidarr', instance.id, 'scheduleEnabled', checked);
+                                    if (checked && !instance.schedule) {
+                                      updateInstanceConfig('lidarr', instance.id, 'schedule', '0 */6 * * *');
+                                    }
+                                  }}
+                                />
+                              </Flex>
+                            </Flex>
+                            {instance.scheduleEnabled && (
+                              <Flex direction="column" gap="2">
+                                <Text size="2" weight="medium">Schedule</Text>
+                                <Select.Root
+                                  value={instanceSchedulePreset}
+                                  onValueChange={(value) => {
+                                    const schedule = value === 'custom' 
+                                      ? (instance.schedule || '0 */6 * * *')
+                                      : CRON_PRESETS[value];
+                                    updateInstanceConfig('lidarr', instance.id, 'schedule', schedule);
+                                  }}
+                                >
+                                  <Select.Trigger />
+                                  <Select.Content position="popper" sideOffset={5}>
+                                    <Select.Item value="every-1-min">Every 1 Minute</Select.Item>
+                                    <Select.Item value="every-10-min">Every 10 Minutes</Select.Item>
+                                    <Select.Item value="every-30-min">Every 30 Minutes</Select.Item>
+                                    <Select.Item value="every-hour">Every Hour</Select.Item>
+                                    <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>
+                                    <Select.Item value="every-12-hours">Every 12 Hours</Select.Item>
+                                    <Select.Item value="daily-midnight">Daily at Midnight</Select.Item>
+                                    <Select.Item value="daily-noon">Daily at Noon</Select.Item>
+                                    <Select.Item value="twice-daily">Twice Daily (Midnight & Noon)</Select.Item>
+                                    <Select.Item value="weekly-sunday">Weekly on Sunday</Select.Item>
+                                    <Select.Item value="custom">Custom Cron Expression</Select.Item>
+                                  </Select.Content>
+                                </Select.Root>
+                                {instanceSchedulePreset === 'custom' && (
+                                  <TextField.Root
+                                    value={instance.schedule || '0 */6 * * *'}
+                                    onChange={(e) => {
+                                      updateInstanceConfig('lidarr', instance.id, 'schedule', e.target.value);
+                                    }}
+                                    placeholder="0 */6 * * *"
+                                  />
+                                )}
+                                <Text size="1" color="gray">
+                                  {instanceSchedulePreset === 'custom' 
+                                    ? (() => {
+                                        try {
+                                          const cronExpression = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
+                                          return `Current: "${cronExpression}" (${description})`;
+                                        } catch {
+                                          return 'Enter a custom cron expression';
+                                        }
+                                      })()
+                                    : (() => {
+                                        try {
+                                          const currentCron = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
+                                          return description;
+                                        } catch {
+                                          return '';
+                                        }
+                                      })()}
+                                </Text>
+                              </Flex>
+                            )}
+                          </Flex>
+                        </Card>
+                      );
+                    })}
+                  </Flex>
+                )}
+
+                {/* Readarr Instances */}
+                {getInstances('readarr').length > 0 && (
+                  <Flex direction="column" gap="3">
+                    <Heading size="4">Readarr Instances</Heading>
+                    {getInstances('readarr').map((instance) => {
+                      const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
+                      return (
+                        <Card key={instance.id} variant="surface">
+                          <Flex direction="column" gap="3" p="3">
+                            <Flex direction="row" align="center" justify="between">
+                              <Text size="3" weight="medium">{instance.name || `Readarr ${instance.instanceId || ''}`}</Text>
+                              <Flex direction="row" align="center" gap="2">
+                                <Text size="2">Enable Schedule</Text>
+                                <Switch
+                                  checked={instance.scheduleEnabled || false}
+                                  onCheckedChange={(checked) => {
+                                    updateInstanceConfig('readarr', instance.id, 'scheduleEnabled', checked);
+                                    if (checked && !instance.schedule) {
+                                      updateInstanceConfig('readarr', instance.id, 'schedule', '0 */6 * * *');
+                                    }
+                                  }}
+                                />
+                              </Flex>
+                            </Flex>
+                            {instance.scheduleEnabled && (
+                              <Flex direction="column" gap="2">
+                                <Text size="2" weight="medium">Schedule</Text>
+                                <Select.Root
+                                  value={instanceSchedulePreset}
+                                  onValueChange={(value) => {
+                                    const schedule = value === 'custom' 
+                                      ? (instance.schedule || '0 */6 * * *')
+                                      : CRON_PRESETS[value];
+                                    updateInstanceConfig('readarr', instance.id, 'schedule', schedule);
+                                  }}
+                                >
+                                  <Select.Trigger />
+                                  <Select.Content position="popper" sideOffset={5}>
+                                    <Select.Item value="every-1-min">Every 1 Minute</Select.Item>
+                                    <Select.Item value="every-10-min">Every 10 Minutes</Select.Item>
+                                    <Select.Item value="every-30-min">Every 30 Minutes</Select.Item>
+                                    <Select.Item value="every-hour">Every Hour</Select.Item>
+                                    <Select.Item value="every-6-hours">Every 6 Hours</Select.Item>
+                                    <Select.Item value="every-12-hours">Every 12 Hours</Select.Item>
+                                    <Select.Item value="daily-midnight">Daily at Midnight</Select.Item>
+                                    <Select.Item value="daily-noon">Daily at Noon</Select.Item>
+                                    <Select.Item value="twice-daily">Twice Daily (Midnight & Noon)</Select.Item>
+                                    <Select.Item value="weekly-sunday">Weekly on Sunday</Select.Item>
+                                    <Select.Item value="custom">Custom Cron Expression</Select.Item>
+                                  </Select.Content>
+                                </Select.Root>
+                                {instanceSchedulePreset === 'custom' && (
+                                  <TextField.Root
+                                    value={instance.schedule || '0 */6 * * *'}
+                                    onChange={(e) => {
+                                      updateInstanceConfig('readarr', instance.id, 'schedule', e.target.value);
+                                    }}
+                                    placeholder="0 */6 * * *"
+                                  />
+                                )}
+                                <Text size="1" color="gray">
+                                  {instanceSchedulePreset === 'custom' 
+                                    ? (() => {
+                                        try {
+                                          const cronExpression = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
+                                          return `Current: "${cronExpression}" (${description})`;
+                                        } catch {
+                                          return 'Enter a custom cron expression';
+                                        }
+                                      })()
+                                    : (() => {
+                                        try {
+                                          const currentCron = instance.schedule || '0 */6 * * *';
+                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
+                                          return description;
+                                        } catch {
+                                          return '';
+                                        }
+                                      })()}
+                                </Text>
+                              </Flex>
+                            )}
+                          </Flex>
+                        </Card>
+                      );
+                    })}
+                  </Flex>
+                )}
+
+                {getInstances('radarr').length === 0 && getInstances('sonarr').length === 0 && getInstances('lidarr').length === 0 && getInstances('readarr').length === 0 && (
                   <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                    No instances configured. Add instances in the Radarr or Sonarr tabs to configure per-instance scheduling.
+                    No instances configured. Add instances in the Applications tab to configure per-instance scheduling.
                   </Text>
                 )}
               </Flex>

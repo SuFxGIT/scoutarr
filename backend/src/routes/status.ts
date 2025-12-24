@@ -33,7 +33,7 @@ statusRouter.get('/', async (req, res) => {
     };
 
     // Helper to check instances for an app
-    const checkInstances = async (appType: 'radarr' | 'sonarr', defaultName: string) => {
+    const checkInstances = async (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', defaultName: string) => {
       const instances = getConfiguredInstances(config.applications[appType] as any[]);
 
       if (instances.length === 0) {
@@ -61,6 +61,12 @@ statusRouter.get('/', async (req, res) => {
 
     // Check Sonarr instances
     await checkInstances('sonarr', 'Sonarr');
+
+    // Check Lidarr instances
+    await checkInstances('lidarr', 'Lidarr');
+
+    // Check Readarr instances
+    await checkInstances('readarr', 'Readarr');
 
     // Add scheduler status
     const schedulerStatus = schedulerService.getStatus();

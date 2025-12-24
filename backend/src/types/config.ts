@@ -38,9 +38,45 @@ export interface SonarrInstance {
   scheduleEnabled?: boolean; // Enable/disable scheduling for this instance
 }
 
+export interface LidarrInstance {
+  id: string; // Unique identifier for this instance
+  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
+  name: string; // Display name
+  url: string;
+  apiKey: string;
+  count: number | 'max' | 'MAX';
+  tagName: string;
+  ignoreTag: string;
+  monitored: boolean;
+  artistStatus: 'continuing' | 'ended' | '';
+  qualityProfileName: string;
+  enabled?: boolean;
+  schedule?: string; // Cron expression for per-instance scheduling
+  scheduleEnabled?: boolean; // Enable/disable scheduling for this instance
+}
+
+export interface ReadarrInstance {
+  id: string; // Unique identifier for this instance
+  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
+  name: string; // Display name
+  url: string;
+  apiKey: string;
+  count: number | 'max' | 'MAX';
+  tagName: string;
+  ignoreTag: string;
+  monitored: boolean;
+  authorStatus: 'continuing' | 'ended' | '';
+  qualityProfileName: string;
+  enabled?: boolean;
+  schedule?: string; // Cron expression for per-instance scheduling
+  scheduleEnabled?: boolean; // Enable/disable scheduling for this instance
+}
+
 export interface ApplicationsConfig {
   radarr: RadarrInstance[];
   sonarr: SonarrInstance[];
+  lidarr: LidarrInstance[];
+  readarr: ReadarrInstance[];
 }
 
 export interface SchedulerConfig {

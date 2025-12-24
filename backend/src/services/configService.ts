@@ -56,7 +56,9 @@ class ConfigService {
       },
       applications: {
         radarr: [],
-        sonarr: []
+        sonarr: [],
+        lidarr: [],
+        readarr: []
       },
       scheduler: {
         enabled: false,
@@ -72,7 +74,20 @@ class ConfigService {
   async loadConfig(): Promise<Config> {
     try {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
-      this.config = JSON.parse(content) as Config;
+      const parsed = JSON.parse(content) as any;
+      
+      // Normalize config: ensure lidarr and readarr arrays exist for backward compatibility
+      if (!parsed.applications) {
+        parsed.applications = {};
+      }
+      if (!Array.isArray(parsed.applications.lidarr)) {
+        parsed.applications.lidarr = [];
+      }
+      if (!Array.isArray(parsed.applications.readarr)) {
+        parsed.applications.readarr = [];
+      }
+      
+      this.config = parsed as Config;
       logger.debug('Configuration loaded successfully', { 
         configFile: CONFIG_FILE
       });

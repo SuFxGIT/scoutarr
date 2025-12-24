@@ -85,6 +85,24 @@ class SchedulerService {
       }
     }
 
+    // Process Lidarr instances
+    const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
+    for (const instance of lidarrInstances) {
+      if (instance.scheduleEnabled && instance.schedule) {
+        const instanceKey = `lidarr-${instance.id}`;
+        this.startInstance(instanceKey, 'lidarr', instance.id, instance.schedule);
+      }
+    }
+
+    // Process Readarr instances
+    const readarrInstances = getConfiguredInstances(config.applications.readarr);
+    for (const instance of readarrInstances) {
+      if (instance.scheduleEnabled && instance.schedule) {
+        const instanceKey = `readarr-${instance.id}`;
+        this.startInstance(instanceKey, 'readarr', instance.id, instance.schedule);
+      }
+    }
+
     const instanceCount = this.instanceTasks.size;
     if (instanceCount > 0) {
       logger.info(`✅ Per-instance schedulers initialized: ${instanceCount} instance(s)`);
@@ -160,7 +178,7 @@ class SchedulerService {
   }
 
   // Per-instance scheduler methods
-  startInstance(instanceKey: string, appType: 'radarr' | 'sonarr', instanceId: string, schedule: string): void {
+  startInstance(instanceKey: string, appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, schedule: string): void {
     this.stopInstance(instanceKey);
 
     if (!cron.validate(schedule)) {
@@ -307,7 +325,7 @@ class SchedulerService {
     }
   }
 
-  private async runInstanceScheduledSearch(instanceKey: string, appType: 'radarr' | 'sonarr', instanceId: string, schedule: string): Promise<void> {
+  private async runInstanceScheduledSearch(instanceKey: string, appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, schedule: string): Promise<void> {
     const isRunning = this.instanceIsRunning.get(instanceKey);
     if (isRunning) {
       logger.warn('⏸️  Previous instance search still running, skipping scheduled run', { instanceKey });

@@ -2,6 +2,8 @@ import express from 'express';
 import { configService } from '../services/configService.js';
 import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
+import { lidarrService } from '../services/lidarrService.js';
+import { readarrService } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import logger from '../utils/logger.js';
@@ -92,10 +94,54 @@ export function createSonarrProcessor(instanceName: string, config: any) {
   };
 }
 
+// Helper to create Lidarr processor config
+export function createLidarrProcessor(instanceName: string, config: any) {
+  return {
+    name: instanceName,
+    config,
+    getMedia: lidarrService.getArtists.bind(lidarrService),
+    filterMedia: lidarrService.filterArtists.bind(lidarrService),
+    searchMedia: async (cfg: any, artistIds: number[]) => {
+      // Lidarr only supports searching one artist at a time
+      for (const artistId of artistIds) {
+        await lidarrService.searchArtists(cfg, artistId);
+      }
+    },
+    searchMediaOneByOne: true,
+    getTagId: lidarrService.getTagId.bind(lidarrService),
+    addTag: lidarrService.addTagToArtists.bind(lidarrService),
+    removeTag: lidarrService.removeTagFromArtists.bind(lidarrService),
+    getMediaId: (a: any) => a.id,
+    getMediaTitle: (a: any) => a.title || a.artistName
+  };
+}
+
+// Helper to create Readarr processor config
+export function createReadarrProcessor(instanceName: string, config: any) {
+  return {
+    name: instanceName,
+    config,
+    getMedia: readarrService.getAuthors.bind(readarrService),
+    filterMedia: readarrService.filterAuthors.bind(readarrService),
+    searchMedia: async (cfg: any, authorIds: number[]) => {
+      // Readarr only supports searching one author at a time
+      for (const authorId of authorIds) {
+        await readarrService.searchAuthors(cfg, authorId);
+      }
+    },
+    searchMediaOneByOne: true,
+    getTagId: readarrService.getTagId.bind(readarrService),
+    addTag: readarrService.addTagToAuthors.bind(readarrService),
+    removeTag: readarrService.removeTagFromAuthors.bind(readarrService),
+    getMediaId: (a: any) => a.id,
+    getMediaTitle: (a: any) => a.title || a.authorName
+  };
+}
+
 // Helper to process all instances of an app type
 async function processAppInstances<T>(
   instances: T[],
-  appType: 'radarr' | 'sonarr',
+  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
   createProcessor: (instanceName: string, config: any) => ApplicationProcessor<any>,
   results: Record<string, any>,
   unattended?: boolean
@@ -108,7 +154,7 @@ async function processAppInstances<T>(
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
-      [appType === 'radarr' ? 'movies' : 'series']: result.items,
+      [appType === 'radarr' ? 'movies' : appType === 'lidarr' ? 'artists' : appType === 'readarr' ? 'authors' : 'series']: result.items,
       instanceName
     };
   }
@@ -130,6 +176,14 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
   const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
   await processAppInstances(sonarrInstances, 'sonarr', createSonarrProcessor, results, unattended);
 
+  // Process Lidarr
+  const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
+  await processAppInstances(lidarrInstances, 'lidarr', createLidarrProcessor, results, unattended);
+
+  // Process Readarr
+  const readarrInstances = getConfiguredInstances(config.applications.readarr);
+  await processAppInstances(readarrInstances, 'readarr', createReadarrProcessor, results, unattended);
+
   // Save stats for successful searches
   await saveStatsForResults(results);
 
@@ -137,7 +191,7 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
 }
 
 // Execute search run for a single instance
-export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr', instanceId: string): Promise<Record<string, any>> {
+export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string): Promise<Record<string, any>> {
   const config = configService.getConfig();
   const results: Record<string, any> = {};
   
@@ -145,9 +199,24 @@ export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr', 
   const unattended = config.scheduler?.unattended || false;
 
   // Find the specific instance
-  const instances = appType === 'radarr' 
-    ? getConfiguredInstances(config.applications.radarr)
-    : getConfiguredInstances(config.applications.sonarr);
+  let instances: any[];
+  let processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
+  
+  if (appType === 'radarr') {
+    instances = getConfiguredInstances(config.applications.radarr);
+    processor = createRadarrProcessor;
+  } else if (appType === 'sonarr') {
+    instances = getConfiguredInstances(config.applications.sonarr);
+    processor = createSonarrProcessor;
+  } else if (appType === 'lidarr') {
+    instances = getConfiguredInstances(config.applications.lidarr);
+    processor = createLidarrProcessor;
+  } else if (appType === 'readarr') {
+    instances = getConfiguredInstances(config.applications.readarr);
+    processor = createReadarrProcessor;
+  } else {
+    throw new Error(`Unknown app type: ${appType}`);
+  }
   
   const instance = instances.find(inst => inst.id === instanceId);
   if (!instance) {
@@ -155,11 +224,7 @@ export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr', 
   }
 
   // Process the single instance
-  if (appType === 'radarr') {
-    await processAppInstances([instance], 'radarr', createRadarrProcessor, results, unattended);
-  } else {
-    await processAppInstances([instance], 'sonarr', createSonarrProcessor, results, unattended);
-  }
+  await processAppInstances([instance], appType, processor, results, unattended);
 
   // Save stats for successful searches
   await saveStatsForResults(results);
@@ -424,7 +489,7 @@ async function processManualRun<TMedia>(
 // Helper to process instances for manual run preview
 async function processManualRunInstances(
   instances: any[],
-  appType: 'radarr' | 'sonarr',
+  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
   getMedia: (config: any) => Promise<any[]>,
   filterMedia: (config: any, media: any[], unattended: boolean) => Promise<any[]>,
   getMediaId: (media: any) => number,
@@ -446,7 +511,7 @@ async function processManualRunInstances(
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
-      [appType === 'radarr' ? 'movies' : 'series']: result.items,
+      [appType === 'radarr' ? 'movies' : appType === 'lidarr' ? 'artists' : appType === 'readarr' ? 'authors' : 'series']: result.items,
       instanceName
     };
   }
@@ -482,6 +547,32 @@ searchRouter.post('/manual-run', async (req, res) => {
       (s) => s.id,
       (s) => s.title,
       sonarrService.getTagId.bind(sonarrService),
+      results
+    );
+
+    // Process Lidarr
+    const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
+    await processManualRunInstances(
+      lidarrInstances,
+      'lidarr',
+      lidarrService.getArtists.bind(lidarrService),
+      lidarrService.filterArtists.bind(lidarrService),
+      (a) => a.id,
+      (a) => a.title || a.artistName,
+      lidarrService.getTagId.bind(lidarrService),
+      results
+    );
+
+    // Process Readarr
+    const readarrInstances = getConfiguredInstances(config.applications.readarr);
+    await processManualRunInstances(
+      readarrInstances,
+      'readarr',
+      readarrService.getAuthors.bind(readarrService),
+      readarrService.filterAuthors.bind(readarrService),
+      (a) => a.id,
+      (a) => a.title || a.authorName,
+      readarrService.getTagId.bind(readarrService),
       results
     );
 
