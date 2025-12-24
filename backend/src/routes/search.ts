@@ -18,7 +18,9 @@ function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
   if (normalizedCount === 'max') {
     return items;
   }
-  if (typeof count === 'number' && count >= items.length) {
+  // After normalization, normalizedCount must be a number
+  const numCount = normalizedCount as number;
+  if (numCount >= items.length) {
     return items;
   }
   if (items.length === 0) {
@@ -26,7 +28,7 @@ function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
   }
   // Shuffle and take first count items (simulating Get-Random behavior)
   const shuffled = [...items].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  return shuffled.slice(0, numCount);
 }
 
 // Helper to generate result key for instances
