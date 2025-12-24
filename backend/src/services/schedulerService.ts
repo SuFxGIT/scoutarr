@@ -15,32 +15,20 @@ interface SchedulerRunHistory {
   results: Record<string, any>;
   success: boolean;
   error?: string;
-  instanceKey?: string; // For per-instance scheduling: "radarr-instanceId" or "sonarr-instanceId"
+  instanceKey?: string;
 }
 
 interface InstanceSchedulerTask {
-  task: cron.ScheduledTask | null;
-  timeoutTimer: NodeJS.Timeout | null;
-  intervalTimer: NodeJS.Timeout | null;
-  nextRunTime: Date | null;
-  usingInterval: boolean;
-  intervalMs: number | null;
+  task: cron.ScheduledTask;
   schedule: string;
   isRunning: boolean;
 }
 
 class SchedulerService {
-  // Global scheduler (backward compatibility)
   private globalTask: cron.ScheduledTask | null = null;
   private globalIsRunning = false;
-  private globalTimeoutTimer: NodeJS.Timeout | null = null;
-  private globalIntervalTimer: NodeJS.Timeout | null = null;
-  private globalNextRunTime: Date | null = null;
   private globalCurrentSchedule: string | null = null;
-  private globalUsingInterval = false;
-  private globalIntervalMs: number | null = null;
 
-  // Per-instance schedulers
   private instanceTasks: Map<string, InstanceSchedulerTask> = new Map();
   private instanceIsRunning: Map<string, boolean> = new Map();
 
@@ -50,7 +38,6 @@ class SchedulerService {
   async initialize(): Promise<void> {
     const config = configService.getConfig();
     
-    // Initialize global scheduler if enabled (backward compatibility)
     if (config.scheduler?.enabled && config.scheduler?.schedule) {
       this.startGlobal(config.scheduler.schedule);
       logger.info('✅ Global scheduler initialized', { schedule: config.scheduler.schedule });
@@ -58,17 +45,14 @@ class SchedulerService {
       logger.info('ℹ️  Global scheduler disabled');
     }
 
-    // Initialize per-instance schedulers
     this.initializeInstanceSchedulers();
   }
 
   private initializeInstanceSchedulers(): void {
     const config = configService.getConfig();
     
-    // Clear existing instance schedulers
     this.stopAllInstanceSchedulers();
 
-    // Process instances for each app type
     for (const appType of APP_TYPES) {
       const instances = getConfiguredInstances(config.applications[appType] as any[]);
       for (const instance of instances) {
@@ -85,7 +69,6 @@ class SchedulerService {
     }
   }
 
-  // Global scheduler methods (backward compatibility)
   startGlobal(schedule: string): void {
     this.stopGlobal();
 
@@ -95,35 +78,11 @@ class SchedulerService {
     }
 
     this.globalCurrentSchedule = schedule;
-    const intervalMs = this.getIntervalMsForSchedule(schedule);
-
-    if (intervalMs !== null) {
-      this.globalUsingInterval = true;
-      this.globalIntervalMs = intervalMs;
-      this.globalNextRunTime = new Date(Date.now() + intervalMs);
-
-      this.globalTimeoutTimer = setTimeout(async () => {
-        await this.runGlobalScheduledSearch(schedule);
-        this.globalIntervalTimer = setInterval(async () => {
-          await this.runGlobalScheduledSearch(schedule);
-          this.globalNextRunTime = new Date(Date.now() + intervalMs);
-        }, intervalMs);
-        this.globalNextRunTime = new Date(Date.now() + intervalMs);
-      }, intervalMs);
-
-      logger.info('🕐 Global interval scheduler started', { schedule, intervalMs });
-      return;
-    }
-
-    this.globalUsingInterval = false;
-    this.globalIntervalMs = null;
-    this.globalNextRunTime = this.getNextRunTime(schedule);
 
     this.globalTask = cron.schedule(
       schedule,
       async () => {
         await this.runGlobalScheduledSearch(schedule);
-        this.globalNextRunTime = this.getNextRunTime(schedule);
       },
       {
         scheduled: true,
@@ -131,7 +90,7 @@ class SchedulerService {
       }
     );
 
-    logger.info('🕐 Global cron scheduler started', { schedule });
+    logger.info('🕐 Global scheduler started', { schedule });
   }
 
   stopGlobal(): void {
@@ -139,21 +98,9 @@ class SchedulerService {
       this.globalTask.stop();
       this.globalTask = null;
     }
-    if (this.globalTimeoutTimer) {
-      clearTimeout(this.globalTimeoutTimer);
-      this.globalTimeoutTimer = null;
-    }
-    if (this.globalIntervalTimer) {
-      clearInterval(this.globalIntervalTimer);
-      this.globalIntervalTimer = null;
-    }
-    this.globalUsingInterval = false;
-    this.globalIntervalMs = null;
-    this.globalNextRunTime = null;
     this.globalCurrentSchedule = null;
   }
 
-  // Per-instance scheduler methods
   startInstance(instanceKey: string, appType: AppType, instanceId: string, schedule: string): void {
     this.stopInstance(instanceKey);
 
@@ -162,74 +109,32 @@ class SchedulerService {
       return;
     }
 
-    const intervalMs = this.getIntervalMsForSchedule(schedule);
+    const task = cron.schedule(
+      schedule,
+      async () => {
+        await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
+      },
+      {
+        scheduled: true,
+        timezone: 'UTC'
+      }
+    );
+
     const taskInfo: InstanceSchedulerTask = {
-      task: null,
-      timeoutTimer: null,
-      intervalTimer: null,
-      nextRunTime: null,
-      usingInterval: false,
-      intervalMs: null,
+      task,
       schedule,
       isRunning: false
     };
 
-    if (intervalMs !== null) {
-      taskInfo.usingInterval = true;
-      taskInfo.intervalMs = intervalMs;
-      taskInfo.nextRunTime = new Date(Date.now() + intervalMs);
-
-      taskInfo.timeoutTimer = setTimeout(async () => {
-        await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
-        taskInfo.intervalTimer = setInterval(async () => {
-          await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
-          if (taskInfo.intervalMs) {
-            taskInfo.nextRunTime = new Date(Date.now() + taskInfo.intervalMs);
-          }
-        }, intervalMs);
-        if (taskInfo.intervalMs) {
-          taskInfo.nextRunTime = new Date(Date.now() + taskInfo.intervalMs);
-        }
-      }, intervalMs);
-
-      logger.info('🕐 Instance interval scheduler started', { instanceKey, schedule, intervalMs });
-    } else {
-      taskInfo.usingInterval = false;
-      taskInfo.intervalMs = null;
-      taskInfo.nextRunTime = this.getNextRunTime(schedule);
-
-      taskInfo.task = cron.schedule(
-        schedule,
-        async () => {
-          await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
-          taskInfo.nextRunTime = this.getNextRunTime(schedule);
-        },
-        {
-          scheduled: true,
-          timezone: 'UTC'
-        }
-      );
-
-      logger.info('🕐 Instance cron scheduler started', { instanceKey, schedule });
-    }
-
     this.instanceTasks.set(instanceKey, taskInfo);
+    logger.info('🕐 Instance scheduler started', { instanceKey, schedule });
   }
 
   stopInstance(instanceKey: string): void {
     const taskInfo = this.instanceTasks.get(instanceKey);
     if (!taskInfo) return;
 
-    if (taskInfo.task) {
-      taskInfo.task.stop();
-    }
-    if (taskInfo.timeoutTimer) {
-      clearTimeout(taskInfo.timeoutTimer);
-    }
-    if (taskInfo.intervalTimer) {
-      clearInterval(taskInfo.intervalTimer);
-    }
-
+    taskInfo.task.stop();
     this.instanceTasks.delete(instanceKey);
     this.instanceIsRunning.delete(instanceKey);
   }
@@ -243,18 +148,15 @@ class SchedulerService {
   restart(): void {
     const config = configService.getConfig();
     
-    // Restart global scheduler
     if (config.scheduler?.enabled && config.scheduler?.schedule) {
       this.startGlobal(config.scheduler.schedule);
     } else {
       this.stopGlobal();
     }
 
-    // Restart per-instance schedulers
     this.initializeInstanceSchedulers();
   }
 
-  // Run methods
   private async runGlobalScheduledSearch(schedule: string): Promise<void> {
     if (this.globalIsRunning) {
       logger.warn('⏸️  Previous global search still running, skipping scheduled run');
@@ -281,7 +183,6 @@ class SchedulerService {
         }))
       });
 
-      // Send notifications
       try {
         await notificationService.sendNotifications(results, true);
       } catch (notificationError: any) {
@@ -303,7 +204,6 @@ class SchedulerService {
         stack: error.stack
       });
 
-      // Send failure notifications
       try {
         await notificationService.sendNotifications({}, false, error.message);
       } catch (notificationError: any) {
@@ -313,9 +213,6 @@ class SchedulerService {
       }
     } finally {
       this.globalIsRunning = false;
-      if (this.globalUsingInterval && this.globalIntervalMs) {
-        this.globalNextRunTime = new Date(Date.now() + this.globalIntervalMs);
-      }
     }
   }
 
@@ -348,7 +245,6 @@ class SchedulerService {
         }))
       });
 
-      // Send notifications
       try {
         await notificationService.sendNotifications(results, true);
       } catch (notificationError: any) {
@@ -372,7 +268,6 @@ class SchedulerService {
         stack: error.stack
       });
 
-      // Send failure notifications
       try {
         await notificationService.sendNotifications({}, false, error.message);
       } catch (notificationError: any) {
@@ -382,14 +277,9 @@ class SchedulerService {
       }
     } finally {
       this.instanceIsRunning.set(instanceKey, false);
-      const taskInfo = this.instanceTasks.get(instanceKey);
-      if (taskInfo && taskInfo.usingInterval && taskInfo.intervalMs) {
-        taskInfo.nextRunTime = new Date(Date.now() + taskInfo.intervalMs);
-      }
     }
   }
 
-  // History methods
   addToHistory(entry: SchedulerRunHistory): void {
     this.runHistory.unshift(entry);
     if (this.runHistory.length > this.maxHistorySize) {
@@ -405,7 +295,6 @@ class SchedulerService {
     this.runHistory = [];
   }
 
-  // Utility methods
   getNextRunTime(schedule: string): Date | null {
     if (!schedule) {
       return null;
@@ -432,44 +321,28 @@ class SchedulerService {
     const globalSchedule = this.globalCurrentSchedule || config.scheduler?.schedule || null;
     const globalNextRun = globalSchedule ? this.getNextRunTime(globalSchedule) : null;
     
-    // Collect instance statuses
     const instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }> = {};
+    let anyInstanceRunning = false;
     for (const [instanceKey, taskInfo] of this.instanceTasks.entries()) {
+      const isRunning = this.instanceIsRunning.get(instanceKey) || false;
       instances[instanceKey] = {
         schedule: taskInfo.schedule,
-        nextRun: taskInfo.nextRunTime ? taskInfo.nextRunTime.toISOString() : null,
-        running: this.instanceIsRunning.get(instanceKey) || false
+        nextRun: this.getNextRunTime(taskInfo.schedule)?.toISOString() || null,
+        running: isRunning
       };
+      if (isRunning) {
+        anyInstanceRunning = true;
+      }
     }
     
+    const globalRunning = !!this.globalTask;
+    
     return {
-      running: !!(this.globalTask || this.globalTimeoutTimer || this.globalIntervalTimer),
+      running: globalRunning || anyInstanceRunning,
       schedule: globalSchedule,
       nextRun: globalNextRun ? globalNextRun.toISOString() : null,
       instances
     };
-  }
-
-  /**
-   * Map known "every N" cron presets to a fixed interval in milliseconds.
-   */
-  private getIntervalMsForSchedule(schedule: string): number | null {
-    switch (schedule) {
-      case '*/1 * * * *':
-        return 60 * 1000;
-      case '*/10 * * * *':
-        return 10 * 60 * 1000;
-      case '*/30 * * * *':
-        return 30 * 60 * 1000;
-      case '0 * * * *':
-        return 60 * 60 * 1000;
-      case '0 */6 * * *':
-        return 6 * 60 * 60 * 1000;
-      case '0 */12 * * *':
-        return 12 * 60 * 60 * 1000;
-      default:
-        return null;
-    }
   }
 }
 

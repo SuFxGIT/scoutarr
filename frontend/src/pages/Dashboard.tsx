@@ -54,6 +54,7 @@ interface StatusResponse {
   [key: string]: any;
   scheduler?: {
     enabled: boolean;
+    globalEnabled?: boolean;
     running: boolean;
     schedule: string | null;
     nextRun: string | null;
@@ -75,7 +76,7 @@ function Dashboard() {
   const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
   // Fetch status with auto-refresh
-  const { data: statusData } = useQuery<StatusResponse>({
+  const { data: statusData, refetch: refetchStatus } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
@@ -266,7 +267,7 @@ function Dashboard() {
       });
     }
     
-    // Add global scheduler next run time if enabled
+    // Add global scheduler next run time if global scheduler is enabled
     if (schedulerEnabled && nextRun) {
       const nextRunDate = new Date(nextRun);
       const now = new Date();
@@ -377,7 +378,7 @@ function Dashboard() {
     const logs = convertHistoryToLogs(
       schedulerHistory, 
       schedulerStatus?.nextRun || null, 
-      schedulerStatus?.enabled || false, 
+      schedulerStatus?.globalEnabled || false, 
       manualRunResults || null,
       schedulerStatus?.instances,
       connectionStatus
@@ -432,7 +433,11 @@ function Dashboard() {
                 <Button 
                   variant="outline" 
                   size="2" 
-                  onClick={() => refetchHistory()}
+                  onClick={() => {
+                    refetchHistory();
+                    refetchPreview();
+                    refetchStatus();
+                  }}
                 >
                   <ReloadIcon />
                 </Button>

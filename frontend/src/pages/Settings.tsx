@@ -21,7 +21,6 @@ import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, Chev
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
-import cronstrue from 'cronstrue';
 import axios from 'axios';
 import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
@@ -187,6 +186,20 @@ function Settings() {
     },
   });
 
+  // Clear tags mutation
+  const clearTagsMutation = useMutation({
+    mutationFn: async ({ app, instanceId }: { app: string; instanceId: string }) => {
+      await axios.post(`/api/config/clear-tags/${app}/${instanceId}`);
+    },
+    onSuccess: () => {
+      toast.success('Tags cleared successfully');
+      setConfirmingClearTags(null);
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to clear tags: ' + getErrorMessage(error));
+      setConfirmingClearTags(null);
+    },
+  });
 
   // Helper to get next available instance ID
   const getNextInstanceId = (_app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instances: any[]): number => {
@@ -1140,23 +1153,18 @@ function Settings() {
                                       variant="solid"
                                       size="2"
                                       color="red"
-                                      onClick={async () => {
-                                        try {
-                                          await axios.post(`/api/config/clear-tags/${selectedAppType}/${instance.id}`);
-                                          toast.success('Tags cleared successfully');
-                                          setConfirmingClearTags(null);
-                                        } catch (error: unknown) {
-                                          toast.error('Failed to clear tags: ' + getErrorMessage(error));
-                                          setConfirmingClearTags(null);
-                                        }
+                                      onClick={() => {
+                                        clearTagsMutation.mutate({ app: selectedAppType, instanceId: instance.id });
                                       }}
+                                      disabled={clearTagsMutation.isPending}
                                     >
-                                      Confirm
+                                      {clearTagsMutation.isPending ? 'Clearing...' : 'Confirm'}
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="2"
                                       onClick={() => setConfirmingClearTags(null)}
+                                      disabled={clearTagsMutation.isPending}
                                     >
                                       Cancel
                                     </Button>
@@ -1260,15 +1268,25 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="scheduler" style={{ paddingTop: '1rem' }}>
+            <Flex direction="column" gap="3" style={{ marginBottom: '1rem' }}>
+              <Text size="2" color="gray">
+                <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'underline' }}>Learn about cron expressions</a>
+              </Text>
+            </Flex>
             <Card>
               <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Global Schedule</Heading>
+                <Flex align="center" gap="2">
+                  <Heading size="5">Global Schedule</Heading>
+                  <Tooltip content="Configure a schedule that applies to all instances. The global scheduler processes all instances except those that have per-instance scheduling enabled. When an instance has its own schedule enabled, it overrides the global schedule for that instance only.">
+                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
+                  </Tooltip>
+                </Flex>
                 <Separator />
 
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
                     <Text size="2" weight="medium">Enable Scheduler</Text>
-                    <Tooltip content="When enabled, searches will run automatically according to the schedule below.">
+                    <Tooltip content="When enabled, the global scheduler will run searches automatically according to the schedule below for all instances that don't have per-instance scheduling enabled.">
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
@@ -1371,27 +1389,6 @@ function Settings() {
                       placeholder="0 */6 * * *"
                     />
                   )}
-                  <Text size="1" color="gray">
-                    {schedulerPreset === 'custom' 
-                      ? (() => {
-                          try {
-                            const cronExpression = config.scheduler?.schedule || '0 */6 * * *';
-                            const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
-                            return `Enter a custom cron expression. Current: "${cronExpression}" (${description})`;
-                          } catch {
-                            return 'Enter a custom cron expression. Format: minute hour day month day-of-week (e.g., "0 */6 * * *" for every 6 hours)';
-                          }
-                        })()
-                      : (() => {
-                          try {
-                            const currentCron = config.scheduler?.schedule || '0 */6 * * *';
-                            const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
-                            return `Current schedule: ${description}. Select a predefined schedule or choose "Custom Cron Expression" to enter your own.`;
-                          } catch {
-                            return 'Select a predefined schedule or choose "Custom Cron Expression" to enter your own.';
-                          }
-                        })()}
-                  </Text>
                 </Flex>
               </Flex>
             </Card>
@@ -1399,11 +1396,13 @@ function Settings() {
             {/* Per-Instance Scheduling */}
             <Card>
               <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Per-Instance Schedule</Heading>
+                <Flex align="center" gap="2">
+                  <Heading size="5">Per-Instance Schedule</Heading>
+                  <Tooltip content="Configure individual schedules for each instance. When enabled for an instance, it overrides the global schedule for that instance only. The instance will run searches according to its own schedule, independent of the global scheduler. Instances without per-instance schedules enabled will continue to use the global schedule.">
+                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
+                  </Tooltip>
+                </Flex>
                 <Separator />
-                <Text size="2" color="gray">
-                  Configure individual schedules for each instance. When enabled, the instance will run searches according to its own schedule, independent of the global scheduler and other instances.
-                </Text>
 
                 {/* Radarr Instances */}
                 {getInstances('radarr').length > 0 && (
@@ -1465,27 +1464,6 @@ function Settings() {
                                     placeholder="0 */6 * * *"
                                   />
                                 )}
-                                <Text size="1" color="gray">
-                                  {instanceSchedulePreset === 'custom' 
-                                    ? (() => {
-                                        try {
-                                          const cronExpression = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
-                                          return `Current: "${cronExpression}" (${description})`;
-                                        } catch {
-                                          return 'Enter a custom cron expression';
-                                        }
-                                      })()
-                                    : (() => {
-                                        try {
-                                          const currentCron = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
-                                          return description;
-                                        } catch {
-                                          return '';
-                                        }
-                                      })()}
-                                </Text>
                               </Flex>
                             )}
                           </Flex>
@@ -1555,27 +1533,6 @@ function Settings() {
                                     placeholder="0 */6 * * *"
                                   />
                                 )}
-                                <Text size="1" color="gray">
-                                  {instanceSchedulePreset === 'custom' 
-                                    ? (() => {
-                                        try {
-                                          const cronExpression = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
-                                          return `Current: "${cronExpression}" (${description})`;
-                                        } catch {
-                                          return 'Enter a custom cron expression';
-                                        }
-                                      })()
-                                    : (() => {
-                                        try {
-                                          const currentCron = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
-                                          return description;
-                                        } catch {
-                                          return '';
-                                        }
-                                      })()}
-                                </Text>
                               </Flex>
                             )}
                           </Flex>
@@ -1645,27 +1602,6 @@ function Settings() {
                                     placeholder="0 */6 * * *"
                                   />
                                 )}
-                                <Text size="1" color="gray">
-                                  {instanceSchedulePreset === 'custom' 
-                                    ? (() => {
-                                        try {
-                                          const cronExpression = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
-                                          return `Current: "${cronExpression}" (${description})`;
-                                        } catch {
-                                          return 'Enter a custom cron expression';
-                                        }
-                                      })()
-                                    : (() => {
-                                        try {
-                                          const currentCron = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
-                                          return description;
-                                        } catch {
-                                          return '';
-                                        }
-                                      })()}
-                                </Text>
                               </Flex>
                             )}
                           </Flex>
@@ -1735,27 +1671,6 @@ function Settings() {
                                     placeholder="0 */6 * * *"
                                   />
                                 )}
-                                <Text size="1" color="gray">
-                                  {instanceSchedulePreset === 'custom' 
-                                    ? (() => {
-                                        try {
-                                          const cronExpression = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(cronExpression, { use24HourTimeFormat: true });
-                                          return `Current: "${cronExpression}" (${description})`;
-                                        } catch {
-                                          return 'Enter a custom cron expression';
-                                        }
-                                      })()
-                                    : (() => {
-                                        try {
-                                          const currentCron = instance.schedule || '0 */6 * * *';
-                                          const description = cronstrue.toString(currentCron, { use24HourTimeFormat: true });
-                                          return description;
-                                        } catch {
-                                          return '';
-                                        }
-                                      })()}
-                                </Text>
                               </Flex>
                             )}
                           </Flex>

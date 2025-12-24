@@ -211,7 +211,10 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
 
   // Process all app types
   for (const appType of APP_TYPES) {
-    const instances = getConfiguredInstances(config.applications[appType] as any[]);
+    // Get all configured instances, then filter out those with per-instance scheduling enabled
+    // Global scheduler should only process instances without per-instance schedules
+    const allInstances = getConfiguredInstances(config.applications[appType] as any[]);
+    const instances = allInstances.filter((instance: any) => !instance.scheduleEnabled);
     const createProcessor = processorCreators[appType];
     await processAppInstances(instances, appType, createProcessor, results, unattended);
   }

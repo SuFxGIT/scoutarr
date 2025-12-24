@@ -1,0 +1,6 @@
+ backend/src/routes/search.ts             |   5 [32m+[m[31m-[m
+ backend/src/routes/status.ts             |  20 [32m+++[m[31m-[m
+ backend/src/services/schedulerService.ts | 181 [32m+++++[m[31m--------------------------[m
+ frontend/src/pages/Dashboard.tsx         |  13 [32m++[m[31m-[m
+ frontend/src/pages/Settings.tsx          | 159 [32m+++++++[m[31m--------------------[m
+ 5 files changed, 96 insertions(+), 282 deletions(-)
