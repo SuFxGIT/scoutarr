@@ -12,7 +12,7 @@ export interface RadarrInstance {
   name: string; // Display name
   url: string;
   apiKey: string;
-  count: number | 'max' | 'MAX';
+  count: number | 'max';
   tagName: string;
   ignoreTag: string;
   monitored: boolean;
@@ -29,7 +29,7 @@ export interface SonarrInstance {
   name: string; // Display name
   url: string;
   apiKey: string;
-  count: number | 'max' | 'MAX';
+  count: number | 'max';
   tagName: string;
   ignoreTag: string;
   monitored: boolean;
@@ -46,7 +46,7 @@ export interface LidarrInstance {
   name: string; // Display name
   url: string;
   apiKey: string;
-  count: number | 'max' | 'MAX';
+  count: number | 'max';
   tagName: string;
   ignoreTag: string;
   monitored: boolean;
@@ -63,7 +63,7 @@ export interface ReadarrInstance {
   name: string; // Display name
   url: string;
   apiKey: string;
-  count: number | 'max' | 'MAX';
+  count: number | 'max';
   tagName: string;
   ignoreTag: string;
   monitored: boolean;

@@ -13,14 +13,11 @@ import { getConfiguredInstances, getMediaTypeKey, APP_TYPES } from '../utils/sta
 export const searchRouter = express.Router();
 
 // Helper function to randomly select items (matching script behavior)
-function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
-  // Normalize 'MAX' to 'max' for consistency
-  const normalizedCount = count === 'MAX' ? 'max' : count;
-  if (normalizedCount === 'max') {
+function randomSelect<T>(items: T[], count: number | 'max'): T[] {
+  if (count === 'max') {
     return items;
   }
-  // After normalization, normalizedCount must be a number
-  const numCount = normalizedCount as number;
+  const numCount = count;
   if (numCount >= items.length) {
     return items;
   }
@@ -335,9 +332,8 @@ export async function processApplication<TMedia>(
       };
     }
 
-    // Select random media based on count (normalize 'MAX' to 'max' if needed)
-    const normalizedCount = processor.config.count === 'MAX' ? 'max' : processor.config.count;
-    const toSearch = randomSelect(filtered, normalizedCount);
+    // Select random media based on count
+    const toSearch = randomSelect(filtered, processor.config.count);
     logger.debug(`🎲 Selected ${processor.name} to search`, {
       selected: toSearch.length,
       available: filtered.length,
@@ -504,7 +500,7 @@ async function processManualRun<TMedia>(
           return m;
         });
         
-        // Re-filter without unattended mode to see what would be available after tag removal
+        // Re-filter with simulated tag removal to see what would be available after tag removal
         filtered = await filterMedia(config, mediaWithTagRemoved);
         logger.debug(`🔄 Simulated re-filter for ${name} after tag removal`, {
           total: media.length,
@@ -513,9 +509,7 @@ async function processManualRun<TMedia>(
       }
     }
 
-    // Normalize 'MAX' to 'max' for consistency
-    const normalizedCount = config.count === 'MAX' ? 'max' : config.count;
-    const toSearch = randomSelect(filtered, normalizedCount);
+    const toSearch = randomSelect(filtered, config.count);
 
     logger.debug(`Manual run preview: ${name} results`, {
       total: media.length,

@@ -18,7 +18,7 @@ export const radarrInstanceSchema = z.object({
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
-  count: z.union([z.number().int().positive(), z.literal('max'), z.literal('MAX')]),
+  count: z.union([z.number().int().positive(), z.literal('max')]),
   tagName: z.string().min(1, 'Tag name is required'),
   ignoreTag: z.string(),
   monitored: z.boolean(),
@@ -47,7 +47,7 @@ export const sonarrInstanceSchema = z.object({
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
-  count: z.union([z.number().int().positive(), z.literal('max'), z.literal('MAX')]),
+  count: z.union([z.number().int().positive(), z.literal('max')]),
   tagName: z.string().min(1, 'Tag name is required'),
   ignoreTag: z.string(),
   monitored: z.boolean(),
@@ -76,7 +76,7 @@ export const lidarrInstanceSchema = z.object({
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
-  count: z.union([z.number().int().positive(), z.literal('max'), z.literal('MAX')]),
+  count: z.union([z.number().int().positive(), z.literal('max')]),
   tagName: z.string().min(1, 'Tag name is required'),
   ignoreTag: z.string(),
   monitored: z.boolean(),
@@ -105,7 +105,7 @@ export const readarrInstanceSchema = z.object({
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
-  count: z.union([z.number().int().positive(), z.literal('max'), z.literal('MAX')]),
+  count: z.union([z.number().int().positive(), z.literal('max')]),
   tagName: z.string().min(1, 'Tag name is required'),
   ignoreTag: z.string(),
   monitored: z.boolean(),

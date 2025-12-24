@@ -52,14 +52,12 @@ statusRouter.get('/', async (req, res) => {
 
       // Multiple instances
       for (const instance of instances) {
-        const instanceId = (instance as any).id || `${appType}-1`;
-        const instanceName =
-          (instance as any).name || `${defaultName} ${(instance as any).instanceId || '1'}`;
+        const instanceId = (instance as any).id;
+        const instanceName = (instance as any).name || `${defaultName} ${(instance as any).instanceId || instanceId}`;
         const instanceStatus = await checkAppStatus(appType, instance as any, instanceName);
         status[instanceId] = {
           ...instanceStatus,
-          instanceName,
-          instanceId: (instance as any).instanceId
+          instanceName
         };
       }
     };

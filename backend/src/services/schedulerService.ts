@@ -475,17 +475,6 @@ class SchedulerService {
     };
   }
 
-  getInstanceNextRunTime(instanceKey: string): Date | null {
-    const taskInfo = this.instanceTasks.get(instanceKey);
-    if (!taskInfo) return null;
-    
-    if (taskInfo.usingInterval && taskInfo.nextRunTime) {
-      return taskInfo.nextRunTime;
-    }
-    
-    return this.getNextRunTime(taskInfo.schedule);
-  }
-
   /**
    * Map known "every N" cron presets to a fixed interval in milliseconds.
    */

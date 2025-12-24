@@ -130,20 +130,6 @@ class QualityProfilesCacheService {
     }
   }
 
-  async invalidateCacheByCredentials(url: string, apiKey: string): Promise<void> {
-    let invalidated = false;
-    for (const [key, entry] of Object.entries(this.cache)) {
-      if (entry.url === url && entry.apiKey === apiKey) {
-        delete this.cache[key];
-        invalidated = true;
-      }
-    }
-    if (invalidated) {
-      await this.saveCache();
-      logger.debug('🗑️  Invalidated quality profiles cache by credentials');
-    }
-  }
-
   getAllCachedProfiles(): Record<string, QualityProfile[]> {
     const result: Record<string, QualityProfile[]> = {};
     for (const [key, entry] of Object.entries(this.cache)) {
@@ -152,11 +138,6 @@ class QualityProfilesCacheService {
     return result;
   }
 
-  async clearCache(): Promise<void> {
-    this.cache = {};
-    await this.saveCache();
-    logger.info('🗑️  Cleared all quality profiles cache');
-  }
 }
 
 export const qualityProfilesCacheService = new QualityProfilesCacheService();
