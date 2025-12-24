@@ -4,7 +4,7 @@ import { configService } from './configService.js';
 import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
 import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
-import { getConfiguredInstances } from '../utils/starrUtils.js';
+import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
 const require = createRequire(import.meta.url);
@@ -68,39 +68,14 @@ class SchedulerService {
     // Clear existing instance schedulers
     this.stopAllInstanceSchedulers();
 
-    // Process Radarr instances
-    const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    for (const instance of radarrInstances) {
-      if (instance.scheduleEnabled && instance.schedule) {
-        const instanceKey = `radarr-${instance.id}`;
-        this.startInstance(instanceKey, 'radarr', instance.id, instance.schedule);
-      }
-    }
-
-    // Process Sonarr instances
-    const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    for (const instance of sonarrInstances) {
-      if (instance.scheduleEnabled && instance.schedule) {
-        const instanceKey = `sonarr-${instance.id}`;
-        this.startInstance(instanceKey, 'sonarr', instance.id, instance.schedule);
-      }
-    }
-
-    // Process Lidarr instances
-    const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
-    for (const instance of lidarrInstances) {
-      if (instance.scheduleEnabled && instance.schedule) {
-        const instanceKey = `lidarr-${instance.id}`;
-        this.startInstance(instanceKey, 'lidarr', instance.id, instance.schedule);
-      }
-    }
-
-    // Process Readarr instances
-    const readarrInstances = getConfiguredInstances(config.applications.readarr);
-    for (const instance of readarrInstances) {
-      if (instance.scheduleEnabled && instance.schedule) {
-        const instanceKey = `readarr-${instance.id}`;
-        this.startInstance(instanceKey, 'readarr', instance.id, instance.schedule);
+    // Process instances for each app type
+    for (const appType of APP_TYPES) {
+      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+      for (const instance of instances) {
+        if (instance.scheduleEnabled && instance.schedule) {
+          const instanceKey = `${appType}-${instance.id}`;
+          this.startInstance(instanceKey, appType, instance.id, instance.schedule);
+        }
       }
     }
 
@@ -179,7 +154,7 @@ class SchedulerService {
   }
 
   // Per-instance scheduler methods
-  startInstance(instanceKey: string, appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, schedule: string): void {
+  startInstance(instanceKey: string, appType: AppType, instanceId: string, schedule: string): void {
     this.stopInstance(instanceKey);
 
     if (!cron.validate(schedule)) {
@@ -344,7 +319,7 @@ class SchedulerService {
     }
   }
 
-  private async runInstanceScheduledSearch(instanceKey: string, appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, schedule: string): Promise<void> {
+  private async runInstanceScheduledSearch(instanceKey: string, appType: AppType, instanceId: string, schedule: string): Promise<void> {
     const isRunning = this.instanceIsRunning.get(instanceKey);
     if (isRunning) {
       logger.warn('⏸️  Previous instance search still running, skipping scheduled run', { instanceKey });

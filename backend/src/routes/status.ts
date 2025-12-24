@@ -1,7 +1,7 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
-import { testStarrConnection, getConfiguredInstances } from '../utils/starrUtils.js';
+import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const statusRouter = express.Router();
@@ -15,7 +15,7 @@ statusRouter.get('/', async (req, res) => {
 
     // Helper to check application status
     const checkAppStatus = async (
-      appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
+      appType: AppType,
       appConfig: { url: string; apiKey: string },
       instanceName?: string
     ) => {
@@ -41,7 +41,7 @@ statusRouter.get('/', async (req, res) => {
     };
 
     // Helper to check instances for an app
-    const checkInstances = async (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', defaultName: string) => {
+    const checkInstances = async (appType: AppType, defaultName: string) => {
       const instances = getConfiguredInstances(config.applications[appType] as any[]);
 
       if (instances.length === 0) {
@@ -62,17 +62,17 @@ statusRouter.get('/', async (req, res) => {
       }
     };
 
-    // Check Radarr instances
-    await checkInstances('radarr', 'Radarr');
-
-    // Check Sonarr instances
-    await checkInstances('sonarr', 'Sonarr');
-
-    // Check Lidarr instances
-    await checkInstances('lidarr', 'Lidarr');
-
-    // Check Readarr instances
-    await checkInstances('readarr', 'Readarr');
+    // Check instances for all app types
+    const appTypeNames: Record<string, string> = {
+      radarr: 'Radarr',
+      sonarr: 'Sonarr',
+      lidarr: 'Lidarr',
+      readarr: 'Readarr'
+    };
+    
+    for (const appType of APP_TYPES) {
+      await checkInstances(appType, appTypeNames[appType]);
+    }
 
     // Add scheduler status
     const schedulerStatus = schedulerService.getStatus();

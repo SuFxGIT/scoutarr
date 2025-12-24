@@ -6,7 +6,7 @@ import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
-import { testStarrConnection, getMediaTypeKey, APP_TYPES } from '../utils/starrUtils.js';
+import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const configRouter = express.Router();
@@ -95,7 +95,7 @@ configRouter.post('/test/:app', async (req, res) => {
       const savedConfig = config.applications[app as keyof typeof config.applications] as any;
 
       if (Array.isArray(savedConfig)) {
-        // For Radarr/Sonarr, pick the first enabled instance with URL and API key
+        // Pick the first enabled instance with URL and API key
         const instance = savedConfig.find(
           (inst: any) => inst && inst.enabled !== false && inst.url && inst.apiKey
         );
@@ -105,12 +105,6 @@ configRouter.post('/test/:app', async (req, res) => {
             apiKey: instance.apiKey
           };
         }
-      } else if (savedConfig && savedConfig.url && savedConfig.apiKey) {
-        // Single-app style config
-        appConfig = {
-          url: savedConfig.url,
-          apiKey: savedConfig.apiKey
-        };
       }
     }
 
@@ -303,64 +297,66 @@ function findInstanceConfig(config: any, app: string, instanceId: string): any |
   return instances.find((inst: any) => inst.id === instanceId) || null;
 }
 
-// Helper to get quality profiles service based on app type
-async function getQualityProfilesForApp(app: string, config: any): Promise<any[]> {
-  if (app === 'radarr') {
-    return await radarrService.getQualityProfiles(config);
-  } else if (app === 'sonarr') {
-    return await sonarrService.getQualityProfiles(config);
-  } else if (app === 'lidarr') {
-    return await lidarrService.getQualityProfiles(config);
-  } else if (app === 'readarr') {
-    return await readarrService.getQualityProfiles(config);
-  } else {
+// Service map for app-specific operations
+const appServiceMap: Record<string, {
+  getQualityProfiles: (config: any) => Promise<any[]>;
+  getTagId: (config: any, tagName: string) => Promise<number | null>;
+  getAllMedia: (config: any) => Promise<any[]>;
+  removeTagFromMedia: (config: any, mediaIds: number[], tagId: number) => Promise<void>;
+}> = {
+  radarr: {
+    getQualityProfiles: (config: any) => radarrService.getQualityProfiles(config),
+    getTagId: (config: any, tagName: string) => radarrService.getTagId(config, tagName),
+    getAllMedia: (config: any) => radarrService.getMovies(config),
+    removeTagFromMedia: (config: any, mediaIds: number[], tagId: number) => radarrService.removeTagFromMovies(config, mediaIds, tagId)
+  },
+  sonarr: {
+    getQualityProfiles: (config: any) => sonarrService.getQualityProfiles(config),
+    getTagId: (config: any, tagName: string) => sonarrService.getTagId(config, tagName),
+    getAllMedia: (config: any) => sonarrService.getSeries(config),
+    removeTagFromMedia: (config: any, mediaIds: number[], tagId: number) => sonarrService.removeTagFromSeries(config, mediaIds, tagId)
+  },
+  lidarr: {
+    getQualityProfiles: (config: any) => lidarrService.getQualityProfiles(config),
+    getTagId: (config: any, tagName: string) => lidarrService.getTagId(config, tagName),
+    getAllMedia: (config: any) => lidarrService.getArtists(config),
+    removeTagFromMedia: (config: any, mediaIds: number[], tagId: number) => lidarrService.removeTagFromArtists(config, mediaIds, tagId)
+  },
+  readarr: {
+    getQualityProfiles: (config: any) => readarrService.getQualityProfiles(config),
+    getTagId: (config: any, tagName: string) => readarrService.getTagId(config, tagName),
+    getAllMedia: (config: any) => readarrService.getAuthors(config),
+    removeTagFromMedia: (config: any, mediaIds: number[], tagId: number) => readarrService.removeTagFromAuthors(config, mediaIds, tagId)
+  }
+};
+
+// Helper to get service for app type
+function getServiceForApp(app: string) {
+  const service = appServiceMap[app];
+  if (!service) {
     throw new Error(`Unsupported app type: ${app}`);
   }
+  return service;
+}
+
+// Helper to get quality profiles service based on app type
+async function getQualityProfilesForApp(app: string, config: any): Promise<any[]> {
+  return await getServiceForApp(app).getQualityProfiles(config);
 }
 
 // Helper to get tag ID based on app type
 async function getTagIdForApp(app: string, config: any, tagName: string): Promise<number | null> {
-  if (app === 'radarr') {
-    return await radarrService.getTagId(config, tagName);
-  } else if (app === 'sonarr') {
-    return await sonarrService.getTagId(config, tagName);
-  } else if (app === 'lidarr') {
-    return await lidarrService.getTagId(config, tagName);
-  } else if (app === 'readarr') {
-    return await readarrService.getTagId(config, tagName);
-  } else {
-    throw new Error(`Unsupported app type: ${app}`);
-  }
+  return await getServiceForApp(app).getTagId(config, tagName);
 }
 
 // Helper to get all media based on app type
 async function getAllMediaForApp(app: string, config: any): Promise<any[]> {
-  if (app === 'radarr') {
-    return await radarrService.getMovies(config);
-  } else if (app === 'sonarr') {
-    return await sonarrService.getSeries(config);
-  } else if (app === 'lidarr') {
-    return await lidarrService.getArtists(config);
-  } else if (app === 'readarr') {
-    return await readarrService.getAuthors(config);
-  } else {
-    throw new Error(`Unsupported app type: ${app}`);
-  }
+  return await getServiceForApp(app).getAllMedia(config);
 }
 
 // Helper to remove tag from media based on app type
 async function removeTagFromMediaForApp(app: string, config: any, mediaIds: number[], tagId: number): Promise<void> {
-  if (app === 'radarr') {
-    await radarrService.removeTagFromMovies(config, mediaIds, tagId);
-  } else if (app === 'sonarr') {
-    await sonarrService.removeTagFromSeries(config, mediaIds, tagId);
-  } else if (app === 'lidarr') {
-    await lidarrService.removeTagFromArtists(config, mediaIds, tagId);
-  } else if (app === 'readarr') {
-    await readarrService.removeTagFromAuthors(config, mediaIds, tagId);
-  } else {
-    throw new Error(`Unsupported app type: ${app}`);
-  }
+  await getServiceForApp(app).removeTagFromMedia(config, mediaIds, tagId);
 }
 
 // Clear tags from all media in an instance
@@ -417,7 +413,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     }
 
     // Get media type name for logging
-    const mediaTypeName = getMediaTypeKey(app);
+    const mediaTypeName = getMediaTypeKey(app as AppType);
 
     logger.info(`✅ Cleared tag from ${mediaIds.length} ${mediaTypeName}`);
     res.json({ 

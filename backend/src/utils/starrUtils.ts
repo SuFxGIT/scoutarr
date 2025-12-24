@@ -9,7 +9,7 @@ export type AppType = typeof APP_TYPES[number];
  * Maps app type to media type key (for result objects)
  * Examples: 'radarr' -> 'movies', 'lidarr' -> 'artists', 'readarr' -> 'authors', 'sonarr' -> 'series'
  */
-export function getMediaTypeKey(appType: string): string {
+export function getMediaTypeKey(appType: AppType): string {
   switch (appType) {
     case 'radarr': return 'movies';
     case 'lidarr': return 'artists';
@@ -41,6 +41,20 @@ export function createStarrClient(url: string, apiKey: string): AxiosInstance {
       'Content-Type': 'application/json'
     }
   });
+}
+
+/**
+ * Extracts items array from a search result object
+ * Handles all media type keys (movies, series, artists, authors, items)
+ */
+export function extractItemsFromResult(result: {
+  movies?: Array<{ id: number; title: string }>;
+  series?: Array<{ id: number; title: string }>;
+  artists?: Array<{ id: number; title: string }>;
+  authors?: Array<{ id: number; title: string }>;
+  items?: Array<{ id: number; title: string }>;
+}): Array<{ id: number; title: string }> {
+  return result.movies || result.series || result.artists || result.authors || result.items || [];
 }
 
 /**

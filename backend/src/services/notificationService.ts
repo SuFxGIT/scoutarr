@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { configService } from './configService.js';
 import logger from '../utils/logger.js';
+import { extractItemsFromResult } from '../utils/starrUtils.js';
 
 interface SearchResults {
   [key: string]: {
@@ -70,7 +71,7 @@ class NotificationService {
           .filter(([_, result]) => result.success && (result.searched || 0) > 0)
           .map(([app, result]) => {
             const appName = this.formatAppName(app);
-            const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+            const items = extractItemsFromResult(result);
             const itemList = items.slice(0, 5).map(item => item.title).join(', ');
             const more = items.length > 5 ? ` (+${items.length - 5} more)` : '';
             return `**${appName}**: ${result.searched} item(s) - ${itemList}${more}`;
@@ -161,7 +162,7 @@ class NotificationService {
           .filter(([_, result]) => result.success && (result.searched || 0) > 0)
           .map(([app, result]) => {
             const appName = this.formatAppName(app);
-            const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+            const items = extractItemsFromResult(result);
             const itemList = items.slice(0, 3).map(item => item.title).join(', ');
             const more = items.length > 3 ? ` (+${items.length - 3} more)` : '';
             return `${appName}: ${result.searched} item(s) - ${itemList}${more}`;

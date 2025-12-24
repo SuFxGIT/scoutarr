@@ -3,14 +3,10 @@ import { SonarrInstance } from '../types/config.js';
 import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
-export interface SonarrSeries {
-  id: number;
+export interface SonarrSeries extends FilterableMedia {
   title: string;
-  status: string;
-  monitored: boolean;
-  tags: number[];
-  qualityProfileId: number;
 }
 
 class SonarrService {
@@ -96,36 +92,20 @@ class SonarrService {
 
   async filterSeries(config: SonarrInstance, series: SonarrSeries[]): Promise<SonarrSeries[]> {
     try {
-      let filtered = series;
-
-      // Filter by monitored status
-      if (config.monitored !== undefined) {
-        const before = filtered.length;
-        filtered = filtered.filter(s => s.monitored === config.monitored);
-        logger.debug('🔽 Filtered by monitored status', { 
-          before, 
-          after: filtered.length, 
-          monitored: config.monitored 
-        });
-      }
-
-      // Get tag ID for filtering
-      const tagId = await this.getTagId(config, config.tagName);
-      if (tagId !== null) {
-        const before = filtered.length;
-        // Always only include media WITHOUT the tag for primary selection.
-        // Unattended mode behavior (removing tags and re-filtering when no media
-        // is found) is handled at the scheduler layer, not here.
-        filtered = filtered.filter(s => !s.tags.includes(tagId));
-        logger.debug('🔽 Filtered out already tagged series', { 
-          before, 
-          after: filtered.length, 
-          tagName: config.tagName 
-        });
-      }
-
-      // Additional filters apply in both attended and unattended modes.
-      // Unattended-specific behavior is handled by the scheduler when no media is found.
+      // Apply common filters (monitored, tag, quality profile, ignore tag)
+      let filtered = await applyCommonFilters(
+        series,
+        {
+          monitored: config.monitored,
+          tagName: config.tagName,
+          ignoreTag: config.ignoreTag,
+          qualityProfileName: config.qualityProfileName,
+          getQualityProfiles: () => this.getQualityProfiles(config),
+          getTagId: (tagName: string) => this.getTagId(config, tagName)
+        },
+        'Sonarr',
+        'series'
+      );
 
       // Filter by series status
       if (config.seriesStatus) {
@@ -136,35 +116,6 @@ class SonarrService {
           after: filtered.length, 
           status: config.seriesStatus 
         });
-      }
-
-      // Filter by quality profile
-      if (config.qualityProfileName) {
-        const profiles = await this.getQualityProfiles(config);
-        const profile = profiles.find(p => p.name === config.qualityProfileName);
-        if (profile) {
-          const before = filtered.length;
-          filtered = filtered.filter(s => s.qualityProfileId === profile.id);
-          logger.debug('🔽 Filtered by quality profile', { 
-            before, 
-            after: filtered.length, 
-            profile: config.qualityProfileName 
-          });
-        }
-      }
-
-      // Filter out series with ignore tag
-      if (config.ignoreTag) {
-        const ignoreTagId = await this.getTagId(config, config.ignoreTag);
-        if (ignoreTagId !== null) {
-          const before = filtered.length;
-          filtered = filtered.filter(s => !s.tags.includes(ignoreTagId));
-          logger.debug('🔽 Filtered out ignore tag', { 
-            before, 
-            after: filtered.length, 
-            ignoreTag: config.ignoreTag 
-          });
-        }
       }
 
       return filtered;

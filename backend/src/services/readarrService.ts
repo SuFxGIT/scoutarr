@@ -3,15 +3,11 @@ import { ReadarrInstance } from '../types/config.js';
 import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
-export interface ReadarrAuthor {
-  id: number;
+export interface ReadarrAuthor extends FilterableMedia {
   authorName: string;
   title?: string; // Alias for authorName for consistency
-  status: string;
-  monitored: boolean;
-  tags: number[];
-  qualityProfileId: number;
 }
 
 class ReadarrService {
@@ -102,30 +98,20 @@ class ReadarrService {
 
   async filterAuthors(config: ReadarrInstance, authors: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
     try {
-      let filtered = authors;
-
-      // Filter by monitored status
-      if (config.monitored !== undefined) {
-        const before = filtered.length;
-        filtered = filtered.filter(a => a.monitored === config.monitored);
-        logger.debug('🔽 Filtered by monitored status', { 
-          before, 
-          after: filtered.length, 
-          monitored: config.monitored 
-        });
-      }
-
-      // Get tag ID for filtering
-      const tagId = await this.getTagId(config, config.tagName);
-      if (tagId !== null) {
-        const before = filtered.length;
-        filtered = filtered.filter(a => !a.tags.includes(tagId));
-        logger.debug('🔽 Filtered out already tagged authors', { 
-          before, 
-          after: filtered.length, 
-          tagName: config.tagName 
-        });
-      }
+      // Apply common filters (monitored, tag, quality profile, ignore tag)
+      let filtered = await applyCommonFilters(
+        authors,
+        {
+          monitored: config.monitored,
+          tagName: config.tagName,
+          ignoreTag: config.ignoreTag,
+          qualityProfileName: config.qualityProfileName,
+          getQualityProfiles: () => this.getQualityProfiles(config),
+          getTagId: (tagName: string) => this.getTagId(config, tagName)
+        },
+        'Readarr',
+        'authors'
+      );
 
       // Filter by author status
       if (config.authorStatus) {
@@ -136,35 +122,6 @@ class ReadarrService {
           after: filtered.length, 
           status: config.authorStatus 
         });
-      }
-
-      // Filter by quality profile
-      if (config.qualityProfileName) {
-        const profiles = await this.getQualityProfiles(config);
-        const profile = profiles.find(p => p.name === config.qualityProfileName);
-        if (profile) {
-          const before = filtered.length;
-          filtered = filtered.filter(a => a.qualityProfileId === profile.id);
-          logger.debug('🔽 Filtered by quality profile', { 
-            before, 
-            after: filtered.length, 
-            profile: config.qualityProfileName 
-          });
-        }
-      }
-
-      // Filter out authors with ignore tag
-      if (config.ignoreTag) {
-        const ignoreTagId = await this.getTagId(config, config.ignoreTag);
-        if (ignoreTagId !== null) {
-          const before = filtered.length;
-          filtered = filtered.filter(a => !a.tags.includes(ignoreTagId));
-          logger.debug('🔽 Filtered out ignore tag', { 
-            before, 
-            after: filtered.length, 
-            ignoreTag: config.ignoreTag 
-          });
-        }
       }
 
       return filtered;

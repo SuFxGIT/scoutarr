@@ -8,7 +8,7 @@ import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { notificationService } from '../services/notificationService.js';
 import logger from '../utils/logger.js';
-import { getConfiguredInstances, getMediaTypeKey, APP_TYPES } from '../utils/starrUtils.js';
+import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
 
 export const searchRouter = express.Router();
 
@@ -30,12 +30,12 @@ function randomSelect<T>(items: T[], count: number | 'max'): T[] {
 }
 
 // Helper to generate result key for instances
-export function getResultKey(instanceId: string, appType: string, instanceCount: number): string {
+export function getResultKey(instanceId: string, appType: AppType, instanceCount: number): string {
   return instanceCount > 1 ? instanceId : appType;
 }
 
 // Helper to extract instance info from config
-export function getInstanceInfo(config: any, appType: string): { instanceName: string; instanceId: string } {
+export function getInstanceInfo(config: any, appType: AppType): { instanceName: string; instanceId: string } {
   return {
     instanceName: config.name || appType,
     instanceId: config.id || `${appType}-1`
@@ -50,7 +50,7 @@ export async function saveStatsForResults(results: Record<string, any>): Promise
       const appType = app.split('-')[0];
       
       // Get items - check all possible media type keys
-      const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+      const items = extractItemsFromResult(result);
       
       // Extract instance ID if present (e.g., "radarr-instance-id" -> "instance-id")
       // Only pass instance if the key contains a dash and is a valid app type
@@ -155,7 +155,7 @@ export function createReadarrProcessor(instanceName: string, config: any) {
 // Helper to process all instances of an app type
 async function processAppInstances<T>(
   instances: T[],
-  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
+  appType: AppType,
   createProcessor: (instanceName: string, config: any) => ApplicationProcessor<any>,
   results: Record<string, any>,
   unattended?: boolean
@@ -176,41 +176,30 @@ async function processAppInstances<T>(
 }
 
 // Helper to get processor creator and instances for an app type
-function getProcessorAndInstances(appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): {
+function getProcessorAndInstances(appType: AppType): {
   instances: any[];
   processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
 } {
   const config = configService.getConfig();
+  const processor = processorCreators[appType];
   
-  const processorMap: Record<string, {
-    instances: any[];
-    processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
-  }> = {
-    radarr: {
-      instances: getConfiguredInstances(config.applications.radarr),
-      processor: createRadarrProcessor
-    },
-    sonarr: {
-      instances: getConfiguredInstances(config.applications.sonarr),
-      processor: createSonarrProcessor
-    },
-    lidarr: {
-      instances: getConfiguredInstances(config.applications.lidarr),
-      processor: createLidarrProcessor
-    },
-    readarr: {
-      instances: getConfiguredInstances(config.applications.readarr),
-      processor: createReadarrProcessor
-    }
-  };
-  
-  const result = processorMap[appType];
-  if (!result) {
+  if (!processor) {
     throw new Error(`Unknown app type: ${appType}`);
   }
   
-  return result;
+  return {
+    instances: getConfiguredInstances(config.applications[appType] as any[]),
+    processor
+  };
 }
+
+// Processor creator map
+const processorCreators: Record<AppType, (instanceName: string, config: any) => ApplicationProcessor<any>> = {
+  radarr: createRadarrProcessor,
+  sonarr: createSonarrProcessor,
+  lidarr: createLidarrProcessor,
+  readarr: createReadarrProcessor
+};
 
 // Shared function to execute search run (used by both manual and scheduled runs)
 export async function executeSearchRun(): Promise<Record<string, any>> {
@@ -220,21 +209,12 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
   // Use scheduler's unattended mode setting
   const unattended = config.scheduler?.unattended || false;
 
-  // Process Radarr
-  const radarrInstances = getConfiguredInstances(config.applications.radarr);
-  await processAppInstances(radarrInstances, 'radarr', createRadarrProcessor, results, unattended);
-
-  // Process Sonarr
-  const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-  await processAppInstances(sonarrInstances, 'sonarr', createSonarrProcessor, results, unattended);
-
-  // Process Lidarr
-  const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
-  await processAppInstances(lidarrInstances, 'lidarr', createLidarrProcessor, results, unattended);
-
-  // Process Readarr
-  const readarrInstances = getConfiguredInstances(config.applications.readarr);
-  await processAppInstances(readarrInstances, 'readarr', createReadarrProcessor, results, unattended);
+  // Process all app types
+  for (const appType of APP_TYPES) {
+    const instances = getConfiguredInstances(config.applications[appType] as any[]);
+    const createProcessor = processorCreators[appType];
+    await processAppInstances(instances, appType, createProcessor, results, unattended);
+  }
 
   // Save stats for successful searches
   await saveStatsForResults(results);
@@ -243,7 +223,7 @@ export async function executeSearchRun(): Promise<Record<string, any>> {
 }
 
 // Execute search run for a single instance
-export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string): Promise<Record<string, any>> {
+export async function executeSearchRunForInstance(appType: AppType, instanceId: string): Promise<Record<string, any>> {
   const config = configService.getConfig();
   const results: Record<string, any> = {};
   
@@ -543,7 +523,7 @@ async function processManualRun<TMedia>(
 // Helper to process instances for manual run preview
 async function processManualRunInstances(
   instances: any[],
-  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
+  appType: AppType,
   getMedia: (config: any) => Promise<any[]>,
   filterMedia: (config: any, media: any[]) => Promise<any[]>,
   getMediaId: (media: any) => number,
@@ -571,6 +551,44 @@ async function processManualRunInstances(
   }
 }
 
+// Service map for manual run preview
+const manualRunServiceMap: Record<AppType, {
+  getMedia: (config: any) => Promise<any[]>;
+  filterMedia: (config: any, media: any[]) => Promise<any[]>;
+  getMediaId: (media: any) => number;
+  getMediaTitle: (media: any) => string;
+  getTagId: (config: any, tagName: string) => Promise<number | null>;
+}> = {
+  radarr: {
+    getMedia: (config: any) => radarrService.getMovies(config),
+    filterMedia: (config: any, media: any[]) => radarrService.filterMovies(config, media),
+    getMediaId: (m: any) => m.id,
+    getMediaTitle: (m: any) => m.title,
+    getTagId: (config: any, tagName: string) => radarrService.getTagId(config, tagName)
+  },
+  sonarr: {
+    getMedia: (config: any) => sonarrService.getSeries(config),
+    filterMedia: (config: any, media: any[]) => sonarrService.filterSeries(config, media),
+    getMediaId: (s: any) => s.id,
+    getMediaTitle: (s: any) => s.title,
+    getTagId: (config: any, tagName: string) => sonarrService.getTagId(config, tagName)
+  },
+  lidarr: {
+    getMedia: (config: any) => lidarrService.getArtists(config),
+    filterMedia: (config: any, media: any[]) => lidarrService.filterArtists(config, media),
+    getMediaId: (a: any) => a.id,
+    getMediaTitle: (a: any) => a.title || a.artistName,
+    getTagId: (config: any, tagName: string) => lidarrService.getTagId(config, tagName)
+  },
+  readarr: {
+    getMedia: (config: any) => readarrService.getAuthors(config),
+    filterMedia: (config: any, media: any[]) => readarrService.filterAuthors(config, media),
+    getMediaId: (a: any) => a.id,
+    getMediaTitle: (a: any) => a.title || a.authorName,
+    getTagId: (config: any, tagName: string) => readarrService.getTagId(config, tagName)
+  }
+};
+
 // Get items that would be searched (manual run preview)
 searchRouter.post('/manual-run', async (req, res) => {
   logger.info('👀 Starting manual run preview');
@@ -578,57 +596,21 @@ searchRouter.post('/manual-run', async (req, res) => {
     const config = configService.getConfig();
     const results: Record<string, any> = {};
 
-    // Process Radarr
-    const radarrInstances = getConfiguredInstances(config.applications.radarr);
-    await processManualRunInstances(
-      radarrInstances,
-      'radarr',
-      radarrService.getMovies.bind(radarrService),
-      radarrService.filterMovies.bind(radarrService),
-      (m) => m.id,
-      (m) => m.title,
-      radarrService.getTagId.bind(radarrService),
-      results
-    );
-
-    // Process Sonarr
-    const sonarrInstances = getConfiguredInstances(config.applications.sonarr);
-    await processManualRunInstances(
-      sonarrInstances,
-      'sonarr',
-      sonarrService.getSeries.bind(sonarrService),
-      sonarrService.filterSeries.bind(sonarrService),
-      (s) => s.id,
-      (s) => s.title,
-      sonarrService.getTagId.bind(sonarrService),
-      results
-    );
-
-    // Process Lidarr
-    const lidarrInstances = getConfiguredInstances(config.applications.lidarr);
-    await processManualRunInstances(
-      lidarrInstances,
-      'lidarr',
-      lidarrService.getArtists.bind(lidarrService),
-      lidarrService.filterArtists.bind(lidarrService),
-      (a) => a.id,
-      (a) => a.title || a.artistName,
-      lidarrService.getTagId.bind(lidarrService),
-      results
-    );
-
-    // Process Readarr
-    const readarrInstances = getConfiguredInstances(config.applications.readarr);
-    await processManualRunInstances(
-      readarrInstances,
-      'readarr',
-      readarrService.getAuthors.bind(readarrService),
-      readarrService.filterAuthors.bind(readarrService),
-      (a) => a.id,
-      (a) => a.title || a.authorName,
-      readarrService.getTagId.bind(readarrService),
-      results
-    );
+    // Process all app types
+    for (const appType of APP_TYPES) {
+      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+      const service = manualRunServiceMap[appType];
+      await processManualRunInstances(
+        instances,
+        appType,
+        service.getMedia,
+        service.filterMedia,
+        service.getMediaId,
+        service.getMediaTitle,
+        service.getTagId,
+        results
+      );
+    }
 
     logger.info('✅ Manual run preview completed');
     res.json(results);

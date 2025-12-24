@@ -263,7 +263,9 @@ class StatsService {
   }
 
   async clearRecentUpgrades(): Promise<void> {
-    // This is the same as resetStats since we're using a database
+    // Note: Since we're using a single database table for all upgrades,
+    // "clearing recent upgrades" effectively clears all stats.
+    // This method exists for API compatibility with the frontend.
     await this.resetStats();
   }
 

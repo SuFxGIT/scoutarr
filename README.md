@@ -67,11 +67,15 @@ Configuration is stored in `config/config.json`. On first run, the application w
   "notifications": {
     "discordWebhook": "",
     "notifiarrPassthroughWebhook": "",
-    "notifiarrPassthroughDiscordChannelId": ""
+    "notifiarrPassthroughDiscordChannelId": "",
+    "pushoverUserKey": "",
+    "pushoverApiToken": ""
   },
   "applications": {
     "radarr": [],
-    "sonarr": []
+    "sonarr": [],
+    "lidarr": [],
+    "readarr": []
   },
   "scheduler": {
     "enabled": false,

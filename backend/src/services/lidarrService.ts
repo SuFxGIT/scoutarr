@@ -3,15 +3,11 @@ import { LidarrInstance } from '../types/config.js';
 import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
-export interface LidarrArtist {
-  id: number;
+export interface LidarrArtist extends FilterableMedia {
   artistName: string;
   title?: string; // Alias for artistName for consistency
-  status: string;
-  monitored: boolean;
-  tags: number[];
-  qualityProfileId: number;
 }
 
 class LidarrService {
@@ -102,30 +98,20 @@ class LidarrService {
 
   async filterArtists(config: LidarrInstance, artists: LidarrArtist[]): Promise<LidarrArtist[]> {
     try {
-      let filtered = artists;
-
-      // Filter by monitored status
-      if (config.monitored !== undefined) {
-        const before = filtered.length;
-        filtered = filtered.filter(a => a.monitored === config.monitored);
-        logger.debug('🔽 Filtered by monitored status', { 
-          before, 
-          after: filtered.length, 
-          monitored: config.monitored 
-        });
-      }
-
-      // Get tag ID for filtering
-      const tagId = await this.getTagId(config, config.tagName);
-      if (tagId !== null) {
-        const before = filtered.length;
-        filtered = filtered.filter(a => !a.tags.includes(tagId));
-        logger.debug('🔽 Filtered out already tagged artists', { 
-          before, 
-          after: filtered.length, 
-          tagName: config.tagName 
-        });
-      }
+      // Apply common filters (monitored, tag, quality profile, ignore tag)
+      let filtered = await applyCommonFilters(
+        artists,
+        {
+          monitored: config.monitored,
+          tagName: config.tagName,
+          ignoreTag: config.ignoreTag,
+          qualityProfileName: config.qualityProfileName,
+          getQualityProfiles: () => this.getQualityProfiles(config),
+          getTagId: (tagName: string) => this.getTagId(config, tagName)
+        },
+        'Lidarr',
+        'artists'
+      );
 
       // Filter by artist status
       if (config.artistStatus) {
@@ -136,35 +122,6 @@ class LidarrService {
           after: filtered.length, 
           status: config.artistStatus 
         });
-      }
-
-      // Filter by quality profile
-      if (config.qualityProfileName) {
-        const profiles = await this.getQualityProfiles(config);
-        const profile = profiles.find(p => p.name === config.qualityProfileName);
-        if (profile) {
-          const before = filtered.length;
-          filtered = filtered.filter(a => a.qualityProfileId === profile.id);
-          logger.debug('🔽 Filtered by quality profile', { 
-            before, 
-            after: filtered.length, 
-            profile: config.qualityProfileName 
-          });
-        }
-      }
-
-      // Filter out artists with ignore tag
-      if (config.ignoreTag) {
-        const ignoreTagId = await this.getTagId(config, config.ignoreTag);
-        if (ignoreTagId !== null) {
-          const before = filtered.length;
-          filtered = filtered.filter(a => !a.tags.includes(ignoreTagId));
-          logger.debug('🔽 Filtered out ignore tag', { 
-            before, 
-            after: filtered.length, 
-            ignoreTag: config.ignoreTag 
-          });
-        }
       }
 
       return filtered;
