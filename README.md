@@ -2,6 +2,16 @@
 
 Scoutarr automates media upgrades in your Starr applications (Radarr and Sonarr) by triggering manual searches for media items that meet your criteria and tagging what was triggered, so you can continuously chase better quality releases without babysitting your apps.
 
+> **Note:** This project uses [Upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/tree/main/Upgradinatorr) as its foundation. We've created a modern UI and enhanced the functionality while maintaining the core concept.
+
+## Screenshots
+
+<img src="screenshots/image.png" alt="Scoutarr Dashboard" width="800">
+
+<img src="screenshots/image2.png" alt="Scoutarr Settings" width="400">
+
+<img src="screenshots/image3.png" alt="Scoutarr Stats" width="400">
+
 ## Features
 
 - 🎬 **Radarr Integration** – Automatically trigger focused manual searches for movies
