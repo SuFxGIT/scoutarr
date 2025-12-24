@@ -52,7 +52,9 @@ class ConfigService {
       notifications: {
         discordWebhook: '',
         notifiarrPassthroughWebhook: '',
-        notifiarrPassthroughDiscordChannelId: ''
+        notifiarrPassthroughDiscordChannelId: '',
+        pushoverUserKey: '',
+        pushoverApiToken: ''
       },
       applications: {
         radarr: [],

@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { createRequire } from 'module';
 import { configService } from './configService.js';
+import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
 import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
 import { getConfiguredInstances } from '../utils/starrUtils.js';
@@ -304,6 +305,15 @@ class SchedulerService {
           count: results[app].searched || 0
         }))
       });
+
+      // Send notifications
+      try {
+        await notificationService.sendNotifications(results, true);
+      } catch (notificationError: any) {
+        logger.debug('Failed to send notifications', {
+          error: notificationError.message
+        });
+      }
     } catch (error: any) {
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
@@ -317,6 +327,15 @@ class SchedulerService {
         error: error.message,
         stack: error.stack
       });
+
+      // Send failure notifications
+      try {
+        await notificationService.sendNotifications({}, false, error.message);
+      } catch (notificationError: any) {
+        logger.debug('Failed to send failure notifications', {
+          error: notificationError.message
+        });
+      }
     } finally {
       this.globalIsRunning = false;
       if (this.globalUsingInterval && this.globalIntervalMs) {
@@ -353,6 +372,15 @@ class SchedulerService {
           count: results[app].searched || 0
         }))
       });
+
+      // Send notifications
+      try {
+        await notificationService.sendNotifications(results, true);
+      } catch (notificationError: any) {
+        logger.debug('Failed to send notifications', {
+          error: notificationError.message
+        });
+      }
     } catch (error: any) {
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
@@ -368,6 +396,15 @@ class SchedulerService {
         error: error.message,
         stack: error.stack
       });
+
+      // Send failure notifications
+      try {
+        await notificationService.sendNotifications({}, false, error.message);
+      } catch (notificationError: any) {
+        logger.debug('Failed to send failure notifications', {
+          error: notificationError.message
+        });
+      }
     } finally {
       this.instanceIsRunning.set(instanceKey, false);
       const taskInfo = this.instanceTasks.get(instanceKey);

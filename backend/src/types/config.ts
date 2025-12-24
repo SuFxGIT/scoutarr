@@ -2,6 +2,8 @@ export interface NotificationConfig {
   discordWebhook: string;
   notifiarrPassthroughWebhook: string;
   notifiarrPassthroughDiscordChannelId: string;
+  pushoverUserKey: string;
+  pushoverApiToken: string;
 }
 
 export interface RadarrInstance {

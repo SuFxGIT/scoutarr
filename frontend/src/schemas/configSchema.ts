@@ -120,6 +120,8 @@ export const notificationConfigSchema = z.object({
   discordWebhook: z.string().url('Invalid Discord webhook URL').or(z.literal('')),
   notifiarrPassthroughWebhook: z.string().url('Invalid webhook URL').or(z.literal('')),
   notifiarrPassthroughDiscordChannelId: z.string(),
+  pushoverUserKey: z.string(),
+  pushoverApiToken: z.string(),
 });
 
 export const schedulerConfigSchema = z.object({

@@ -908,6 +908,26 @@ function Settings() {
                     />
                   </Tooltip>
                 </Flex>
+
+                <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Pushover User Key (optional)</Text>
+                  <Tooltip content="Your Pushover user key for notifications. Leave empty to disable.">
+                    <TextField.Root
+                      value={config.notifications.pushoverUserKey}
+                      onChange={(e) => updateNotificationConfig('pushoverUserKey', e.target.value)}
+                    />
+                  </Tooltip>
+                </Flex>
+
+                <Flex direction="column" gap="1">
+                  <Text size="2" weight="medium">Pushover API Token (optional)</Text>
+                  <Tooltip content="Your Pushover application API token. Required if a Pushover user key is set.">
+                    <TextField.Root
+                      value={config.notifications.pushoverApiToken}
+                      onChange={(e) => updateNotificationConfig('pushoverApiToken', e.target.value)}
+                    />
+                  </Tooltip>
+                </Flex>
               </Flex>
             </Card>
           </Tabs.Content>

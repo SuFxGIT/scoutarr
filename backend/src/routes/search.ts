@@ -6,6 +6,7 @@ import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
+import { notificationService } from '../services/notificationService.js';
 import logger from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES } from '../utils/starrUtils.js';
 
@@ -423,6 +424,15 @@ searchRouter.post('/run', async (req, res) => {
       });
     }
 
+    // Send notifications
+    try {
+      await notificationService.sendNotifications(results, true);
+    } catch (notificationError: any) {
+      logger.debug('Failed to send notifications', {
+        error: notificationError.message
+      });
+    }
+
     res.json(results);
   } catch (error: any) {
     logger.error('❌ Search operation failed', {
@@ -443,6 +453,16 @@ searchRouter.post('/run', async (req, res) => {
         error: historyError.message
       });
     }
+
+    // Send failure notifications
+    try {
+      await notificationService.sendNotifications({}, false, error.message);
+    } catch (notificationError: any) {
+      logger.debug('Failed to send failure notifications', {
+        error: notificationError.message
+      });
+    }
+
     res.status(500).json({ error: error.message });
   }
 });

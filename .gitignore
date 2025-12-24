@@ -24,7 +24,6 @@ Thumbs.db
 
 # Config (user-specific)
 config/config.json
-config/stats.json
 config/stats.db
 
 # Data

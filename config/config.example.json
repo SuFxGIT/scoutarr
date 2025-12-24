@@ -2,7 +2,9 @@
   "notifications": {
     "discordWebhook": "",
     "notifiarrPassthroughWebhook": "",
-    "notifiarrPassthroughDiscordChannelId": ""
+    "notifiarrPassthroughDiscordChannelId": "",
+    "pushoverUserKey": "",
+    "pushoverApiToken": ""
   },
   "applications": {
     "radarr": [],
