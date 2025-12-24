@@ -6,6 +6,12 @@ export const MAX_INSTANCES_PER_APP = 4;
 export const REFETCH_INTERVAL = 10000; // 10 seconds
 
 /**
+ * Supported application types
+ */
+export const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
+export type AppType = typeof APP_TYPES[number];
+
+/**
  * Cron expression presets
  */
 export const CRON_PRESETS: Record<string, string> = {

@@ -18,7 +18,7 @@ import ReactPaginate from 'react-paginate';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
-import { ITEMS_PER_PAGE, REFETCH_INTERVAL } from '../utils/constants';
+import { ITEMS_PER_PAGE, REFETCH_INTERVAL, APP_TYPES } from '../utils/constants';
 
 interface SearchResults {
   [key: string]: {
@@ -28,6 +28,9 @@ interface SearchResults {
     total?: number;
     movies?: Array<{ id: number; title: string }>;
     series?: Array<{ id: number; title: string }>;
+    artists?: Array<{ id: number; title: string }>;
+    authors?: Array<{ id: number; title: string }>;
+    items?: Array<{ id: number; title: string }>;
     error?: string;
   };
 }
@@ -323,31 +326,27 @@ function Dashboard() {
             const appName = formatAppName(app);
             const searched = result.searched || 0;
             
+            // Determine media type and plural name
+            const mediaType = result.movies ? 'movies' : result.artists ? 'artists' : result.authors ? 'authors' : 'series';
+            const mediaTypeSingular = mediaType === 'movies' ? 'movie' : mediaType === 'artists' ? 'artist' : mediaType === 'authors' ? 'author' : 'series';
+            
             // Show triggered action
             logs.push({
               timestamp,
               app,
-              message: `${appName}: Triggered search for ${searched} ${result.movies ? 'movies' : 'series'}`,
+              message: `${appName}: Triggered search for ${searched} ${mediaType}`,
               type: 'success'
             });
             
-            // Show searched items
-            if (result.movies && result.movies.length > 0) {
-              result.movies.forEach((movie: any) => {
+            // Show searched items (check all possible media type keys)
+            const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+            if (items.length > 0) {
+              items.forEach((item: any) => {
+                const itemLabel = mediaType === 'movies' ? 'Movie' : mediaType === 'artists' ? 'Artist' : mediaType === 'authors' ? 'Author' : 'Series';
                 logs.push({
                   timestamp,
                   app,
-                  message: `  → Movie: ${movie.title}`,
-                  type: 'info'
-                });
-              });
-            }
-            if (result.series && result.series.length > 0) {
-              result.series.forEach((series: any) => {
-                logs.push({
-                  timestamp,
-                  app,
-                  message: `  → Series: ${series.title}`,
+                  message: `  → ${itemLabel}: ${item.title}`,
                   type: 'info'
                 });
               });
@@ -485,11 +484,10 @@ function Dashboard() {
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
               {(() => {
                 // Group status entries by app type
-                const appTypes = ['radarr', 'sonarr', 'lidarr', 'readarr'];
                 const groupedStatus: Record<string, { connected: number; total: number; configured: boolean }> = {};
                 
                 // Initialize all app types
-                appTypes.forEach(appType => {
+                APP_TYPES.forEach(appType => {
                   groupedStatus[appType] = { connected: 0, total: 0, configured: true };
                 });
                 
@@ -498,7 +496,7 @@ function Dashboard() {
                   if (key === 'scheduler') return;
                   
                   // Check if it's an app type directly (for backward compatibility or "not configured" case)
-                  if (appTypes.includes(key)) {
+                  if (APP_TYPES.includes(key as any)) {
                     if (status.configured === false) {
                       groupedStatus[key].configured = false;
                     }
@@ -507,7 +505,7 @@ function Dashboard() {
                   
                   // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
                   const appType = key.split('-')[0];
-                  if (appTypes.includes(appType)) {
+                  if (APP_TYPES.includes(appType as any)) {
                     groupedStatus[appType].total++;
                     if (status.connected) {
                       groupedStatus[appType].connected++;
@@ -517,7 +515,7 @@ function Dashboard() {
                 });
                 
                 // Generate badges for each app type
-                return appTypes.map(appType => {
+                return APP_TYPES.map(appType => {
                   const stats = groupedStatus[appType];
                   const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
                   let statusMessage = '';

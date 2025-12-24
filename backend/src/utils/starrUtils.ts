@@ -1,6 +1,32 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from './logger.js';
 
+// Supported application types
+export const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
+export type AppType = typeof APP_TYPES[number];
+
+/**
+ * Maps app type to media type key (for result objects)
+ * Examples: 'radarr' -> 'movies', 'lidarr' -> 'artists', 'readarr' -> 'authors', 'sonarr' -> 'series'
+ */
+export function getMediaTypeKey(appType: string): string {
+  switch (appType) {
+    case 'radarr': return 'movies';
+    case 'lidarr': return 'artists';
+    case 'readarr': return 'authors';
+    case 'sonarr':
+    default: return 'series';
+  }
+}
+
+/**
+ * Maps app type to media type name (for logging/display)
+ * Examples: 'radarr' -> 'movies', 'lidarr' -> 'artists', 'readarr' -> 'authors', 'sonarr' -> 'series'
+ */
+export function getMediaTypeName(appType: string): string {
+  return getMediaTypeKey(appType);
+}
+
 // Helper to get configured instances for an app (filters out disabled or incomplete configs)
 export function getConfiguredInstances<T extends { url: string; apiKey: string; enabled?: boolean }>(
   appConfigs: T[] | undefined

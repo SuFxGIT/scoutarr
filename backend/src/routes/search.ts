@@ -7,7 +7,7 @@ import { readarrService } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import logger from '../utils/logger.js';
-import { getConfiguredInstances } from '../utils/starrUtils.js';
+import { getConfiguredInstances, getMediaTypeKey, APP_TYPES } from '../utils/starrUtils.js';
 
 export const searchRouter = express.Router();
 
@@ -42,12 +42,20 @@ export function getInstanceInfo(config: any, appType: string): { instanceName: s
 
 // Helper to save stats for results
 export async function saveStatsForResults(results: Record<string, any>): Promise<void> {
+  
   for (const [app, result] of Object.entries(results)) {
     if (result.success && result.searched && result.searched > 0) {
-      const items = result.movies || result.series || result.items || [];
-      const instanceKey = app.includes('-') && app !== 'radarr' && app !== 'sonarr' ? app : undefined;
+      // Extract app type from result key (could be "radarr" or "radarr-instance-id")
+      const appType = app.split('-')[0];
+      
+      // Get items - check all possible media type keys
+      const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+      
+      // Instance key is the full app key if it contains a dash (instance ID) and is a valid app type
+      const instanceKey = app.includes('-') && APP_TYPES.includes(appType as any) ? app : undefined;
+      
       await statsService.addUpgrade(
-        app.split('-')[0],
+        appType,
         result.searched,
         items,
         instanceKey
@@ -154,9 +162,41 @@ async function processAppInstances<T>(
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
-      [appType === 'radarr' ? 'movies' : appType === 'lidarr' ? 'artists' : appType === 'readarr' ? 'authors' : 'series']: result.items,
+      [getMediaTypeKey(appType)]: result.items,
       instanceName
     };
+  }
+}
+
+// Helper to get processor creator and instances for an app type
+function getProcessorAndInstances(appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): {
+  instances: any[];
+  processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
+} {
+  const config = configService.getConfig();
+  
+  if (appType === 'radarr') {
+    return {
+      instances: getConfiguredInstances(config.applications.radarr),
+      processor: createRadarrProcessor
+    };
+  } else if (appType === 'sonarr') {
+    return {
+      instances: getConfiguredInstances(config.applications.sonarr),
+      processor: createSonarrProcessor
+    };
+  } else if (appType === 'lidarr') {
+    return {
+      instances: getConfiguredInstances(config.applications.lidarr),
+      processor: createLidarrProcessor
+    };
+  } else if (appType === 'readarr') {
+    return {
+      instances: getConfiguredInstances(config.applications.readarr),
+      processor: createReadarrProcessor
+    };
+  } else {
+    throw new Error(`Unknown app type: ${appType}`);
   }
 }
 
@@ -198,25 +238,8 @@ export async function executeSearchRunForInstance(appType: 'radarr' | 'sonarr' |
   // Use scheduler's unattended mode setting (per-instance scheduling still uses global unattended mode)
   const unattended = config.scheduler?.unattended || false;
 
-  // Find the specific instance
-  let instances: any[];
-  let processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
-  
-  if (appType === 'radarr') {
-    instances = getConfiguredInstances(config.applications.radarr);
-    processor = createRadarrProcessor;
-  } else if (appType === 'sonarr') {
-    instances = getConfiguredInstances(config.applications.sonarr);
-    processor = createSonarrProcessor;
-  } else if (appType === 'lidarr') {
-    instances = getConfiguredInstances(config.applications.lidarr);
-    processor = createLidarrProcessor;
-  } else if (appType === 'readarr') {
-    instances = getConfiguredInstances(config.applications.readarr);
-    processor = createReadarrProcessor;
-  } else {
-    throw new Error(`Unknown app type: ${appType}`);
-  }
+  // Get processor and instances for the app type
+  const { instances, processor } = getProcessorAndInstances(appType);
   
   const instance = instances.find(inst => inst.id === instanceId);
   if (!instance) {
@@ -511,7 +534,7 @@ async function processManualRunInstances(
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
-      [appType === 'radarr' ? 'movies' : appType === 'lidarr' ? 'artists' : appType === 'readarr' ? 'authors' : 'series']: result.items,
+      [getMediaTypeKey(appType)]: result.items,
       instanceName
     };
   }

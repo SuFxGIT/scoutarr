@@ -2,7 +2,9 @@ import express from 'express';
 import { configService } from '../services/configService.js';
 import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
-import { testStarrConnection, createStarrClient } from '../utils/starrUtils.js';
+import { lidarrService } from '../services/lidarrService.js';
+import { readarrService } from '../services/readarrService.js';
+import { testStarrConnection, createStarrClient, getMediaTypeName } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const configRouter = express.Router();
@@ -145,21 +147,34 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: 'Tag name not configured for this instance' });
     }
 
-    // Get tag ID
-    const tagId = app === 'radarr' 
-      ? await radarrService.getTagId(instanceConfig, instanceConfig.tagName)
-      : await sonarrService.getTagId(instanceConfig, instanceConfig.tagName);
+    // Get tag ID based on app type
+    let tagId: number | null;
+    if (app === 'radarr') {
+      tagId = await radarrService.getTagId(instanceConfig, instanceConfig.tagName);
+    } else if (app === 'sonarr') {
+      tagId = await sonarrService.getTagId(instanceConfig, instanceConfig.tagName);
+    } else if (app === 'lidarr') {
+      tagId = await lidarrService.getTagId(instanceConfig, instanceConfig.tagName);
+    } else if (app === 'readarr') {
+      tagId = await readarrService.getTagId(instanceConfig, instanceConfig.tagName);
+    } else {
+      return res.status(400).json({ error: `Unsupported app type: ${app}` });
+    }
 
     if (tagId === null) {
       return res.json({ success: true, message: 'Tag does not exist, nothing to clear' });
     }
 
-    // Get all media
+    // Get all media based on app type
     let allMedia: any[] = [];
     if (app === 'radarr') {
       allMedia = await radarrService.getMovies(instanceConfig);
-    } else {
+    } else if (app === 'sonarr') {
       allMedia = await sonarrService.getSeries(instanceConfig);
+    } else if (app === 'lidarr') {
+      allMedia = await lidarrService.getArtists(instanceConfig);
+    } else if (app === 'readarr') {
+      allMedia = await readarrService.getAuthors(instanceConfig);
     }
 
     // Filter media that has the tag
@@ -172,17 +187,24 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     // Get media IDs
     const mediaIds = mediaWithTag.map((m: any) => m.id);
 
-    // Remove tag from all media
+    // Remove tag from all media based on app type
     if (app === 'radarr') {
       await radarrService.removeTagFromMovies(instanceConfig, mediaIds, tagId);
-    } else {
+    } else if (app === 'sonarr') {
       await sonarrService.removeTagFromSeries(instanceConfig, mediaIds, tagId);
+    } else if (app === 'lidarr') {
+      await lidarrService.removeTagFromArtists(instanceConfig, mediaIds, tagId);
+    } else if (app === 'readarr') {
+      await readarrService.removeTagFromAuthors(instanceConfig, mediaIds, tagId);
     }
 
-    logger.info(`✅ Cleared tag from ${mediaIds.length} ${app === 'radarr' ? 'movies' : 'series'}`);
+    // Get media type name for logging
+    const mediaTypeName = getMediaTypeName(app);
+
+    logger.info(`✅ Cleared tag from ${mediaIds.length} ${mediaTypeName}`);
     res.json({ 
       success: true, 
-      message: `Cleared tag from ${mediaIds.length} ${app === 'radarr' ? 'movies' : 'series'}`,
+      message: `Cleared tag from ${mediaIds.length} ${mediaTypeName}`,
       count: mediaIds.length
     });
   } catch (error: any) {
