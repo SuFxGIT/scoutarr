@@ -483,47 +483,71 @@ function Dashboard() {
         <Card style={{ padding: '0.5rem' }}>
           <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
-              {Object.entries(connectionStatus)
-                .filter(([app]) => app !== 'scheduler') // Exclude scheduler from connection status
-                .map(([app, status]: [string, any]) => {
-                  // Format display name - handle instance IDs
-                  let displayName = app;
-                  if (app.includes('-') && app !== 'radarr' && app !== 'sonarr') {
-                    // It's an instance ID, use instanceName from status or construct from app type
-                    if (status.instanceName) {
-                      displayName = status.instanceName;
-                    } else {
-                      // Extract app type from ID (e.g., "sonarr-1766427071907" -> "Sonarr")
-                      const appType = app.split('-')[0];
-                      const instanceNum = status.instanceId || app.split('-').slice(1)[0]?.substring(0, 1) || '1';
-                      displayName = `${appType.charAt(0).toUpperCase() + appType.slice(1)} ${instanceNum}`;
+              {(() => {
+                // Group status entries by app type
+                const appTypes = ['radarr', 'sonarr', 'lidarr', 'readarr'];
+                const groupedStatus: Record<string, { connected: number; total: number; configured: boolean }> = {};
+                
+                // Initialize all app types
+                appTypes.forEach(appType => {
+                  groupedStatus[appType] = { connected: 0, total: 0, configured: true };
+                });
+                
+                // Process connection status entries
+                Object.entries(connectionStatus).forEach(([key, status]: [string, any]) => {
+                  if (key === 'scheduler') return;
+                  
+                  // Check if it's an app type directly (for backward compatibility or "not configured" case)
+                  if (appTypes.includes(key)) {
+                    if (status.configured === false) {
+                      groupedStatus[key].configured = false;
                     }
-                  } else {
-                    displayName = app.charAt(0).toUpperCase() + app.slice(1);
+                    return;
                   }
                   
-                  // Determine status message
-                  let statusMessage = 'Disconnected';
+                  // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
+                  const appType = key.split('-')[0];
+                  if (appTypes.includes(appType)) {
+                    groupedStatus[appType].total++;
+                    if (status.connected) {
+                      groupedStatus[appType].connected++;
+                    }
+                    groupedStatus[appType].configured = true; // Has at least one instance configured
+                  }
+                });
+                
+                // Generate badges for each app type
+                return appTypes.map(appType => {
+                  const stats = groupedStatus[appType];
+                  const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
+                  let statusMessage = '';
                   let badgeColor: 'green' | 'gray' | 'red' = 'red';
                   
-                  if (status.connected) {
-                    statusMessage = 'Connected';
+                  if (!stats.configured) {
+                    statusMessage = 'Not Configured';
+                    badgeColor = 'gray';
+                  } else if (stats.connected > 0) {
+                    statusMessage = `${stats.connected} Instance${stats.connected === 1 ? '' : 's'} connected`;
                     badgeColor = 'green';
-                  } else if (status.configured === false) {
+                  } else if (stats.total > 0) {
+                    statusMessage = `${stats.total} Instance${stats.total === 1 ? '' : 's'} disconnected`;
+                    badgeColor = 'red';
+                  } else {
                     statusMessage = 'Not Configured';
                     badgeColor = 'gray';
                   }
                   
                   return (
                     <Badge 
-                      key={app} 
+                      key={appType} 
                       color={badgeColor}
                       size="2"
                     >
-                      {displayName}: {statusMessage}
+                      {appName}: {statusMessage}
                     </Badge>
                   );
-                })}
+                });
+              })()}
             </Flex>
             <Flex>
               <Tooltip content="Reset all statistics and recent triggers.">
