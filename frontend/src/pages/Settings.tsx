@@ -17,7 +17,7 @@ import {
   Tooltip
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
@@ -661,7 +661,7 @@ function Settings() {
           <Callout.Root color="blue" size="1">
             <Flex align="center" justify="between" gap="2">
               <Callout.Text>
-                <Text size="1">💡 Hover over input fields to see descriptions and hints</Text>
+                <Text size="1">💡 Hover over the question mark icons next to field labels to see descriptions and hints</Text>
               </Callout.Text>
               <button
                 type="button"
@@ -846,163 +846,196 @@ function Settings() {
                           <Collapsible.Content style={{ overflow: 'hidden' }}>
                             <Flex direction="column" gap="3" p="3" pt="2">
                               <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Enable Instance</Text>
-                                <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
-                                  <span>
-                                    <Switch
-                                      checked={instance.enabled !== false}
-                                      onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
-                                    />
-                                  </span>
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Enable Instance</Text>
+                                  <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <Switch
+                                  checked={instance.enabled !== false}
+                                  onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
+                                />
                               </Flex>
                               <Separator />
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Name (optional)</Text>
-                                <Tooltip content={`A friendly name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Leave empty to use default ID.`}>
-                                  <TextField.Root
-                                    value={instance.name || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
-                                    placeholder={`${appInfo.name} ${instance.instanceId || idx + 1}`}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Name (optional)</Text>
+                                  <Tooltip content={`A friendly name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Leave empty to use default ID.`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  value={instance.name || ''}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
+                                  placeholder={`${appInfo.name} ${instance.instanceId || idx + 1}`}
+                                />
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">{appInfo.name} URL</Text>
-                                <Tooltip content={`The base URL where your ${appInfo.name} instance is accessible (e.g., http://localhost:${appInfo.defaultPort} or https://${selectedAppType}.example.com)`}>
-                                  <TextField.Root
-                                    placeholder={`http://localhost:${appInfo.defaultPort}`}
-                                    value={instance.url || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">{appInfo.name} URL</Text>
+                                  <Tooltip content={`The base URL where your ${appInfo.name} instance is accessible (e.g., http://localhost:${appInfo.defaultPort} or https://${selectedAppType}.example.com)`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  placeholder={`http://localhost:${appInfo.defaultPort}`}
+                                  value={instance.url || ''}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
+                                />
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">API Key</Text>
-                                <Tooltip content={`Your ${appInfo.name} API key found in Settings → General → Security → API Key (must be 32 characters)`}>
-                                  <TextField.Root
-                                    type="password"
-                                    placeholder="API Key"
-                                    value={instance.apiKey || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">API Key</Text>
+                                  <Tooltip content={`Your ${appInfo.name} API key found in Settings → General → Security → API Key (must be 32 characters)`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  type="password"
+                                  placeholder="API Key"
+                                  value={instance.apiKey || ''}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
+                                />
                               </Flex>
 
                               {renderTestButton(selectedAppType, instance.id)}
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Number of {appInfo.mediaTypePlural.charAt(0).toUpperCase() + appInfo.mediaTypePlural.slice(1)} to Search</Text>
-                                <Tooltip content={`How many ${appInfo.mediaTypePlural} to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching ${appInfo.mediaTypePlural}.`}>
-                                  <TextField.Root
-                                    type="number"
-                                    value={(instance.count || 5).toString()}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Number of {appInfo.mediaTypePlural.charAt(0).toUpperCase() + appInfo.mediaTypePlural.slice(1)} to Search</Text>
+                                  <Tooltip content={`How many ${appInfo.mediaTypePlural} to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching ${appInfo.mediaTypePlural}.`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  type="number"
+                                  value={(instance.count || 5).toString()}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
+                                />
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Tag Name (optional)</Text>
-                                <Tooltip content={`The tag name to use for tracking which ${appInfo.mediaTypePlural} have been searched. This tag will be created automatically if it doesn't exist.`}>
-                                  <TextField.Root
-                                    value={instance.tagName || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Tag Name (optional)</Text>
+                                  <Tooltip content={`The tag name to use for tracking which ${appInfo.mediaTypePlural} have been searched. This tag will be created automatically if it doesn't exist.`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  value={instance.tagName || ''}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
+                                />
                               </Flex>
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Ignore Tag (optional)</Text>
-                                <Tooltip content={`${appInfo.mediaType} with this tag will be excluded from upgrade searches. Leave empty to include all ${appInfo.mediaTypePlural} matching other criteria.`}>
-                                  <TextField.Root
-                                    value={instance.ignoreTag || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
-                                  />
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Ignore Tag (optional)</Text>
+                                  <Tooltip content={`${appInfo.mediaType} with this tag will be excluded from upgrade searches. Leave empty to include all ${appInfo.mediaTypePlural} matching other criteria.`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <TextField.Root
+                                  value={instance.ignoreTag || ''}
+                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
+                                />
                               </Flex>
 
                               <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Search Monitored {appInfo.mediaType} Only</Text>
-                                <Tooltip content={`When enabled, only ${appInfo.mediaTypePlural} that are currently monitored will be considered for upgrades.`}>
-                                  <span>
-                                    <Switch
-                                      checked={instance.monitored ?? true}
-                                      onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
-                                    />
-                                  </span>
-                                </Tooltip>
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Search Monitored {appInfo.mediaType} Only</Text>
+                                  <Tooltip content={`When enabled, only ${appInfo.mediaTypePlural} that are currently monitored will be considered for upgrades.`}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <Switch
+                                  checked={instance.monitored ?? true}
+                                  onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
+                                />
                               </Flex>
 
                               {selectedAppType === 'radarr' && (
                                 <Flex direction="column" gap="2">
-                                  <Text size="2" weight="medium">Movie Status</Text>
-                                  <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
-                                    <Select.Root
-                                      value={instance.movieStatus || 'any'}
-                                      onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
-                                    >
-                                      <Select.Trigger />
-                                      <Select.Content position="popper" sideOffset={5}>
-                                        <Select.Item value="any">Any</Select.Item>
-                                        <Select.Item value="announced">Announced</Select.Item>
-                                        <Select.Item value="in cinemas">In Cinemas</Select.Item>
-                                        <Select.Item value="released">Released</Select.Item>
-                                      </Select.Content>
-                                    </Select.Root>
-                                  </Tooltip>
+                                  <Flex align="center" gap="1">
+                                    <Text size="2" weight="medium">Movie Status</Text>
+                                    <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
+                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                    </Tooltip>
+                                  </Flex>
+                                  <Select.Root
+                                    value={instance.movieStatus || 'any'}
+                                    onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
+                                  >
+                                    <Select.Trigger />
+                                    <Select.Content position="popper" sideOffset={5}>
+                                      <Select.Item value="any">Any</Select.Item>
+                                      <Select.Item value="announced">Announced</Select.Item>
+                                      <Select.Item value="in cinemas">In Cinemas</Select.Item>
+                                      <Select.Item value="released">Released</Select.Item>
+                                    </Select.Content>
+                                  </Select.Root>
                                 </Flex>
                               )}
                               
                               {selectedAppType === 'sonarr' && (
                                 <Flex direction="column" gap="2">
-                                  <Text size="2" weight="medium">Series Status</Text>
-                                  <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
-                                    <Select.Root
-                                      value={instance.seriesStatus || 'any'}
-                                      onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
-                                    >
-                                      <Select.Trigger />
-                                      <Select.Content position="popper" sideOffset={5}>
-                                        <Select.Item value="any">Any</Select.Item>
-                                        <Select.Item value="continuing">Continuing</Select.Item>
-                                        <Select.Item value="upcoming">Upcoming</Select.Item>
-                                        <Select.Item value="ended">Ended</Select.Item>
-                                      </Select.Content>
-                                    </Select.Root>
-                                  </Tooltip>
+                                  <Flex align="center" gap="1">
+                                    <Text size="2" weight="medium">Series Status</Text>
+                                    <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
+                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                    </Tooltip>
+                                  </Flex>
+                                  <Select.Root
+                                    value={instance.seriesStatus || 'any'}
+                                    onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
+                                  >
+                                    <Select.Trigger />
+                                    <Select.Content position="popper" sideOffset={5}>
+                                      <Select.Item value="any">Any</Select.Item>
+                                      <Select.Item value="continuing">Continuing</Select.Item>
+                                      <Select.Item value="upcoming">Upcoming</Select.Item>
+                                      <Select.Item value="ended">Ended</Select.Item>
+                                    </Select.Content>
+                                  </Select.Root>
                                 </Flex>
                               )}
 
                               {(selectedAppType === 'lidarr' || selectedAppType === 'readarr') && (
                                 <Flex direction="column" gap="2">
-                                  <Text size="2" weight="medium">{appInfo.mediaType} Status</Text>
-                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} with this status will be considered for upgrades. Leave as 'Any' to include all statuses.`}>
-                                    <Select.Root
-                                      value={selectedAppType === 'lidarr' ? (instance.artistStatus || 'any') : (instance.authorStatus || 'any')}
-                                      onValueChange={(value) => {
-                                        const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
-                                        updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);
-                                      }}
-                                    >
-                                      <Select.Trigger />
-                                      <Select.Content position="popper" sideOffset={5}>
-                                        <Select.Item value="any">Any</Select.Item>
-                                        <Select.Item value="continuing">Continuing</Select.Item>
-                                        <Select.Item value="ended">Ended</Select.Item>
-                                      </Select.Content>
-                                    </Select.Root>
-                                  </Tooltip>
+                                  <Flex align="center" gap="1">
+                                    <Text size="2" weight="medium">{appInfo.mediaType} Status</Text>
+                                    <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} with this status will be considered for upgrades. Leave as 'Any' to include all statuses.`}>
+                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                    </Tooltip>
+                                  </Flex>
+                                  <Select.Root
+                                    value={selectedAppType === 'lidarr' ? (instance.artistStatus || 'any') : (instance.authorStatus || 'any')}
+                                    onValueChange={(value) => {
+                                      const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
+                                      updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);
+                                    }}
+                                  >
+                                    <Select.Trigger />
+                                    <Select.Content position="popper" sideOffset={5}>
+                                      <Select.Item value="any">Any</Select.Item>
+                                      <Select.Item value="continuing">Continuing</Select.Item>
+                                      <Select.Item value="ended">Ended</Select.Item>
+                                    </Select.Content>
+                                  </Select.Root>
                                 </Flex>
                               )}
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Quality Profile (optional)</Text>
-                                <Flex gap="2" align="center">
+                                <Flex align="center" gap="1">
+                                  <Text size="2" weight="medium">Quality Profile (optional)</Text>
                                   <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Leave empty to include all quality profiles.`}>
-                                    <div style={{ flex: 1 }}>
+                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                                  </Tooltip>
+                                </Flex>
+                                <Flex gap="2" align="center">
+                                  <div style={{ flex: 1 }}>
                                       {(() => {
                                         const profileKey = `${selectedAppType}-${instance.id}`;
                                         const profiles = qualityProfiles[profileKey] || [];
@@ -1054,7 +1087,6 @@ function Settings() {
                                         );
                                       })()}
                                     </div>
-                                  </Tooltip>
                                   {(() => {
                                     const profileKey = `${selectedAppType}-${instance.id}`;
                                     const isLoading = loadingProfiles[profileKey];
@@ -1160,53 +1192,68 @@ function Settings() {
                 <Separator />
 
                 <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Discord Webhook URL (optional)</Text>
-                  <Tooltip content="Webhook URL where Discord notifications will be sent. Leave empty to disable.">
-                    <TextField.Root
-                      value={config.notifications.discordWebhook}
-                      onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
-                    />
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Discord Webhook URL (optional)</Text>
+                    <Tooltip content="Webhook URL where Discord notifications will be sent. Leave empty to disable.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    value={config.notifications.discordWebhook}
+                    onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
+                  />
                 </Flex>
 
                 <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Notifiarr Passthrough Webhook (optional)</Text>
-                  <Tooltip content="Notifiarr passthrough webhook for notifications. Leave empty to disable.">
-                    <TextField.Root
-                      value={config.notifications.notifiarrPassthroughWebhook}
-                      onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
-                    />
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Notifiarr Passthrough Webhook (optional)</Text>
+                    <Tooltip content="Notifiarr passthrough webhook for notifications. Leave empty to disable.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    value={config.notifications.notifiarrPassthroughWebhook}
+                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
+                  />
                 </Flex>
 
                 <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Notifiarr Discord Channel ID (optional)</Text>
-                  <Tooltip content="Discord channel ID for Notifiarr notifications (17–19 digits). Required if a Notifiarr webhook is set.">
-                    <TextField.Root
-                      value={config.notifications.notifiarrPassthroughDiscordChannelId}
-                      onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
-                    />
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Notifiarr Discord Channel ID (optional)</Text>
+                    <Tooltip content="Discord channel ID for Notifiarr notifications (17–19 digits). Required if a Notifiarr webhook is set.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    value={config.notifications.notifiarrPassthroughDiscordChannelId}
+                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
+                  />
                 </Flex>
 
                 <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Pushover User Key (optional)</Text>
-                  <Tooltip content="Your Pushover user key for notifications. Leave empty to disable.">
-                    <TextField.Root
-                      value={config.notifications.pushoverUserKey}
-                      onChange={(e) => updateNotificationConfig('pushoverUserKey', e.target.value)}
-                    />
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Pushover User Key (optional)</Text>
+                    <Tooltip content="Your Pushover user key for notifications. Leave empty to disable.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    value={config.notifications.pushoverUserKey}
+                    onChange={(e) => updateNotificationConfig('pushoverUserKey', e.target.value)}
+                  />
                 </Flex>
 
                 <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Pushover API Token (optional)</Text>
-                  <Tooltip content="Your Pushover application API token. Required if a Pushover user key is set.">
-                    <TextField.Root
-                      value={config.notifications.pushoverApiToken}
-                      onChange={(e) => updateNotificationConfig('pushoverApiToken', e.target.value)}
-                    />
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Pushover API Token (optional)</Text>
+                    <Tooltip content="Your Pushover application API token. Required if a Pushover user key is set.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    value={config.notifications.pushoverApiToken}
+                    onChange={(e) => updateNotificationConfig('pushoverApiToken', e.target.value)}
+                  />
                 </Flex>
               </Flex>
             </Card>
@@ -1219,51 +1266,53 @@ function Settings() {
                 <Separator />
 
                 <Flex direction="row" align="center" justify="between" gap="2">
-                  <Text size="2" weight="medium">Enable Scheduler</Text>
-                  <Tooltip content="When enabled, searches will run automatically according to the schedule below.">
-                    <span>
-                      <Switch
-                        checked={config.scheduler?.enabled || false}
-                        onCheckedChange={(checked) => {
-                          if (!config.scheduler) {
-                            setConfig({
-                              ...config,
-                              scheduler: { enabled: checked, schedule: '0 */6 * * *', unattended: false }
-                            });
-                          } else {
-                            setConfig({
-                              ...config,
-                              scheduler: { ...config.scheduler, enabled: checked }
-                            });
-                          }
-                        }}
-                      />
-                    </span>
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Enable Scheduler</Text>
+                    <Tooltip content="When enabled, searches will run automatically according to the schedule below.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <Switch
+                    checked={config.scheduler?.enabled || false}
+                    onCheckedChange={(checked) => {
+                      if (!config.scheduler) {
+                        setConfig({
+                          ...config,
+                          scheduler: { enabled: checked, schedule: '0 */6 * * *', unattended: false }
+                        });
+                      } else {
+                        setConfig({
+                          ...config,
+                          scheduler: { ...config.scheduler, enabled: checked }
+                        });
+                      }
+                    }}
+                  />
                 </Flex>
 
                 <Flex direction="row" align="center" justify="between" gap="2">
-                  <Text size="2" weight="medium">Unattended Mode</Text>
-                  <Tooltip content="When enabled, the scheduler will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation without manual intervention.">
-                    <span>
-                      <Switch
-                        checked={config.scheduler?.unattended || false}
-                        onCheckedChange={(checked) => {
-                          if (!config.scheduler) {
-                            setConfig({
-                              ...config,
-                              scheduler: { enabled: false, schedule: '0 */6 * * *', unattended: checked }
-                            });
-                          } else {
-                            setConfig({
-                              ...config,
-                              scheduler: { ...config.scheduler, unattended: checked }
-                            });
-                          }
-                        }}
-                      />
-                    </span>
-                  </Tooltip>
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Unattended Mode</Text>
+                    <Tooltip content="When enabled, the scheduler will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation without manual intervention.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <Switch
+                    checked={config.scheduler?.unattended || false}
+                    onCheckedChange={(checked) => {
+                      if (!config.scheduler) {
+                        setConfig({
+                          ...config,
+                          scheduler: { enabled: false, schedule: '0 */6 * * *', unattended: checked }
+                        });
+                      } else {
+                        setConfig({
+                          ...config,
+                          scheduler: { ...config.scheduler, unattended: checked }
+                        });
+                      }
+                    }}
+                  />
                 </Flex>
 
                 <Flex direction="column" gap="1">
