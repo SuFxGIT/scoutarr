@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { ITEMS_PER_PAGE, REFETCH_INTERVAL, APP_TYPES } from '../utils/constants';
+import { AppIcon } from '../components/icons/AppIcon';
 
 interface SearchResults {
   [key: string]: {
@@ -457,15 +458,26 @@ function Dashboard() {
             ) : (
               logs.map((log, idx) => (
                 <div key={idx} style={{ marginBottom: '0.25rem' }}>
-                  <Text 
-                    size="2" 
-                    style={{ 
-                      color: log.type === 'error' ? 'var(--red-9)' : log.type === 'success' ? 'var(--green-9)' : 'var(--gray-9)',
-                      whiteSpace: 'pre-wrap'
-                    }}
-                  >
-                    [{log.timestamp}] {formatAppName(log.app)}: {log.message}
-                  </Text>
+                  <Flex align="center" gap="1" wrap="wrap">
+                    <Text 
+                      size="2" 
+                      style={{ 
+                        color: log.type === 'error' ? 'var(--red-9)' : log.type === 'success' ? 'var(--green-9)' : 'var(--gray-9)',
+                      }}
+                    >
+                      [{log.timestamp}]
+                    </Text>
+                    <AppIcon app={log.app} size={12} variant="light" />
+                    <Text 
+                      size="2" 
+                      style={{ 
+                        color: log.type === 'error' ? 'var(--red-9)' : log.type === 'success' ? 'var(--green-9)' : 'var(--gray-9)',
+                        whiteSpace: 'pre-wrap'
+                      }}
+                    >
+                      {formatAppName(log.app)}: {log.message}
+                    </Text>
+                  </Flex>
                 </div>
               ))
             )}
@@ -540,7 +552,10 @@ function Dashboard() {
                       color={badgeColor}
                       size="2"
                     >
-                      {appName}: {statusMessage}
+                      <Flex align="center" gap="1">
+                        <AppIcon app={appType} size={14} variant="light" />
+                        {appName}: {statusMessage}
+                      </Flex>
                     </Badge>
                   );
                 });
@@ -602,13 +617,19 @@ function Dashboard() {
                 <Flex gap="3" wrap="wrap" justify="center">
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Lidarr</Text>
+                      <Flex align="center" gap="2">
+                        <AppIcon app="lidarr" size={20} variant="light" />
+                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Lidarr</Text>
+                      </Flex>
                       <Heading size="7" style={{ textAlign: 'center' }}>{lidarrTotal}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Radarr</Text>
+                      <Flex align="center" gap="2">
+                        <AppIcon app="radarr" size={20} variant="light" />
+                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Radarr</Text>
+                      </Flex>
                       <Heading size="7" style={{ textAlign: 'center' }}>{radarrTotal}</Heading>
                     </Flex>
                   </Card>
@@ -620,13 +641,19 @@ function Dashboard() {
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Sonarr</Text>
+                      <Flex align="center" gap="2">
+                        <AppIcon app="sonarr" size={20} variant="light" />
+                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Sonarr</Text>
+                      </Flex>
                       <Heading size="7" style={{ textAlign: 'center' }}>{sonarrTotal}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Readarr</Text>
+                      <Flex align="center" gap="2">
+                        <AppIcon app="readarr" size={20} variant="light" />
+                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Readarr</Text>
+                      </Flex>
                       <Heading size="7" style={{ textAlign: 'center' }}>{readarrTotal}</Heading>
                     </Flex>
                   </Card>
@@ -691,6 +718,7 @@ function Dashboard() {
                             }}
                             onClick={() => setSelectedUpgrade(upgrade)}
                           >
+                            <AppIcon app={upgrade.application} size={16} variant="light" />
                             <Badge size="1" style={{ textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>
                               {appName}
                             </Badge>
