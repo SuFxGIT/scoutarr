@@ -44,19 +44,75 @@ export function createStarrClient(url: string, apiKey: string): AxiosInstance {
 }
 
 /**
- * Tests connection to a Starr application
+ * Tests connection to a Starr application and verifies the app type matches
+ * Returns an object with connection status, version info, and app name
  */
-export async function testStarrConnection(url: string, apiKey: string, appName: string): Promise<boolean> {
+export async function testStarrConnection(
+  url: string, 
+  apiKey: string, 
+  expectedApp: string
+): Promise<{ success: boolean; version?: string; appName?: string; error?: string }> {
   try {
     const client = createStarrClient(url, apiKey);
     // Lidarr and Readarr use v1 API, Radarr and Sonarr use v3
-    const apiVersion = appName.toLowerCase().includes('lidarr') || appName.toLowerCase().includes('readarr') ? 'v1' : 'v3';
-    await client.get(`/api/${apiVersion}/system/status`, { timeout: 5000 });
-    logger.debug(`✅ ${appName} connection test successful`, { url });
-    return true;
+    const apiVersion = expectedApp.toLowerCase().includes('lidarr') || expectedApp.toLowerCase().includes('readarr') ? 'v1' : 'v3';
+    
+    // Fetch system status to get app information
+    const response = await client.get<{
+      appName?: string;
+      version?: string;
+      instanceName?: string;
+      [key: string]: any;
+    }>(`/api/${apiVersion}/system/status`, { timeout: 5000 });
+    
+    const systemData = response.data;
+    const actualAppName = systemData.appName;
+    const version = systemData.version;
+    
+    // Verify the app name matches the expected app type
+    // Expected app names: "Radarr", "Sonarr", "Readarr", "Lidarr"
+    const expectedAppName = expectedApp.charAt(0).toUpperCase() + expectedApp.slice(1).toLowerCase();
+    
+    if (!actualAppName) {
+      logger.debug(`❌ ${expectedApp} connection test failed: No appName in response`, { url });
+      return {
+        success: false,
+        error: 'Unable to determine application type from server response'
+      };
+    }
+    
+    // Case-insensitive comparison
+    if (actualAppName.toLowerCase() !== expectedAppName.toLowerCase()) {
+      logger.debug(`❌ ${expectedApp} connection test failed: App mismatch`, { 
+        url, 
+        expected: expectedAppName, 
+        actual: actualAppName 
+      });
+      return {
+        success: false,
+        appName: actualAppName,
+        version,
+        error: `Application type mismatch: Expected ${expectedAppName}, but got ${actualAppName}`
+      };
+    }
+    
+    logger.debug(`✅ ${expectedApp} connection test successful`, { 
+      url, 
+      appName: actualAppName, 
+      version 
+    });
+    
+    return {
+      success: true,
+      appName: actualAppName,
+      version
+    };
   } catch (error: any) {
-    logger.debug(`❌ ${appName} connection test failed`, { url, error: error.message });
-    return false;
+    logger.debug(`❌ ${expectedApp} connection test failed`, { url, error: error.message });
+    return {
+      success: false,
+      error: error.message || 'Connection test failed'
+    };
   }
 }
 

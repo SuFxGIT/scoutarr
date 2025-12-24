@@ -90,27 +90,27 @@ configRouter.post('/test/:app', async (req, res) => {
     }
 
     // Test connection using utility function
-    const connected = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
+    const testResult = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
 
-    if (connected) {
-      // Get system status for additional info
-      try {
-        const client = createStarrClient(appConfig.url, appConfig.apiKey);
-        // Lidarr and Readarr use v1 API, Radarr and Sonarr use v3
-        const apiVersion = app.toLowerCase().includes('lidarr') || app.toLowerCase().includes('readarr') ? 'v1' : 'v3';
-        const response = await client.get(`/api/${apiVersion}/system/status`);
-        logger.info(`✅ Connection test successful for ${app}`, { url: appConfig.url });
-        res.json({ success: true, status: response.data });
-      } catch (error: any) {
-        // Connection works but status call failed
-        logger.info(`✅ Connection test successful for ${app}`, { url: appConfig.url });
-        res.json({ success: true });
-      }
+    if (testResult.success) {
+      logger.info(`✅ Connection test successful for ${app}`, { 
+        url: appConfig.url, 
+        appName: testResult.appName, 
+        version: testResult.version 
+      });
+      res.json({ 
+        success: true, 
+        appName: testResult.appName,
+        version: testResult.version
+      });
     } else {
-      logger.error(`❌ Connection test failed for ${app}`, { url: appConfig.url });
+      logger.error(`❌ Connection test failed for ${app}`, { 
+        url: appConfig.url, 
+        error: testResult.error 
+      });
       res.status(500).json({
         error: 'Connection test failed',
-        message: 'Unable to connect to application'
+        message: testResult.error || 'Unable to connect to application or application type mismatch'
       });
     }
   } catch (error: any) {

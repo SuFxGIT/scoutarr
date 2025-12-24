@@ -33,7 +33,7 @@ import { AppIcon } from '../components/icons/AppIcon';
 function Settings() {
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<Config | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean }>>({});
+  const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
   const [activeTab, setActiveTab] = useState<string>('applications');
   const [selectedAppType, setSelectedAppType] = useState<'radarr' | 'sonarr' | 'lidarr' | 'readarr'>('radarr');
@@ -395,10 +395,17 @@ function Settings() {
           )}
         </Button>
         {testResult?.status !== null && testResult?.status !== undefined && !testResult.testing && (
-          <Badge color={testResult.status ? 'green' : 'red'}>
-            {testResult.status ? <CheckIcon /> : <CrossCircledIcon />}
-            {testResult.status ? 'Connected' : 'Failed'}
-          </Badge>
+          <Flex gap="2" align="center">
+            <Badge color={testResult.status ? 'green' : 'red'}>
+              {testResult.status ? <CheckIcon /> : <CrossCircledIcon />}
+              {testResult.status ? 'Connected' : 'Failed'}
+            </Badge>
+            {testResult.status && testResult.version && (
+              <Text size="2" color="gray">
+                v{testResult.version}
+              </Text>
+            )}
+          </Flex>
         )}
         {!canTest && (
           <Text size="2" color="gray">
@@ -452,10 +459,16 @@ function Settings() {
       const success = response.data.success === true;
       setTestResults(prev => ({
         ...prev,
-        [key]: { status: success, testing: false }
+        [key]: { 
+          status: success, 
+          testing: false,
+          version: response.data.version,
+          appName: response.data.appName
+        }
       }));
       if (success) {
-        toast.success('Connection test successful');
+        const versionText = response.data.version ? ` (v${response.data.version})` : '';
+        toast.success(`Connection test successful${versionText}`);
       } else {
         toast.error('Connection test failed');
       }

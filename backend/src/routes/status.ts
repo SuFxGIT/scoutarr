@@ -15,21 +15,29 @@ statusRouter.get('/', async (req, res) => {
 
     // Helper to check application status
     const checkAppStatus = async (
-      appName: string,
-      appConfig: { url: string; apiKey: string }
+      appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
+      appConfig: { url: string; apiKey: string },
+      instanceName?: string
     ) => {
       // Check if configured (has URL and API key)
       const isConfigured = !!(appConfig.url && appConfig.apiKey);
       
       if (!isConfigured) {
-        logger.debug(`⚠️  ${appName} not configured (missing URL or API key)`);
+        const displayName = instanceName || appType;
+        logger.debug(`⚠️  ${displayName} not configured (missing URL or API key)`);
         return { connected: false, configured: false };
       }
       
-      // Test connection
-      const connected = await testStarrConnection(appConfig.url, appConfig.apiKey, appName);
+      // Test connection - pass appType (e.g., 'radarr') not instanceName
+      const testResult = await testStarrConnection(appConfig.url, appConfig.apiKey, appType);
       
-      return { connected, configured: true };
+      return { 
+        connected: testResult.success, 
+        configured: true,
+        version: testResult.version,
+        appName: testResult.appName,
+        error: testResult.error
+      };
     };
 
     // Helper to check instances for an app
@@ -47,7 +55,7 @@ statusRouter.get('/', async (req, res) => {
         const instanceId = (instance as any).id || `${appType}-1`;
         const instanceName =
           (instance as any).name || `${defaultName} ${(instance as any).instanceId || '1'}`;
-        const instanceStatus = await checkAppStatus(instanceName, instance as any);
+        const instanceStatus = await checkAppStatus(appType, instance as any, instanceName);
         status[instanceId] = {
           ...instanceStatus,
           instanceName,
