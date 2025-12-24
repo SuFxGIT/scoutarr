@@ -557,10 +557,10 @@ function Settings() {
               <Flex align="center" justify="between">
                 <Heading size="5">Applications</Heading>
                 <Flex gap="2" align="center">
-                  <Text size="2">Application Type:</Text>
+                  <Text size="2" weight="medium">Application Type</Text>
                   <Select.Root value={selectedAppType} onValueChange={(value) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
                     <Select.Trigger style={{ minWidth: '120px' }} />
-                    <Select.Content>
+                    <Select.Content position="popper" sideOffset={5}>
                       <Select.Item value="radarr">Radarr</Select.Item>
                       <Select.Item value="sonarr">Sonarr</Select.Item>
                       <Select.Item value="lidarr">Lidarr</Select.Item>
