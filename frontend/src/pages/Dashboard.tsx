@@ -566,22 +566,30 @@ function Dashboard() {
         </Card>
 
         {stats && (() => {
-          // Calculate Radarr and Sonarr totals
+          // Calculate totals for all app types
+          let lidarrTotal = 0;
           let radarrTotal = 0;
           let sonarrTotal = 0;
+          let readarrTotal = 0;
           
           Object.entries(stats.upgradesByInstance || {}).forEach(([instanceKey, count]) => {
-            if (instanceKey.startsWith('radarr')) {
+            if (instanceKey.startsWith('lidarr')) {
+              lidarrTotal += count as number;
+            } else if (instanceKey.startsWith('radarr')) {
               radarrTotal += count as number;
             } else if (instanceKey.startsWith('sonarr')) {
               sonarrTotal += count as number;
+            } else if (instanceKey.startsWith('readarr')) {
+              readarrTotal += count as number;
             }
           });
           
           // Fallback to upgradesByApplication if upgradesByInstance is empty
-          if (radarrTotal === 0 && sonarrTotal === 0) {
+          if (lidarrTotal === 0 && radarrTotal === 0 && sonarrTotal === 0 && readarrTotal === 0) {
+            lidarrTotal = stats.upgradesByApplication?.lidarr || 0;
             radarrTotal = stats.upgradesByApplication?.radarr || 0;
             sonarrTotal = stats.upgradesByApplication?.sonarr || 0;
+            readarrTotal = stats.upgradesByApplication?.readarr || 0;
           }
           
           return (
@@ -592,6 +600,12 @@ function Dashboard() {
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
+                  <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                    <Flex direction="column" gap="2" align="center" justify="center">
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Lidarr</Text>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{lidarrTotal}</Heading>
+                    </Flex>
+                  </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Text size="2" color="gray" style={{ textAlign: 'center' }}>Radarr</Text>
@@ -608,6 +622,12 @@ function Dashboard() {
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Text size="2" color="gray" style={{ textAlign: 'center' }}>Sonarr</Text>
                       <Heading size="7" style={{ textAlign: 'center' }}>{sonarrTotal}</Heading>
+                    </Flex>
+                  </Card>
+                  <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
+                    <Flex direction="column" gap="2" align="center" justify="center">
+                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Readarr</Text>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{readarrTotal}</Heading>
                     </Flex>
                   </Card>
                 </Flex>
