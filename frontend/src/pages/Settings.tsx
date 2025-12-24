@@ -104,6 +104,7 @@ function Settings() {
     onSuccess: () => {
       toast.success('Configuration saved successfully!');
       queryClient.invalidateQueries({ queryKey: ['config'] });
+      queryClient.invalidateQueries({ queryKey: ['manualRunPreview'] });
       refetchConfig();
     },
     onError: (error: unknown) => {

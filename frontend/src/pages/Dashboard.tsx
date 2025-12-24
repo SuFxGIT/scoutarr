@@ -97,14 +97,13 @@ function Dashboard() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
-  // Fetch manual run preview with auto-refresh
-  const { data: manualRunResults } = useQuery<SearchResults>({
+  // Fetch manual run preview
+  const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
     queryKey: ['manualRunPreview'],
     queryFn: async () => {
       const response = await axios.post('/api/search/manual-run');
       return response.data;
     },
-    refetchInterval: REFETCH_INTERVAL,
   });
 
   // Fetch stats with auto-refresh
@@ -138,6 +137,7 @@ function Dashboard() {
       toast.success('Search run completed');
       refetchStats();
       refetchHistory();
+      refetchPreview();
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));
