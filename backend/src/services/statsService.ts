@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONFIG_DIR = process.env.CONFIG_DIR || path.join(__dirname, '../../../config');
-const STATS_FILE = path.join(CONFIG_DIR, 'stats.json');
+const DB_FILE = path.join(CONFIG_DIR, 'stats.db');
 
 export interface UpgradeEntry {
   timestamp: string;
@@ -26,126 +27,82 @@ export interface Stats {
 }
 
 class StatsService {
-  private stats: Stats | null = null;
+  private db: Database.Database | null = null;
 
   async initialize(): Promise<void> {
     try {
       await fs.mkdir(CONFIG_DIR, { recursive: true });
-      await this.loadStats();
-      logger.info('✅ Stats service initialized successfully', { statsFile: STATS_FILE });
-    } catch (error: any) {
-      logger.warn('⚠️  Error initializing stats, creating default stats', { 
-        error: error.message,
-        statsFile: STATS_FILE 
-      });
-      await this.createDefaultStats();
-      await this.loadStats();
-      logger.info('✅ Default stats created and loaded');
-    }
-  }
-
-  private async createDefaultStats(): Promise<void> {
-    const defaultStats: Stats = {
-      totalUpgrades: 0,
-      upgradesByApplication: {},
-      upgradesByInstance: {},
-      recentUpgrades: []
-    };
-    await fs.writeFile(STATS_FILE, JSON.stringify(defaultStats, null, 2));
-  }
-
-  async loadStats(): Promise<Stats> {
-    try {
-      const content = await fs.readFile(STATS_FILE, 'utf-8');
-      const loaded = JSON.parse(content) as Stats;
+      this.db = new Database(DB_FILE);
+      this.createTables();
       
-      // Ensure all required properties exist (migration for old stats files)
-      this.stats = {
-        totalUpgrades: loaded.totalUpgrades || 0,
-        upgradesByApplication: loaded.upgradesByApplication || {},
-        upgradesByInstance: loaded.upgradesByInstance || {},
-        recentUpgrades: loaded.recentUpgrades || [],
-        lastUpgrade: loaded.lastUpgrade
-      };
-      
-      return this.stats;
+      logger.info('✅ Stats service initialized successfully', { dbFile: DB_FILE });
     } catch (error: any) {
-      // If file doesn't exist, create default
-      if (error.code === 'ENOENT') {
-        await this.createDefaultStats();
-        const content = await fs.readFile(STATS_FILE, 'utf-8');
-        this.stats = JSON.parse(content) as Stats;
-        return this.stats;
-      }
-      logger.error('❌ Error loading stats', { 
+      logger.error('❌ Error initializing stats service', { 
         error: error.message,
-        statsFile: STATS_FILE 
+        dbFile: DB_FILE 
       });
       throw error;
     }
+  }
+
+  private createTables(): void {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Create upgrades table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS upgrades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        application TEXT NOT NULL,
+        instance TEXT,
+        count INTEGER NOT NULL,
+        items TEXT NOT NULL
+      )
+    `);
+
+    // Create indexes for better query performance
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_upgrades_application ON upgrades(application);
+      CREATE INDEX IF NOT EXISTS idx_upgrades_instance ON upgrades(instance);
+    `);
   }
 
   async addUpgrade(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
     try {
-      const stats = await this.loadStats();
-      
-      // Ensure properties exist (defensive check)
-      if (!stats.upgradesByApplication) {
-        stats.upgradesByApplication = {};
-      }
-      if (!stats.upgradesByInstance) {
-        stats.upgradesByInstance = {};
-      }
-      if (!stats.recentUpgrades) {
-        stats.recentUpgrades = [];
-      }
-      
-      const entry: UpgradeEntry = {
-        timestamp: new Date().toISOString(),
-        application: application.toLowerCase(),
-        instance,
-        count,
-        items
-      };
-
-      stats.totalUpgrades = (stats.totalUpgrades || 0) + count;
+      const timestamp = new Date().toISOString();
       const appKey = application.toLowerCase();
-      stats.upgradesByApplication[appKey] = 
-        (stats.upgradesByApplication[appKey] || 0) + count;
-      
-      // Track by instance
-      const instanceKey = instance ? `${appKey}-${instance}` : appKey;
-      stats.upgradesByInstance[instanceKey] = 
-        (stats.upgradesByInstance[instanceKey] || 0) + count;
-      
-      // Add to recent upgrades (keep last 15 entries for display, but store more for "View All")
-      stats.recentUpgrades.unshift(entry);
-      // Keep up to 100 entries for "View All" functionality, but display only shows 15
-      if (stats.recentUpgrades.length > 100) {
-        stats.recentUpgrades = stats.recentUpgrades.slice(0, 100);
-      }
 
-      stats.lastUpgrade = entry.timestamp;
+      const insertStmt = this.db.prepare(`
+        INSERT INTO upgrades (timestamp, application, instance, count, items)
+        VALUES (?, ?, ?, ?, ?)
+      `);
 
-      await fs.writeFile(STATS_FILE, JSON.stringify(stats, null, 2));
-      this.stats = stats;
-      logger.debug('📊 Stats updated', { 
-        application,
-        instance,
+      insertStmt.run(
+        timestamp,
+        appKey,
+        instance || null,
         count,
-        totalUpgrades: stats.totalUpgrades
+        JSON.stringify(items)
+      );
+
+      logger.debug('📊 Stats updated', { 
+        application: appKey,
+        instance,
+        count
       });
     } catch (error: any) {
       logger.error('❌ Error saving stats', { 
-        error: error.message,
-        statsFile: STATS_FILE 
+        error: error.message
       });
       throw error;
     }
   }
 
-  getStats(): Stats {
-    if (!this.stats) {
+  async getStats(limit: number = 100): Promise<Stats> {
+    if (!this.db) {
       return {
         totalUpgrades: 0,
         upgradesByApplication: {},
@@ -153,31 +110,169 @@ class StatsService {
         recentUpgrades: []
       };
     }
-    return this.stats;
+
+    try {
+      // Get total upgrades
+      const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
+      const totalResult = totalStmt.get() as { total: number | null };
+      const totalUpgrades = totalResult.total || 0;
+
+      // Get upgrades by application
+      const byAppStmt = this.db.prepare(`
+        SELECT application, SUM(count) as total
+        FROM upgrades
+        GROUP BY application
+      `);
+      const byAppResults = byAppStmt.all() as Array<{ application: string; total: number }>;
+      const upgradesByApplication: Record<string, number> = {};
+      for (const row of byAppResults) {
+        upgradesByApplication[row.application] = row.total;
+      }
+
+      // Get upgrades by instance
+      const byInstanceStmt = this.db.prepare(`
+        SELECT 
+          CASE 
+            WHEN instance IS NOT NULL THEN application || '-' || instance
+            ELSE application
+          END as instance_key,
+          SUM(count) as total
+        FROM upgrades
+        GROUP BY instance_key
+      `);
+      const byInstanceResults = byInstanceStmt.all() as Array<{ instance_key: string; total: number }>;
+      const upgradesByInstance: Record<string, number> = {};
+      for (const row of byInstanceResults) {
+        upgradesByInstance[row.instance_key] = row.total;
+      }
+
+      // Get recent upgrades (limited for API response)
+      const recentStmt = this.db.prepare(`
+        SELECT timestamp, application, instance, count, items
+        FROM upgrades
+        ORDER BY timestamp DESC
+        LIMIT ?
+      `);
+      const recentResults = recentStmt.all(limit) as Array<{
+        timestamp: string;
+        application: string;
+        instance: string | null;
+        count: number;
+        items: string;
+      }>;
+
+      const recentUpgrades: UpgradeEntry[] = recentResults.map(row => ({
+        timestamp: row.timestamp,
+        application: row.application,
+        instance: row.instance || undefined,
+        count: row.count,
+        items: JSON.parse(row.items)
+      }));
+
+      // Get last upgrade timestamp
+      const lastStmt = this.db.prepare(`
+        SELECT timestamp
+        FROM upgrades
+        ORDER BY timestamp DESC
+        LIMIT 1
+      `);
+      const lastResult = lastStmt.get() as { timestamp: string } | undefined;
+      const lastUpgrade = lastResult?.timestamp;
+
+      return {
+        totalUpgrades,
+        upgradesByApplication,
+        upgradesByInstance,
+        recentUpgrades,
+        lastUpgrade
+      };
+    } catch (error: any) {
+      logger.error('❌ Error getting stats', { 
+        error: error.message
+      });
+      return {
+        totalUpgrades: 0,
+        upgradesByApplication: {},
+        upgradesByInstance: {},
+        recentUpgrades: []
+      };
+    }
+  }
+
+  async getRecentUpgrades(page: number = 1, pageSize: number = 15): Promise<{
+    upgrades: UpgradeEntry[];
+    total: number;
+    totalPages: number;
+  }> {
+    if (!this.db) {
+      return { upgrades: [], total: 0, totalPages: 0 };
+    }
+
+    try {
+      // Get total count
+      const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM upgrades');
+      const countResult = countStmt.get() as { count: number };
+      const total = countResult.count;
+      const totalPages = Math.ceil(total / pageSize);
+
+      // Get paginated results
+      const offset = (page - 1) * pageSize;
+      const stmt = this.db.prepare(`
+        SELECT timestamp, application, instance, count, items
+        FROM upgrades
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+      `);
+      const results = stmt.all(pageSize, offset) as Array<{
+        timestamp: string;
+        application: string;
+        instance: string | null;
+        count: number;
+        items: string;
+      }>;
+
+      const upgrades: UpgradeEntry[] = results.map(row => ({
+        timestamp: row.timestamp,
+        application: row.application,
+        instance: row.instance || undefined,
+        count: row.count,
+        items: JSON.parse(row.items)
+      }));
+
+      return { upgrades, total, totalPages };
+    } catch (error: any) {
+      logger.error('❌ Error getting recent upgrades', { 
+        error: error.message
+      });
+      return { upgrades: [], total: 0, totalPages: 0 };
+    }
   }
 
   async resetStats(): Promise<void> {
-    await this.createDefaultStats();
-    await this.loadStats();
-    logger.info('🔄 Stats reset');
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      this.db.exec('DELETE FROM upgrades');
+      logger.info('🔄 Stats reset');
+    } catch (error: any) {
+      logger.error('❌ Error resetting stats', { 
+        error: error.message
+      });
+      throw error;
+    }
   }
 
   async clearRecentUpgrades(): Promise<void> {
-    try {
-      const stats = await this.loadStats();
-      stats.recentUpgrades = [];
-      await fs.writeFile(STATS_FILE, JSON.stringify(stats, null, 2));
-      this.stats = stats;
-      logger.info('🔄 Recent upgrades cleared');
-    } catch (error: any) {
-      logger.error('❌ Error clearing recent upgrades', { 
-        error: error.message,
-        statsFile: STATS_FILE 
-      });
-      throw error;
+    // This is the same as resetStats since we're using a database
+    await this.resetStats();
+  }
+
+  close(): void {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
     }
   }
 }
 
 export const statsService = new StatsService();
-

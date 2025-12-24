@@ -43,16 +43,37 @@ app.get('*', (req, res) => {
 });
 
 // Initialize services and start server
+let server: any = null;
+
 Promise.all([
   configService.initialize(),
   statsService.initialize()
 ]).then(async () => {
   await schedulerService.initialize();
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     logger.info(`🚀 Server started successfully`, { port: PORT, environment: process.env.NODE_ENV || 'development' });
   });
 }).catch((error) => {
   logger.error('❌ Failed to initialize services', { error: error.message, stack: error.stack });
   process.exit(1);
 });
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  logger.info(`📴 Received ${signal}, shutting down gracefully...`);
+  
+  if (server) {
+    server.close(() => {
+      logger.info('✅ HTTP server closed');
+    });
+  }
+  
+  // Close database connections
+  statsService.close();
+  
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 

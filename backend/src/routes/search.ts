@@ -46,7 +46,6 @@ export function getInstanceInfo(config: any, appType: string): { instanceName: s
 
 // Helper to save stats for results
 export async function saveStatsForResults(results: Record<string, any>): Promise<void> {
-  
   for (const [app, result] of Object.entries(results)) {
     if (result.success && result.searched && result.searched > 0) {
       // Extract app type from result key (could be "radarr" or "radarr-instance-id")
@@ -55,14 +54,19 @@ export async function saveStatsForResults(results: Record<string, any>): Promise
       // Get items - check all possible media type keys
       const items = result.movies || result.series || result.artists || result.authors || result.items || [];
       
-      // Instance key is the full app key if it contains a dash (instance ID) and is a valid app type
-      const instanceKey = app.includes('-') && APP_TYPES.includes(appType as any) ? app : undefined;
+      // Extract instance ID if present (e.g., "radarr-instance-id" -> "instance-id")
+      // Only pass instance if the key contains a dash and is a valid app type
+      let instanceId: string | undefined;
+      if (app.includes('-') && APP_TYPES.includes(appType as any)) {
+        // Extract everything after the first dash as the instance ID
+        instanceId = app.substring(app.indexOf('-') + 1);
+      }
       
       await statsService.addUpgrade(
         appType,
         result.searched,
         items,
-        instanceKey
+        instanceId
       );
     }
   }
