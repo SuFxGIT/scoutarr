@@ -1,5 +1,6 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
+import { qualityProfilesCacheService } from '../services/qualityProfilesCacheService.js';
 import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
@@ -37,6 +38,26 @@ configRouter.post('/reset', async (_req, res) => {
 configRouter.put('/', async (req, res) => {
   logger.info('💾 Config update requested');
   try {
+    const oldConfig = configService.getConfig();
+    const newConfig = req.body;
+    
+    // Invalidate quality profiles cache for instances where URL or API key changed
+    const apps: Array<'radarr' | 'sonarr' | 'lidarr' | 'readarr'> = ['radarr', 'sonarr', 'lidarr', 'readarr'];
+    for (const app of apps) {
+      const oldInstances = oldConfig.applications[app] || [];
+      const newInstances = newConfig.applications?.[app] || [];
+      
+      for (const newInstance of newInstances) {
+        const oldInstance = oldInstances.find((inst: any) => inst.id === newInstance.id);
+        if (oldInstance) {
+          // Check if URL or API key changed
+          if (oldInstance.url !== newInstance.url || oldInstance.apiKey !== newInstance.apiKey) {
+            await qualityProfilesCacheService.invalidateCache(app, newInstance.id);
+          }
+        }
+      }
+    }
+    
     await configService.saveConfig(req.body);
     res.json({ success: true });
   } catch (error: any) {
@@ -136,6 +157,19 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: 'Instance not found or not configured' });
     }
 
+    // Check cache first
+    const cachedProfiles = qualityProfilesCacheService.getCachedProfiles(
+      app,
+      instanceId,
+      instanceConfig.url,
+      instanceConfig.apiKey
+    );
+
+    if (cachedProfiles) {
+      logger.debug(`✅ Using cached quality profiles for ${app} instance ${instanceId}`, { count: cachedProfiles.length });
+      return res.json(cachedProfiles);
+    }
+
     // Fetch quality profiles based on app type
     let profiles: any[] = [];
     if (app === 'radarr') {
@@ -149,6 +183,15 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
     } else {
       return res.status(400).json({ error: `Unsupported app type: ${app}` });
     }
+
+    // Cache the profiles
+    await qualityProfilesCacheService.setCachedProfiles(
+      app,
+      instanceId,
+      instanceConfig.url,
+      instanceConfig.apiKey,
+      profiles
+    );
 
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
     res.json(profiles);
@@ -168,10 +211,30 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
   const { app } = req.params;
   logger.info(`📋 Fetching quality profiles for ${app}`);
   try {
-    const { url, apiKey } = req.body;
+    const { url, apiKey, instanceId, forceRefresh } = req.body;
 
     if (!url || !apiKey) {
       return res.status(400).json({ error: 'URL and API key are required' });
+    }
+
+    // If instanceId is provided and not forcing refresh, check cache first
+    if (instanceId && !forceRefresh) {
+      const cachedProfiles = qualityProfilesCacheService.getCachedProfiles(
+        app,
+        instanceId,
+        url,
+        apiKey
+      );
+
+      if (cachedProfiles) {
+        logger.debug(`✅ Using cached quality profiles for ${app} instance ${instanceId}`, { count: cachedProfiles.length });
+        return res.json(cachedProfiles);
+      }
+    }
+
+    // If forcing refresh, invalidate cache first
+    if (instanceId && forceRefresh) {
+      await qualityProfilesCacheService.invalidateCache(app, instanceId);
     }
 
     // Create a temporary config object
@@ -191,6 +254,17 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
       return res.status(400).json({ error: `Unsupported app type: ${app}` });
     }
 
+    // Cache the profiles if instanceId is provided
+    if (instanceId) {
+      await qualityProfilesCacheService.setCachedProfiles(
+        app,
+        instanceId,
+        url,
+        apiKey,
+        profiles
+      );
+    }
+
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`);
     res.json(profiles);
   } catch (error: any) {
@@ -199,6 +273,23 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
     });
     res.status(500).json({ 
       error: 'Failed to fetch quality profiles',
+      message: error.message 
+    });
+  }
+});
+
+// Get all cached quality profiles
+configRouter.get('/quality-profiles', async (_req, res) => {
+  logger.debug('📋 Fetching all cached quality profiles');
+  try {
+    const cachedProfiles = qualityProfilesCacheService.getAllCachedProfiles();
+    res.json(cachedProfiles);
+  } catch (error: any) {
+    logger.error('❌ Failed to fetch cached quality profiles', {
+      error: error.message
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch cached quality profiles',
       message: error.message 
     });
   }

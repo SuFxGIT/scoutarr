@@ -7,6 +7,7 @@ import { statsRouter } from './routes/stats.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
+import { qualityProfilesCacheService } from './services/qualityProfilesCacheService.js';
 import logger from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import path from 'path';
@@ -47,7 +48,8 @@ let server: any = null;
 
 Promise.all([
   configService.initialize(),
-  statsService.initialize()
+  statsService.initialize(),
+  qualityProfilesCacheService.initialize()
 ]).then(async () => {
   await schedulerService.initialize();
   server = app.listen(PORT, () => {

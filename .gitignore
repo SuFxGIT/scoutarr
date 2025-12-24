@@ -25,6 +25,7 @@ Thumbs.db
 # Config (user-specific)
 config/config.json
 config/stats.db
+config/quality-profiles-cache.json
 
 # Data
 data/
