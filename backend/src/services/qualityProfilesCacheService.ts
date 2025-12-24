@@ -138,6 +138,12 @@ class QualityProfilesCacheService {
     return result;
   }
 
+  async clearAllCache(): Promise<void> {
+    this.cache = {};
+    await this.saveCache();
+    logger.info('🗑️  Cleared all quality profiles cache');
+  }
+
 }
 
 export const qualityProfilesCacheService = new QualityProfilesCacheService();

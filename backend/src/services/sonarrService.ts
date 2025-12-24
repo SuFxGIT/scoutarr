@@ -13,7 +13,6 @@ export interface SonarrSeries {
   qualityProfileId: number;
 }
 
-
 class SonarrService {
   private createClient(config: SonarrInstance): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);

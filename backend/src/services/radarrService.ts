@@ -13,7 +13,6 @@ export interface RadarrMovie {
   qualityProfileId: number;
 }
 
-
 class RadarrService {
   private createClient(config: RadarrInstance): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);

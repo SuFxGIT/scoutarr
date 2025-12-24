@@ -182,29 +182,34 @@ function getProcessorAndInstances(appType: 'radarr' | 'sonarr' | 'lidarr' | 'rea
 } {
   const config = configService.getConfig();
   
-  if (appType === 'radarr') {
-    return {
+  const processorMap: Record<string, {
+    instances: any[];
+    processor: (instanceName: string, config: any) => ApplicationProcessor<any>;
+  }> = {
+    radarr: {
       instances: getConfiguredInstances(config.applications.radarr),
       processor: createRadarrProcessor
-    };
-  } else if (appType === 'sonarr') {
-    return {
+    },
+    sonarr: {
       instances: getConfiguredInstances(config.applications.sonarr),
       processor: createSonarrProcessor
-    };
-  } else if (appType === 'lidarr') {
-    return {
+    },
+    lidarr: {
       instances: getConfiguredInstances(config.applications.lidarr),
       processor: createLidarrProcessor
-    };
-  } else if (appType === 'readarr') {
-    return {
+    },
+    readarr: {
       instances: getConfiguredInstances(config.applications.readarr),
       processor: createReadarrProcessor
-    };
-  } else {
+    }
+  };
+  
+  const result = processorMap[appType];
+  if (!result) {
     throw new Error(`Unknown app type: ${appType}`);
   }
+  
+  return result;
 }
 
 // Shared function to execute search run (used by both manual and scheduled runs)

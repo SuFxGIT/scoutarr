@@ -14,7 +14,6 @@ export interface ReadarrAuthor {
   qualityProfileId: number;
 }
 
-
 class ReadarrService {
   private createClient(config: ReadarrInstance): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);

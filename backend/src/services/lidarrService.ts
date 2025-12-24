@@ -14,7 +14,6 @@ export interface LidarrArtist {
   qualityProfileId: number;
 }
 
-
 class LidarrService {
   private createClient(config: LidarrInstance): AxiosInstance {
     return createStarrClient(config.url, config.apiKey);

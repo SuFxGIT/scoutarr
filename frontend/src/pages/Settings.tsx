@@ -40,12 +40,11 @@ function Settings() {
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
   const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
-  const [confirmingResetConfig, setConfirmingResetConfig] = useState<boolean>(false);
+  const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
   const [showIntroCallout, setShowIntroCallout] = useState(true);
   const [showHintCallout, setShowHintCallout] = useState(true);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
-
 
   // Load config with react-query
   const { data: loadedConfig, isLoading: loading, error: loadError, refetch: refetchConfig } = useQuery<Config>({
@@ -154,20 +153,21 @@ function Settings() {
     saveConfigMutation.mutate(config);
   };
 
-  // Reset config mutation
-  const resetConfigMutation = useMutation({
+  // Reset app mutation (clears config, quality profiles cache, and stats)
+  const resetAppMutation = useMutation({
     mutationFn: async () => {
-      await axios.post('/api/config/reset');
+      await axios.post('/api/config/reset-app');
     },
     onSuccess: () => {
-      toast.success('Configuration reset to defaults');
+      toast.success('App reset completed - all data cleared');
       queryClient.invalidateQueries({ queryKey: ['config'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
       refetchConfig();
-      setConfirmingResetConfig(false);
+      setConfirmingResetApp(false);
     },
     onError: (error: unknown) => {
-      toast.error('Failed to reset config: ' + getErrorMessage(error));
-      setConfirmingResetConfig(false);
+      toast.error('Failed to reset app: ' + getErrorMessage(error));
+      setConfirmingResetApp(false);
     },
   });
 
@@ -1765,40 +1765,40 @@ function Settings() {
                 <Separator />
 
                 <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">Reset Configuration</Text>
+                  <Text size="2" weight="medium">Reset App</Text>
                   <Text size="1" color="gray">
-                    Restore the configuration file to its default values. This will remove all configured instances and custom settings.
+                    This will permanently delete all configuration, quality profiles cache, and statistics. This action cannot be undone.
                   </Text>
-                  {confirmingResetConfig ? (
+                  {confirmingResetApp ? (
                     <Flex gap="2" align="center">
-                      <Text size="1" color="gray">Confirm reset?</Text>
+                      <Text size="1" color="red" weight="medium">Are you sure? This will delete all data.</Text>
                       <Button
                         variant="solid"
                         size="2"
                         color="red"
-                        onClick={() => resetConfigMutation.mutate()}
-                        disabled={resetConfigMutation.isPending}
+                        onClick={() => resetAppMutation.mutate()}
+                        disabled={resetAppMutation.isPending}
                       >
-                        Confirm
+                        Confirm Reset
                       </Button>
                       <Button
                         variant="outline"
                         size="2"
-                        onClick={() => setConfirmingResetConfig(false)}
-                        disabled={resetConfigMutation.isPending}
+                        onClick={() => setConfirmingResetApp(false)}
+                        disabled={resetAppMutation.isPending}
                       >
                         Cancel
                       </Button>
                     </Flex>
                   ) : (
                     <Button
-                      variant="outline"
+                      variant="solid"
                       color="red"
                       size="2"
-                      onClick={() => setConfirmingResetConfig(true)}
-                      disabled={resetConfigMutation.isPending}
+                      onClick={() => setConfirmingResetApp(true)}
+                      disabled={resetAppMutation.isPending}
                     >
-                      Reset Config
+                      Reset App
                     </Button>
                   )}
                 </Flex>
