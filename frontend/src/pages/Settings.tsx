@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Flex,
   Heading,
@@ -17,7 +17,7 @@ import {
   Tooltip
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
@@ -43,6 +43,9 @@ function Settings() {
   const [confirmingResetConfig, setConfirmingResetConfig] = useState<boolean>(false);
   const [showIntroCallout, setShowIntroCallout] = useState(true);
   const [showHintCallout, setShowHintCallout] = useState(true);
+  const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
+  const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
+  const fetchedProfilesRef = useRef<Set<string>>(new Set());
 
 
   // Load config with react-query
@@ -80,6 +83,45 @@ function Settings() {
       // Ignore storage errors and fall back to defaults
     }
   }, []);
+
+  // Fetch quality profiles when URL/API key changes for any instance (only on initial load)
+  useEffect(() => {
+    if (!config) return;
+
+    const fetchProfilesForAllInstances = async () => {
+      const apps: ('radarr' | 'sonarr' | 'lidarr' | 'readarr')[] = ['radarr', 'sonarr', 'lidarr', 'readarr'];
+      
+      for (const app of apps) {
+        const instances = config.applications[app];
+        if (Array.isArray(instances)) {
+          for (const instance of instances) {
+            if (instance.url && instance.apiKey && instance.id) {
+              const key = `${app}-${instance.id}`;
+              const cacheKey = `${key}:${instance.url}:${instance.apiKey}`;
+              
+              // Only fetch if we haven't fetched for this URL/API key combination yet
+              if (!fetchedProfilesRef.current.has(cacheKey) && 
+                  !loadingProfiles[key] && 
+                  !qualityProfiles[key] && 
+                  validator.isURL(instance.url, { require_protocol: true })) {
+                fetchedProfilesRef.current.add(cacheKey);
+                await fetchQualityProfiles(app, instance.id, instance.url, instance.apiKey);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    // Debounce to avoid too many requests
+    const timeoutId = setTimeout(() => {
+      fetchProfilesForAllInstances();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+    // Only run once on mount or when config is first loaded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedConfig]);
 
   // Save config mutation with validation
   const saveConfigMutation = useMutation({
@@ -214,9 +256,12 @@ function Settings() {
   const updateInstanceConfig = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, field: string, value: any) => {
     if (!config) return;
     const instances = getInstances(app);
+    const currentInstance = instances.find(inst => inst.id === instanceId);
     const updatedInstances = instances.map(inst => 
       inst.id === instanceId ? { ...inst, [field]: value } : inst
     );
+    
+    const updatedInstance = updatedInstances.find(inst => inst.id === instanceId);
     
     setConfig({
       ...config,
@@ -232,6 +277,33 @@ function Settings() {
         ...prev,
         [`${app}-${instanceId}`]: { status: null, testing: false }
       }));
+      
+      // Fetch quality profiles when URL or API key is updated (debounced)
+      // Only fetch if URL or API key actually changed
+      const urlChanged = field === 'url' && currentInstance?.url !== value;
+      const apiKeyChanged = field === 'apiKey' && currentInstance?.apiKey !== value;
+      
+      if (urlChanged || apiKeyChanged) {
+        // Clear the cache for this instance since URL/API key changed
+        const oldCacheKey = `${app}-${instanceId}:${currentInstance?.url || ''}:${currentInstance?.apiKey || ''}`;
+        fetchedProfilesRef.current.delete(oldCacheKey);
+        
+        if (updatedInstance && updatedInstance.url && updatedInstance.apiKey) {
+          if (validator.isURL(updatedInstance.url, { require_protocol: true })) {
+            // Debounce the fetch to avoid too many requests
+            setTimeout(() => {
+              fetchQualityProfiles(app, instanceId, updatedInstance.url, updatedInstance.apiKey);
+            }, 1000);
+          }
+        } else {
+          // Clear profiles if URL or API key is removed
+          setQualityProfiles(prev => {
+            const newProfiles = { ...prev };
+            delete newProfiles[`${app}-${instanceId}`];
+            return newProfiles;
+          });
+        }
+      }
     }
   };
 
@@ -416,12 +488,60 @@ function Settings() {
     );
   };
 
+  const fetchQualityProfiles = async (app: string, instanceId: string, url: string, apiKey: string) => {
+    const key = `${app}-${instanceId}`;
+    const cacheKey = `${key}:${url}:${apiKey}`;
+    
+    if (!url || !apiKey) {
+      setQualityProfiles(prev => {
+        const newProfiles = { ...prev };
+        delete newProfiles[key];
+        return newProfiles;
+      });
+      fetchedProfilesRef.current.delete(cacheKey);
+      return;
+    }
+
+    // Validate URL
+    if (!validator.isURL(url, { require_protocol: true })) {
+      return;
+    }
+
+    // Don't fetch if we already have profiles for this URL/API key combination
+    if (fetchedProfilesRef.current.has(cacheKey) && qualityProfiles[key]) {
+      return;
+    }
+
+    setLoadingProfiles(prev => ({ ...prev, [key]: true }));
+    try {
+      const response = await axios.post(`/api/config/quality-profiles/${app}`, {
+        url,
+        apiKey
+      });
+      setQualityProfiles(prev => ({
+        ...prev,
+        [key]: response.data.map((p: any) => ({ id: p.id, name: p.name }))
+      }));
+      fetchedProfilesRef.current.add(cacheKey);
+    } catch (error: any) {
+      // Silently fail - don't show error toast as this is called automatically
+      setQualityProfiles(prev => {
+        const newProfiles = { ...prev };
+        delete newProfiles[key];
+        return newProfiles;
+      });
+      fetchedProfilesRef.current.delete(cacheKey);
+    } finally {
+      setLoadingProfiles(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
   const testConnection = async (app: string, instanceId?: string) => {
     if (!config) return;
     const key = instanceId ? `${app}-${instanceId}` : app;
     let appConfig: any;
-    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr'] as any[];
+    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
+      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as any[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
       appConfig = config.applications[app as keyof Config['applications']];
@@ -469,6 +589,10 @@ function Settings() {
       if (success) {
         const versionText = response.data.version ? ` (v${response.data.version})` : '';
         toast.success(`Connection test successful${versionText}`);
+        // Fetch quality profiles after successful connection test
+        if (instanceId && appConfig.url && appConfig.apiKey) {
+          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey);
+        }
       } else {
         toast.error('Connection test failed');
       }
@@ -875,13 +999,102 @@ function Settings() {
                               )}
 
                               <Flex direction="column" gap="2">
-                                <Text size="2" weight="medium">Quality Profile Name (optional)</Text>
-                                <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Leave empty to include all quality profiles.`}>
-                                  <TextField.Root
-                                    value={instance.qualityProfileName || ''}
-                                    onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'qualityProfileName', e.target.value)}
-                                  />
-                                </Tooltip>
+                                <Text size="2" weight="medium">Quality Profile (optional)</Text>
+                                <Flex gap="2" align="center">
+                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Leave empty to include all quality profiles.`}>
+                                    <div style={{ flex: 1 }}>
+                                      {(() => {
+                                        const profileKey = `${selectedAppType}-${instance.id}`;
+                                        const profiles = qualityProfiles[profileKey] || [];
+                                        const isLoading = loadingProfiles[profileKey];
+                                        const hasUrlAndApiKey = instance.url && instance.apiKey;
+                                        
+                                        if (!hasUrlAndApiKey) {
+                                          return (
+                                            <Select.Root
+                                              value={undefined}
+                                              onValueChange={() => {}}
+                                              disabled
+                                            >
+                                              <Select.Trigger placeholder="Configure URL and API Key first" />
+                                            </Select.Root>
+                                          );
+                                        }
+                                        
+                                        if (isLoading) {
+                                          return (
+                                            <Select.Root disabled>
+                                              <Select.Trigger placeholder="Loading profiles..." />
+                                            </Select.Root>
+                                          );
+                                        }
+                                        
+                                        // Use a special value "__all__" to represent "all profiles" (empty string in config)
+                                        const selectValue = instance.qualityProfileName || '__all__';
+                                        
+                                        return (
+                                          <Select.Root
+                                            value={selectValue}
+                                            onValueChange={(value) => {
+                                              // Convert "__all__" back to empty string for config
+                                              const configValue = value === '__all__' ? '' : value;
+                                              updateInstanceConfig(selectedAppType, instance.id, 'qualityProfileName', configValue);
+                                            }}
+                                          >
+                                            <Select.Trigger placeholder="All quality profiles" />
+                                            <Select.Content position="popper" sideOffset={5}>
+                                              <Select.Item value="__all__">All quality profiles</Select.Item>
+                                              {profiles.map((profile) => (
+                                                <Select.Item key={profile.id} value={profile.name}>
+                                                  {profile.name}
+                                                </Select.Item>
+                                              ))}
+                                            </Select.Content>
+                                          </Select.Root>
+                                        );
+                                      })()}
+                                    </div>
+                                  </Tooltip>
+                                  {(() => {
+                                    const profileKey = `${selectedAppType}-${instance.id}`;
+                                    const isLoading = loadingProfiles[profileKey];
+                                    const hasUrlAndApiKey = instance.url && instance.apiKey;
+                                    
+                                    if (!hasUrlAndApiKey) {
+                                      return null;
+                                    }
+                                    
+                                    return (
+                                      <Tooltip content="Refresh quality profiles">
+                                        <Button
+                                          variant="soft"
+                                          size="1"
+                                          onClick={() => {
+                                            // Clear cache for this instance to force refresh
+                                            const cacheKey = `${profileKey}:${instance.url}:${instance.apiKey}`;
+                                            fetchedProfilesRef.current.delete(cacheKey);
+                                            // Clear existing profiles to show loading state
+                                            setQualityProfiles(prev => {
+                                              const newProfiles = { ...prev };
+                                              delete newProfiles[profileKey];
+                                              return newProfiles;
+                                            });
+                                            // Fetch fresh profiles
+                                            fetchQualityProfiles(selectedAppType, instance.id, instance.url, instance.apiKey);
+                                          }}
+                                          disabled={isLoading}
+                                          style={{ minWidth: '32px', width: '32px', padding: 0 }}
+                                        >
+                                          {isLoading ? (
+                                            <Spinner size="1" />
+                                          ) : (
+                                            <ReloadIcon width="14" height="14" />
+                                          )}
+                                        </Button>
+                                      </Tooltip>
+                                    );
+                                  })()}
+                                </Flex>
                               </Flex>
 
                               <Separator />

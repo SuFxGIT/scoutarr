@@ -124,6 +124,86 @@ configRouter.post('/test/:app', async (req, res) => {
   }
 });
 
+// Get quality profiles for an application instance
+configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
+  const { app, instanceId } = req.params;
+  logger.info(`📋 Fetching quality profiles for ${app} instance ${instanceId}`);
+  try {
+    const config = configService.getConfig();
+    const instanceConfig = findInstanceConfig(config, app, instanceId);
+
+    if (!instanceConfig || !instanceConfig.url || !instanceConfig.apiKey) {
+      return res.status(400).json({ error: 'Instance not found or not configured' });
+    }
+
+    // Fetch quality profiles based on app type
+    let profiles: any[] = [];
+    if (app === 'radarr') {
+      profiles = await radarrService.getQualityProfiles(instanceConfig);
+    } else if (app === 'sonarr') {
+      profiles = await sonarrService.getQualityProfiles(instanceConfig);
+    } else if (app === 'lidarr') {
+      profiles = await lidarrService.getQualityProfiles(instanceConfig);
+    } else if (app === 'readarr') {
+      profiles = await readarrService.getQualityProfiles(instanceConfig);
+    } else {
+      return res.status(400).json({ error: `Unsupported app type: ${app}` });
+    }
+
+    logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
+    res.json(profiles);
+  } catch (error: any) {
+    logger.error(`❌ Failed to fetch quality profiles for ${app} instance ${instanceId}`, {
+      error: error.message
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch quality profiles',
+      message: error.message 
+    });
+  }
+});
+
+// Get quality profiles for an application (using URL and API key from request body)
+configRouter.post('/quality-profiles/:app', async (req, res) => {
+  const { app } = req.params;
+  logger.info(`📋 Fetching quality profiles for ${app}`);
+  try {
+    const { url, apiKey } = req.body;
+
+    if (!url || !apiKey) {
+      return res.status(400).json({ error: 'URL and API key are required' });
+    }
+
+    // Create a temporary config object
+    const tempConfig = { url, apiKey } as any;
+
+    // Fetch quality profiles based on app type
+    let profiles: any[] = [];
+    if (app === 'radarr') {
+      profiles = await radarrService.getQualityProfiles(tempConfig);
+    } else if (app === 'sonarr') {
+      profiles = await sonarrService.getQualityProfiles(tempConfig);
+    } else if (app === 'lidarr') {
+      profiles = await lidarrService.getQualityProfiles(tempConfig);
+    } else if (app === 'readarr') {
+      profiles = await readarrService.getQualityProfiles(tempConfig);
+    } else {
+      return res.status(400).json({ error: `Unsupported app type: ${app}` });
+    }
+
+    logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`);
+    res.json(profiles);
+  } catch (error: any) {
+    logger.error(`❌ Failed to fetch quality profiles for ${app}`, {
+      error: error.message
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch quality profiles',
+      message: error.message 
+    });
+  }
+});
+
 // Helper to find instance config
 function findInstanceConfig(config: any, app: string, instanceId: string): any | null {
   const appConfig = config.applications[app as keyof typeof config.applications];
