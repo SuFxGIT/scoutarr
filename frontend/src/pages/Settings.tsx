@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Flex,
   Heading,
@@ -17,7 +17,7 @@ import {
   Tooltip
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon, QuestionMarkCircledIcon, InfoCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
@@ -27,7 +27,7 @@ import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP } from '../utils/constants';
+import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 
 function Settings() {
@@ -45,7 +45,6 @@ function Settings() {
   const [showHintCallout, setShowHintCallout] = useState(true);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
-  const fetchedProfilesRef = useRef<Set<string>>(new Set());
 
 
   // Load config with react-query
@@ -78,9 +77,8 @@ function Settings() {
         // Validate cached profiles against current config
         if (config) {
           const validatedProfiles: Record<string, { id: number; name: string }[]> = {};
-          const apps: Array<'radarr' | 'sonarr' | 'lidarr' | 'readarr'> = ['radarr', 'sonarr', 'lidarr', 'readarr'];
           
-          for (const app of apps) {
+          for (const app of APP_TYPES) {
             const instances = config.applications[app] || [];
             for (const instance of instances) {
               const key = `${app}-${instance.id}`;
@@ -91,25 +89,6 @@ function Settings() {
           }
           
           setQualityProfiles(validatedProfiles);
-          
-          // Mark cache keys as fetched
-          for (const key of Object.keys(validatedProfiles)) {
-            // Key format is `${app}-${instanceId}` where instanceId is the full instance ID
-            // Find the instance by matching the key directly
-            const apps: Array<'radarr' | 'sonarr' | 'lidarr' | 'readarr'> = ['radarr', 'sonarr', 'lidarr', 'readarr'];
-            for (const app of apps) {
-              const instances = config.applications[app] || [];
-              const instance = instances.find((inst: any) => {
-                const instanceKey = `${app}-${inst.id}`;
-                return instanceKey === key;
-              });
-              if (instance && instance.url && instance.apiKey) {
-                const cacheKey = `${key}:${instance.url}:${instance.apiKey}`;
-                fetchedProfilesRef.current.add(cacheKey);
-                break;
-              }
-            }
-          }
         } else {
           // Config not loaded yet, just set the profiles
           setQualityProfiles(cachedProfiles);
@@ -299,11 +278,8 @@ function Settings() {
       const apiKeyChanged = field === 'apiKey' && currentInstance?.apiKey !== value;
       
       if (urlChanged || apiKeyChanged) {
-        // Clear the cache for this instance since URL/API key changed
-        const oldCacheKey = `${app}-${instanceId}:${currentInstance?.url || ''}:${currentInstance?.apiKey || ''}`;
-        fetchedProfilesRef.current.delete(oldCacheKey);
-        
         // Clear profiles if URL or API key is removed or changed
+        // Backend cache will be invalidated automatically on config save
         setQualityProfiles(prev => {
           const newProfiles = { ...prev };
           delete newProfiles[`${app}-${instanceId}`];
@@ -496,7 +472,6 @@ function Settings() {
 
   const fetchQualityProfiles = async (app: string, instanceId: string, url: string, apiKey: string, forceRefresh: boolean = false) => {
     const key = `${app}-${instanceId}`;
-    const cacheKey = `${key}:${url}:${apiKey}`;
     
     if (!url || !apiKey) {
       setQualityProfiles(prev => {
@@ -504,7 +479,6 @@ function Settings() {
         delete newProfiles[key];
         return newProfiles;
       });
-      fetchedProfilesRef.current.delete(cacheKey);
       return;
     }
 
@@ -513,8 +487,9 @@ function Settings() {
       return;
     }
 
-    // Don't fetch if we already have profiles for this URL/API key combination (unless forcing refresh)
-    if (!forceRefresh && fetchedProfilesRef.current.has(cacheKey) && qualityProfiles[key]) {
+    // Don't fetch if we already have profiles (unless forcing refresh)
+    // Backend cache handles preventing duplicate API calls
+    if (!forceRefresh && qualityProfiles[key]) {
       return;
     }
 
@@ -530,7 +505,6 @@ function Settings() {
         ...prev,
         [key]: response.data.map((p: any) => ({ id: p.id, name: p.name }))
       }));
-      fetchedProfilesRef.current.add(cacheKey);
     } catch (error: any) {
       // Silently fail - don't show error toast as this is called automatically
       setQualityProfiles(prev => {
@@ -538,7 +512,6 @@ function Settings() {
         delete newProfiles[key];
         return newProfiles;
       });
-      fetchedProfilesRef.current.delete(cacheKey);
     } finally {
       setLoadingProfiles(prev => ({ ...prev, [key]: false }));
     }
@@ -629,14 +602,19 @@ function Settings() {
       <Flex direction="column" gap="3">
         {showIntroCallout && (
           <Callout.Root color="blue">
-            <Flex align="start" justify="between" gap="3">
-              <Callout.Text>
-                <Text weight="bold" size="3">What is Scoutarr?</Text>
-                <br />
-                <Text size="2">
-                  Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
-                </Text>
-              </Callout.Text>
+            <Flex align="start" justify="between" gap="3" style={{ width: '100%' }}>
+              <Flex align="start" gap="3" style={{ flex: 1 }}>
+                <Callout.Icon>
+                  <InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text weight="bold" size="3">What is Scoutarr?</Text>
+                  <br />
+                  <Text size="2">
+                    Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
+                  </Text>
+                </Callout.Text>
+              </Flex>
               <button
                 type="button"
                 aria-label="Dismiss intro"
@@ -652,11 +630,9 @@ function Settings() {
                   border: 'none',
                   background: 'transparent',
                   padding: 0,
-                  marginLeft: 'auto',
-                  marginRight: '0.25rem',
-                  marginTop: '0.25rem',
                   cursor: 'pointer',
                   color: 'var(--gray-11)',
+                  flexShrink: 0,
                 }}
               >
                 <Cross2Icon />
@@ -667,10 +643,15 @@ function Settings() {
 
         {showHintCallout && (
           <Callout.Root color="blue" size="1">
-            <Flex align="center" justify="between" gap="2">
-              <Callout.Text>
-                <Text size="1">💡 Hover over the question mark icons next to field labels to see descriptions and hints</Text>
-              </Callout.Text>
+            <Flex align="center" justify="between" gap="2" style={{ width: '100%' }}>
+              <Flex align="center" gap="2" style={{ flex: 1 }}>
+                <Callout.Icon>
+                  <QuestionMarkCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text size="1">Hover over the question mark icons next to field labels to see descriptions and hints</Text>
+                </Callout.Text>
+              </Flex>
               <button
                 type="button"
                 aria-label="Dismiss hint"
@@ -686,9 +667,9 @@ function Settings() {
                   border: 'none',
                   background: 'transparent',
                   padding: 0,
-                  marginRight: '0.25rem',
                   cursor: 'pointer',
                   color: 'var(--gray-11)',
+                  flexShrink: 0,
                 }}
               >
                 <Cross2Icon />
@@ -1110,9 +1091,6 @@ function Settings() {
                                           variant="soft"
                                           size="1"
                                           onClick={async () => {
-                                            // Clear cache for this instance to force refresh
-                                            const cacheKey = `${profileKey}:${instance.url}:${instance.apiKey}`;
-                                            fetchedProfilesRef.current.delete(cacheKey);
                                             // Clear existing profiles to show loading state
                                             setQualityProfiles(prev => {
                                               const newProfiles = { ...prev };

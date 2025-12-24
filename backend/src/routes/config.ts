@@ -5,7 +5,7 @@ import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
-import { testStarrConnection, createStarrClient, getMediaTypeKey } from '../utils/starrUtils.js';
+import { testStarrConnection, createStarrClient, getMediaTypeKey, APP_TYPES } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const configRouter = express.Router();
@@ -42,8 +42,7 @@ configRouter.put('/', async (req, res) => {
     const newConfig = req.body;
     
     // Invalidate quality profiles cache for instances where URL or API key changed
-    const apps: Array<'radarr' | 'sonarr' | 'lidarr' | 'readarr'> = ['radarr', 'sonarr', 'lidarr', 'readarr'];
-    for (const app of apps) {
+    for (const app of APP_TYPES) {
       const oldInstances = oldConfig.applications[app] || [];
       const newInstances = newConfig.applications?.[app] || [];
       
@@ -184,13 +183,14 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: `Unsupported app type: ${app}` });
     }
 
-    // Cache the profiles
+    // Cache only id and name from profiles
+    const profilesToCache = profiles.map(p => ({ id: p.id, name: p.name }));
     await qualityProfilesCacheService.setCachedProfiles(
       app,
       instanceId,
       instanceConfig.url,
       instanceConfig.apiKey,
-      profiles
+      profilesToCache
     );
 
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
@@ -254,14 +254,15 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
       return res.status(400).json({ error: `Unsupported app type: ${app}` });
     }
 
-    // Cache the profiles if instanceId is provided
+    // Cache only id and name from profiles if instanceId is provided
     if (instanceId) {
+      const profilesToCache = profiles.map(p => ({ id: p.id, name: p.name }));
       await qualityProfilesCacheService.setCachedProfiles(
         app,
         instanceId,
         url,
         apiKey,
-        profiles
+        profilesToCache
       );
     }
 
