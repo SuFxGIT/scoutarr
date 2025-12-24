@@ -84,44 +84,6 @@ function Settings() {
     }
   }, []);
 
-  // Fetch quality profiles when URL/API key changes for any instance (only on initial load)
-  useEffect(() => {
-    if (!config) return;
-
-    const fetchProfilesForAllInstances = async () => {
-      const apps: ('radarr' | 'sonarr' | 'lidarr' | 'readarr')[] = ['radarr', 'sonarr', 'lidarr', 'readarr'];
-      
-      for (const app of apps) {
-        const instances = config.applications[app];
-        if (Array.isArray(instances)) {
-          for (const instance of instances) {
-            if (instance.url && instance.apiKey && instance.id) {
-              const key = `${app}-${instance.id}`;
-              const cacheKey = `${key}:${instance.url}:${instance.apiKey}`;
-              
-              // Only fetch if we haven't fetched for this URL/API key combination yet
-              if (!fetchedProfilesRef.current.has(cacheKey) && 
-                  !loadingProfiles[key] && 
-                  !qualityProfiles[key] && 
-                  validator.isURL(instance.url, { require_protocol: true })) {
-                fetchedProfilesRef.current.add(cacheKey);
-                await fetchQualityProfiles(app, instance.id, instance.url, instance.apiKey);
-              }
-            }
-          }
-        }
-      }
-    };
-
-    // Debounce to avoid too many requests
-    const timeoutId = setTimeout(() => {
-      fetchProfilesForAllInstances();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-    // Only run once on mount or when config is first loaded
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedConfig]);
 
   // Save config mutation with validation
   const saveConfigMutation = useMutation({
@@ -271,15 +233,14 @@ function Settings() {
       }
     });
     
-    // Clear test result when config changes
+    // Clear test result and quality profiles when config changes
     if (field === 'url' || field === 'apiKey') {
       setTestResults(prev => ({
         ...prev,
         [`${app}-${instanceId}`]: { status: null, testing: false }
       }));
       
-      // Fetch quality profiles when URL or API key is updated (debounced)
-      // Only fetch if URL or API key actually changed
+      // Clear quality profiles cache when URL or API key changes
       const urlChanged = field === 'url' && currentInstance?.url !== value;
       const apiKeyChanged = field === 'apiKey' && currentInstance?.apiKey !== value;
       
@@ -288,21 +249,12 @@ function Settings() {
         const oldCacheKey = `${app}-${instanceId}:${currentInstance?.url || ''}:${currentInstance?.apiKey || ''}`;
         fetchedProfilesRef.current.delete(oldCacheKey);
         
-        if (updatedInstance && updatedInstance.url && updatedInstance.apiKey) {
-          if (validator.isURL(updatedInstance.url, { require_protocol: true })) {
-            // Debounce the fetch to avoid too many requests
-            setTimeout(() => {
-              fetchQualityProfiles(app, instanceId, updatedInstance.url, updatedInstance.apiKey);
-            }, 1000);
-          }
-        } else {
-          // Clear profiles if URL or API key is removed
-          setQualityProfiles(prev => {
-            const newProfiles = { ...prev };
-            delete newProfiles[`${app}-${instanceId}`];
-            return newProfiles;
-          });
-        }
+        // Clear profiles if URL or API key is removed or changed
+        setQualityProfiles(prev => {
+          const newProfiles = { ...prev };
+          delete newProfiles[`${app}-${instanceId}`];
+          return newProfiles;
+        });
       }
     }
   };
