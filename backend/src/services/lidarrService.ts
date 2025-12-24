@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { LidarrInstance } from '../types/config.js';
-import { StarrTag, StarrQualityProfile } from '../types/starr.js';
+import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
@@ -14,9 +14,6 @@ export interface LidarrArtist {
   qualityProfileId: number;
 }
 
-// Re-export shared types for backward compatibility
-export type LidarrTag = StarrTag;
-export type LidarrQualityProfile = StarrQualityProfile;
 
 class LidarrService {
   private createClient(config: LidarrInstance): AxiosInstance {
@@ -104,7 +101,7 @@ class LidarrService {
     return getOrCreateTagId(client, tagName, 'Lidarr');
   }
 
-  async filterArtists(config: LidarrInstance, artists: LidarrArtist[], unattended: boolean = false): Promise<LidarrArtist[]> {
+  async filterArtists(config: LidarrInstance, artists: LidarrArtist[]): Promise<LidarrArtist[]> {
     try {
       let filtered = artists;
 

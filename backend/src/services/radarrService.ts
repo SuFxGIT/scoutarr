@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { RadarrInstance } from '../types/config.js';
-import { StarrTag, StarrQualityProfile } from '../types/starr.js';
+import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
@@ -13,9 +13,6 @@ export interface RadarrMovie {
   qualityProfileId: number;
 }
 
-// Re-export shared types for backward compatibility
-export type RadarrTag = StarrTag;
-export type RadarrQualityProfile = StarrQualityProfile;
 
 class RadarrService {
   private createClient(config: RadarrInstance): AxiosInstance {
@@ -97,7 +94,7 @@ class RadarrService {
     return getOrCreateTagId(client, tagName, 'Radarr');
   }
 
-  async filterMovies(config: RadarrInstance, movies: RadarrMovie[], unattended: boolean = false): Promise<RadarrMovie[]> {
+  async filterMovies(config: RadarrInstance, movies: RadarrMovie[]): Promise<RadarrMovie[]> {
     try {
       let filtered = movies;
 

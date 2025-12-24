@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { SonarrInstance } from '../types/config.js';
-import { StarrTag, StarrQualityProfile } from '../types/starr.js';
+import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
@@ -13,9 +13,6 @@ export interface SonarrSeries {
   qualityProfileId: number;
 }
 
-// Re-export shared types for backward compatibility
-export type SonarrTag = StarrTag;
-export type SonarrQualityProfile = StarrQualityProfile;
 
 class SonarrService {
   private createClient(config: SonarrInstance): AxiosInstance {
@@ -98,7 +95,7 @@ class SonarrService {
     return getOrCreateTagId(client, tagName, 'Sonarr');
   }
 
-  async filterSeries(config: SonarrInstance, series: SonarrSeries[], unattended: boolean = false): Promise<SonarrSeries[]> {
+  async filterSeries(config: SonarrInstance, series: SonarrSeries[]): Promise<SonarrSeries[]> {
     try {
       let filtered = series;
 

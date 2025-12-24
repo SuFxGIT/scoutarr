@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { ReadarrInstance } from '../types/config.js';
-import { StarrTag, StarrQualityProfile } from '../types/starr.js';
+import { StarrQualityProfile } from '../types/starr.js';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
@@ -14,9 +14,6 @@ export interface ReadarrAuthor {
   qualityProfileId: number;
 }
 
-// Re-export shared types for backward compatibility
-export type ReadarrTag = StarrTag;
-export type ReadarrQualityProfile = StarrQualityProfile;
 
 class ReadarrService {
   private createClient(config: ReadarrInstance): AxiosInstance {
@@ -104,7 +101,7 @@ class ReadarrService {
     return getOrCreateTagId(client, tagName, 'Readarr');
   }
 
-  async filterAuthors(config: ReadarrInstance, authors: ReadarrAuthor[], unattended: boolean = false): Promise<ReadarrAuthor[]> {
+  async filterAuthors(config: ReadarrInstance, authors: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
     try {
       let filtered = authors;
 

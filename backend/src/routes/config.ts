@@ -4,7 +4,7 @@ import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
-import { testStarrConnection, createStarrClient, getMediaTypeName } from '../utils/starrUtils.js';
+import { testStarrConnection, createStarrClient, getMediaTypeKey } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 
 export const configRouter = express.Router();
@@ -96,7 +96,9 @@ configRouter.post('/test/:app', async (req, res) => {
       // Get system status for additional info
       try {
         const client = createStarrClient(appConfig.url, appConfig.apiKey);
-        const response = await client.get('/api/v3/system/status');
+        // Lidarr and Readarr use v1 API, Radarr and Sonarr use v3
+        const apiVersion = app.toLowerCase().includes('lidarr') || app.toLowerCase().includes('readarr') ? 'v1' : 'v3';
+        const response = await client.get(`/api/${apiVersion}/system/status`);
         logger.info(`✅ Connection test successful for ${app}`, { url: appConfig.url });
         res.json({ success: true, status: response.data });
       } catch (error: any) {
@@ -199,7 +201,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     }
 
     // Get media type name for logging
-    const mediaTypeName = getMediaTypeName(app);
+    const mediaTypeName = getMediaTypeKey(app);
 
     logger.info(`✅ Cleared tag from ${mediaIds.length} ${mediaTypeName}`);
     res.json({ 

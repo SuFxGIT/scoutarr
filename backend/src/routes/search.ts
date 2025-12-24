@@ -13,7 +13,9 @@ export const searchRouter = express.Router();
 
 // Helper function to randomly select items (matching script behavior)
 function randomSelect<T>(items: T[], count: number | 'max' | 'MAX'): T[] {
-  if (count === 'max' || count === 'MAX') {
+  // Normalize 'MAX' to 'max' for consistency
+  const normalizedCount = count === 'MAX' ? 'max' : count;
+  if (normalizedCount === 'max') {
     return items;
   }
   if (typeof count === 'number' && count >= items.length) {
@@ -156,6 +158,7 @@ async function processAppInstances<T>(
 ): Promise<void> {
   for (const instanceConfig of instances) {
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig as any, appType);
+    // Merge unattended mode into config if provided
     const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
     const processor = createProcessor(instanceName, config);
     const result = await processApplication(processor);
@@ -260,7 +263,7 @@ interface ApplicationProcessor<TMedia> {
   name: string;
   config: any;
   getMedia: (config: any) => Promise<TMedia[]>;
-  filterMedia: (config: any, media: TMedia[], unattended: boolean) => Promise<TMedia[]>;
+  filterMedia: (config: any, media: TMedia[]) => Promise<TMedia[]>;
   searchMedia: (config: any, mediaIds: number[]) => Promise<void>;
   searchMediaOneByOne: boolean;
   getTagId: (config: any, tagName: string) => Promise<number | null>;
@@ -284,7 +287,7 @@ export async function processApplication<TMedia>(
     let allMedia = await processor.getMedia(processor.config);
     logger.debug(`📥 Fetched ${processor.name} media`, { total: allMedia.length });
 
-    let filtered = await processor.filterMedia(processor.config, allMedia, processor.config.unattended);
+    let filtered = await processor.filterMedia(processor.config, allMedia);
     logger.debug(`🔽 Filtered ${processor.name} media`, {
       total: allMedia.length,
       filtered: filtered.length,
@@ -307,7 +310,7 @@ export async function processApplication<TMedia>(
 
           // Re-fetch and re-filter
           allMedia = await processor.getMedia(processor.config);
-          filtered = await processor.filterMedia(processor.config, allMedia, false);
+          filtered = await processor.filterMedia(processor.config, allMedia);
           logger.debug(`🔄 Re-filtered ${processor.name} after tag removal`, {
             total: allMedia.length,
             filtered: filtered.length
@@ -325,8 +328,9 @@ export async function processApplication<TMedia>(
       };
     }
 
-    // Select random media based on count
-    const toSearch = randomSelect(filtered, processor.config.count);
+    // Select random media based on count (normalize 'MAX' to 'max' if needed)
+    const normalizedCount = processor.config.count === 'MAX' ? 'max' : processor.config.count;
+    const toSearch = randomSelect(filtered, normalizedCount);
     logger.debug(`🎲 Selected ${processor.name} to search`, {
       selected: toSearch.length,
       available: filtered.length,
@@ -442,7 +446,7 @@ async function processManualRun<TMedia>(
   name: string,
   config: any,
   getMedia: (config: any) => Promise<TMedia[]>,
-  filterMedia: (config: any, media: TMedia[], unattended: boolean) => Promise<TMedia[]>,
+  filterMedia: (config: any, media: TMedia[]) => Promise<TMedia[]>,
   getMediaId: (media: TMedia) => number,
   getMediaTitle: (media: TMedia) => string,
   getTagId?: (config: any, tagName: string) => Promise<number | null>
@@ -453,7 +457,7 @@ async function processManualRun<TMedia>(
       unattended: config.unattended
     });
     let media = await getMedia(config);
-    let filtered = await filterMedia(config, media, config.unattended);
+    let filtered = await filterMedia(config, media);
 
     // Unattended mode: if no media found, simulate tag removal and re-filter (preview only, no actual changes)
     if (config.unattended && filtered.length === 0 && getTagId) {
@@ -475,7 +479,7 @@ async function processManualRun<TMedia>(
         });
         
         // Re-filter without unattended mode to see what would be available after tag removal
-        filtered = await filterMedia(config, mediaWithTagRemoved, false);
+        filtered = await filterMedia(config, mediaWithTagRemoved);
         logger.debug(`🔄 Simulated re-filter for ${name} after tag removal`, {
           total: media.length,
           filtered: filtered.length
@@ -483,7 +487,9 @@ async function processManualRun<TMedia>(
       }
     }
 
-    const toSearch = randomSelect(filtered, config.count);
+    // Normalize 'MAX' to 'max' for consistency
+    const normalizedCount = config.count === 'MAX' ? 'max' : config.count;
+    const toSearch = randomSelect(filtered, normalizedCount);
 
     logger.debug(`Manual run preview: ${name} results`, {
       total: media.length,
@@ -514,7 +520,7 @@ async function processManualRunInstances(
   instances: any[],
   appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr',
   getMedia: (config: any) => Promise<any[]>,
-  filterMedia: (config: any, media: any[], unattended: boolean) => Promise<any[]>,
+  filterMedia: (config: any, media: any[]) => Promise<any[]>,
   getMediaId: (media: any) => number,
   getMediaTitle: (media: any) => string,
   getTagId: (config: any, tagName: string) => Promise<number | null>,

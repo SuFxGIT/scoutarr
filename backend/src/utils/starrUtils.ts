@@ -19,13 +19,6 @@ export function getMediaTypeKey(appType: string): string {
   }
 }
 
-/**
- * Maps app type to media type name (for logging/display)
- * Examples: 'radarr' -> 'movies', 'lidarr' -> 'artists', 'readarr' -> 'authors', 'sonarr' -> 'series'
- */
-export function getMediaTypeName(appType: string): string {
-  return getMediaTypeKey(appType);
-}
 
 // Helper to get configured instances for an app (filters out disabled or incomplete configs)
 export function getConfiguredInstances<T extends { url: string; apiKey: string; enabled?: boolean }>(
