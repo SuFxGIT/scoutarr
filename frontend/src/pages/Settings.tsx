@@ -1698,7 +1698,7 @@ function Settings() {
                 <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Reset App</Text>
                   <Text size="1" color="gray">
-                    This will permanently delete all configuration, quality profiles cache, and statistics. This action cannot be undone.
+                    This will permanently delete all configuration, quality profiles cache, statistics, and logs. This action cannot be undone.
                   </Text>
                   {confirmingResetApp ? (
                     <Flex gap="2" align="center">
