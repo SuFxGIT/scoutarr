@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Flex,
   Heading,
@@ -14,7 +14,8 @@ import {
   Badge,
   Spinner,
   Grid,
-  Tooltip
+  Tooltip,
+  AlertDialog
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
@@ -22,6 +23,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
@@ -31,6 +33,7 @@ import { AppIcon } from '../components/icons/AppIcon';
 
 function Settings() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
@@ -49,6 +52,10 @@ function Settings() {
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const loadedConfigRef = useRef<Config | null>(null);
 
   // Load config with react-query
   const { data: loadedConfig, isLoading: loading, error: loadError, refetch: refetchConfig } = useQuery<Config>({
@@ -76,11 +83,58 @@ function Settings() {
   useEffect(() => {
     if (loadedConfig) {
       setConfig(loadedConfig);
+      loadedConfigRef.current = loadedConfig;
       if (loadedConfig.scheduler?.schedule) {
         setSchedulerPreset(getPresetFromSchedule(loadedConfig.scheduler.schedule));
       }
     }
   }, [loadedConfig]);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useCallback((): boolean => {
+    if (!config || !loadedConfigRef.current) return false;
+    return JSON.stringify(config) !== JSON.stringify(loadedConfigRef.current);
+  }, [config]);
+
+  // Handle tab change with unsaved changes check
+  const handleTabChange = useCallback((newTab: string) => {
+    if (hasUnsavedChanges() && activeTab !== newTab) {
+      setPendingTab(newTab);
+      setShowUnsavedDialog(true);
+    } else {
+      setActiveTab(newTab);
+    }
+  }, [hasUnsavedChanges, activeTab]);
+
+  // Handle navigation with unsaved changes check
+  const handleNavigation = useCallback((path: string) => {
+    if (hasUnsavedChanges()) {
+      setPendingNavigation(path);
+      setShowUnsavedDialog(true);
+    } else {
+      navigate(path);
+    }
+  }, [hasUnsavedChanges, navigate]);
+
+  // Confirm navigation/tab change (discard changes)
+  const confirmDiscardChanges = useCallback(() => {
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
+    }
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
+    setShowUnsavedDialog(false);
+  }, [pendingNavigation, pendingTab, navigate]);
+
+  // Cancel navigation/tab change
+  const cancelDiscardChanges = useCallback(() => {
+    setPendingNavigation(null);
+    setPendingTab(null);
+    setShowUnsavedDialog(false);
+  }, []);
 
   // Load cached quality profiles on mount
   useEffect(() => {
@@ -125,6 +179,30 @@ function Settings() {
     }
   }, [activeTab]);
 
+  // Handle browser beforeunload event for unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  // Expose navigation handler to parent via window (for App.tsx to use)
+  useEffect(() => {
+    (window as any).__scoutarr_handleNavigation = handleNavigation;
+    return () => {
+      delete (window as any).__scoutarr_handleNavigation;
+    };
+  }, [handleNavigation]);
+
 
   // Save config mutation with validation
   const saveConfigMutation = useMutation({
@@ -146,14 +224,24 @@ function Settings() {
       }
       await axios.put('/api/config', configToSave);
     },
-    onSuccess: () => {
+    onSuccess: (_, configToSave) => {
       toast.success('Configuration saved successfully!');
+      // Update ref with the saved config
+      if (configToSave) {
+        loadedConfigRef.current = configToSave;
+      }
       queryClient.invalidateQueries({ queryKey: ['config'] });
       queryClient.invalidateQueries({ queryKey: ['manualRunPreview'] });
       refetchConfig();
     },
     onError: (error: unknown) => {
-      toast.error('Failed to save config: ' + getErrorMessage(error));
+      toast.error('Failed to save config: ' + getErrorMessage(error), {
+        style: {
+          background: 'var(--red-9)',
+          color: 'white',
+          border: '1px solid var(--red-10)',
+        },
+      });
     },
   });
 
@@ -196,7 +284,13 @@ function Settings() {
       }, 1000);
     },
     onError: (error: unknown) => {
-      toast.error('Failed to reset app: ' + getErrorMessage(error));
+      toast.error('Failed to reset app: ' + getErrorMessage(error), {
+        style: {
+          background: 'var(--red-9)',
+          color: 'white',
+          border: '1px solid var(--red-10)',
+        },
+      });
       setConfirmingResetApp(false);
     },
   });
@@ -211,7 +305,13 @@ function Settings() {
       setConfirmingClearTags(null);
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear tags: ' + getErrorMessage(error));
+      toast.error('Failed to clear tags: ' + getErrorMessage(error), {
+        style: {
+          background: 'var(--red-9)',
+          color: 'white',
+          border: '1px solid var(--red-10)',
+        },
+      });
       setConfirmingClearTags(null);
     },
   });
@@ -337,7 +437,13 @@ function Settings() {
     const instances = getInstances(app);
     // Limit instances per app
     if (instances.length >= MAX_INSTANCES_PER_APP) {
-      toast.error(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
+      toast.error(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`, {
+        style: {
+          background: 'var(--red-9)',
+          color: 'white',
+          border: '1px solid var(--red-10)',
+        },
+      });
       return;
     }
     const newId = `${app}-${Date.now()}`;
@@ -579,7 +685,13 @@ function Settings() {
 
     // Validate URL with validator library
     if (!validator.isURL(appConfig.url, { require_protocol: true })) {
-      toast.error('Invalid URL format');
+        toast.error('Invalid URL format', {
+          style: {
+            background: 'var(--red-9)',
+            color: 'white',
+            border: '1px solid var(--red-10)',
+          },
+        });
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
@@ -617,14 +729,26 @@ function Settings() {
           fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey);
         }
       } else {
-        toast.error('Connection test failed');
+        toast.error('Connection test failed', {
+          style: {
+            background: 'var(--red-9)',
+            color: 'white',
+            border: '1px solid var(--red-10)',
+          },
+        });
       }
     } catch (error: any) {
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
       }));
-      toast.error('Connection test failed: ' + getErrorMessage(error));
+      toast.error('Connection test failed: ' + getErrorMessage(error), {
+        style: {
+          background: 'var(--red-9)',
+          color: 'white',
+          border: '1px solid var(--red-10)',
+        },
+      });
     }
   };
 
@@ -708,7 +832,7 @@ function Settings() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
-        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+        <Tabs.Root value={activeTab} onValueChange={handleTabChange}>
           <Flex align="center" justify="between" gap="3">
             <Tabs.List>
               <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
@@ -1547,6 +1671,28 @@ function Settings() {
           </Tabs.Content>
         </Tabs.Root>
       </Flex>
+
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog.Root open={showUnsavedDialog}>
+        <AlertDialog.Content maxWidth="450px">
+          <AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
+          <AlertDialog.Description size="3" mb="4">
+            You have unsaved changes. Are you sure you want to leave without saving? Your changes will be lost.
+          </AlertDialog.Description>
+          <Flex gap="3" justify="end">
+            <AlertDialog.Cancel>
+              <Button variant="soft" color="gray" onClick={cancelDiscardChanges}>
+                Cancel
+              </Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action>
+              <Button variant="solid" color="red" onClick={confirmDiscardChanges}>
+                Discard Changes
+              </Button>
+            </AlertDialog.Action>
+          </Flex>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
     </div>
   );
 }
