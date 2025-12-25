@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from '@radix-ui/themes';
 import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import humanizeDuration from 'humanize-duration';
 import ReactPaginate from 'react-paginate';
@@ -69,6 +69,7 @@ interface SchedulerHistoryEntry {
 }
 
 function Dashboard() {
+  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
@@ -184,11 +185,14 @@ function Dashboard() {
       await axios.post('/api/status/scheduler/history/clear');
     },
     onSuccess: () => {
+      // Optimistically update the query cache instead of refetching
+      queryClient.setQueryData(['schedulerHistory'], []);
       toast.success('Scheduler history cleared');
-      refetchHistory();
     },
     onError: (error: unknown) => {
       toast.error('Failed to clear history: ' + getErrorMessage(error));
+      // Only refetch on error to get the actual state
+      refetchHistory();
     },
   });
 
