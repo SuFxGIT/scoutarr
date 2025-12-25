@@ -1504,47 +1504,6 @@ function Settings() {
                 <Separator />
 
                 <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">Reset App</Text>
-                  <Text size="1" color="gray">
-                    This will permanently delete all configuration, quality profiles cache, statistics, and logs. This action cannot be undone.
-                  </Text>
-                  {confirmingResetApp ? (
-                    <Flex gap="2" align="center">
-                      <Text size="1" color="red" weight="medium">Are you sure? This will delete all data.</Text>
-                      <Button
-                        variant="solid"
-                        size="2"
-                        color="red"
-                        onClick={() => resetAppMutation.mutate()}
-                        disabled={resetAppMutation.isPending}
-                      >
-                        Confirm Reset
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="2"
-                        onClick={() => setConfirmingResetApp(false)}
-                        disabled={resetAppMutation.isPending}
-                      >
-                        Cancel
-                      </Button>
-                    </Flex>
-                  ) : (
-                    <Button
-                      variant="solid"
-                      color="red"
-                      size="2"
-                      onClick={() => setConfirmingResetApp(true)}
-                      disabled={resetAppMutation.isPending}
-                    >
-                      Reset App
-                    </Button>
-                  )}
-                </Flex>
-
-                <Separator />
-
-                <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Intro Hints</Text>
                   <Text size="1" color="gray">
                     Show the introductory hints at the top of the Settings page again.
@@ -1567,6 +1526,49 @@ function Settings() {
                   >
                     Show Intro Hints
                   </Button>
+                </Flex>
+
+                <Separator />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Reset App</Text>
+                  <Text size="1" color="gray">
+                    This will permanently delete all configuration, quality profiles cache, statistics, and logs. This action cannot be undone.
+                  </Text>
+                  {confirmingResetApp ? (
+                    <Flex gap="2" align="center" wrap="wrap">
+                      <Text size="1" color="red" weight="medium">Are you sure? This will delete all data.</Text>
+                      <Flex gap="2">
+                        <Button
+                          variant="solid"
+                          size="2"
+                          color="red"
+                          onClick={() => resetAppMutation.mutate()}
+                          disabled={resetAppMutation.isPending}
+                        >
+                          Confirm Reset
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="2"
+                          onClick={() => setConfirmingResetApp(false)}
+                          disabled={resetAppMutation.isPending}
+                        >
+                          Cancel
+                        </Button>
+                      </Flex>
+                    </Flex>
+                  ) : (
+                    <Button
+                      variant="solid"
+                      color="red"
+                      size="2"
+                      onClick={() => setConfirmingResetApp(true)}
+                      disabled={resetAppMutation.isPending}
+                    >
+                      Reset App
+                    </Button>
+                  )}
                 </Flex>
               </Flex>
             </Card>
