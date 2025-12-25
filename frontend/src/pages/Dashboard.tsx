@@ -501,6 +501,8 @@ function Dashboard() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
+        {renderAutomaticRunPreview()}
+
         <Card style={{ padding: '0.5rem' }}>
           <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
@@ -678,8 +680,6 @@ function Dashboard() {
             </Card>
           );
         })()}
-
-        {renderAutomaticRunPreview()}
 
         {stats && (() => {
           const recentUpgrades = stats.recentUpgrades || [];
