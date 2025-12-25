@@ -162,17 +162,38 @@ function Settings() {
     saveConfigMutation.mutate(config);
   };
 
-  // Reset app mutation (clears config, quality profiles cache, and stats)
+  // Reset app mutation (clears config, quality profiles cache, stats, logs, and localStorage)
   const resetAppMutation = useMutation({
     mutationFn: async () => {
       await axios.post('/api/config/reset-app');
     },
     onSuccess: () => {
-      toast.success('App reset completed - all data cleared');
+      // Clear localStorage to reset UI state
+      try {
+        localStorage.removeItem('scoutarr_settings_active_tab');
+        // Clear any other potential localStorage keys
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('scoutarr_')) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      } catch (error) {
+        // Ignore localStorage errors
+      }
+      
+      toast.success('App reset completed - all data cleared. Reloading...');
       queryClient.invalidateQueries({ queryKey: ['config'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       refetchConfig();
       setConfirmingResetApp(false);
+      
+      // Reload the page after a short delay to ensure fresh UI state
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     },
     onError: (error: unknown) => {
       toast.error('Failed to reset app: ' + getErrorMessage(error));
@@ -1484,7 +1505,7 @@ function Settings() {
                 <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Reset App</Text>
                   <Text size="1" color="gray">
-                    This will permanently delete all configuration, quality profiles cache, statistics, and logs. This action cannot be undone.
+                    This will completely reset the app to a fresh state like a first-time installation. It will permanently delete all configuration, quality profiles cache, statistics database, log files, and clear browser storage. The app will reload automatically after reset. This action cannot be undone.
                   </Text>
                   {confirmingResetApp ? (
                     <Flex gap="2" align="center" wrap="wrap">

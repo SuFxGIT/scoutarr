@@ -288,6 +288,28 @@ class StatsService {
     await this.resetStats();
   }
 
+  async clearData(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Delete all entries from the upgrades table
+      // This clears recent triggers and stats but keeps the database structure
+      const deleteStmt = this.db.prepare('DELETE FROM upgrades');
+      const result = deleteStmt.run();
+      
+      logger.info('🗑️  Cleared all upgrade data from stats database', { 
+        rowsDeleted: result.changes 
+      });
+    } catch (error: any) {
+      logger.error('❌ Error clearing data', { 
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
   close(): void {
     if (this.db) {
       this.db.close();

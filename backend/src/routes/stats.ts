@@ -59,3 +59,14 @@ statsRouter.post('/clear-recent', async (req, res) => {
   }
 });
 
+// Clear data (recent triggers and stats) - keeps database structure
+statsRouter.post('/clear-data', async (req, res) => {
+  try {
+    await statsService.clearData();
+    res.json({ success: true, message: 'Recent triggers and stats cleared successfully' });
+  } catch (error: any) {
+    logger.error('❌ Error clearing data', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+

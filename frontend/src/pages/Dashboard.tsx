@@ -166,16 +166,16 @@ function Dashboard() {
   // Mutation for clearing stats
   const clearStatsMutation = useMutation({
     mutationFn: async () => {
-      await axios.post('/api/stats/reset');
+      await axios.post('/api/stats/clear-data');
     },
     onSuccess: () => {
-      toast.success('Stats cleared');
+      toast.success('Recent triggers and stats cleared');
       setCurrentPage(1);
       setConfirmingClear(null);
       refetchStats();
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear stats: ' + getErrorMessage(error));
+      toast.error('Failed to clear data: ' + getErrorMessage(error));
       setConfirmingClear(null);
     },
   });
@@ -575,7 +575,7 @@ function Dashboard() {
               })()}
             </Flex>
             <Flex>
-              <Tooltip content="Reset all statistics and recent triggers.">
+              <Tooltip content="Clear recent triggers and statistics. This will remove all upgrade history and reset stats to zero, but keep the database structure intact.">
                 <span>
                   {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
                     <Button 
