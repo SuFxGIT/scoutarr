@@ -31,7 +31,6 @@ interface SearchResults {
     series?: Array<{ id: number; title: string }>;
     artists?: Array<{ id: number; title: string }>;
     authors?: Array<{ id: number; title: string }>;
-    items?: Array<{ id: number; title: string }>;
     error?: string;
   };
 }
@@ -340,7 +339,7 @@ function Dashboard() {
             });
             
             // Show searched items (check all possible media type keys)
-            const items = result.movies || result.series || result.artists || result.authors || result.items || [];
+            const items = result.movies || result.series || result.artists || result.authors || [];
             if (items.length > 0) {
               items.forEach((item: any) => {
                 const itemLabel = mediaType === 'movies' ? 'Movie' : mediaType === 'artists' ? 'Artist' : mediaType === 'authors' ? 'Author' : 'Series';

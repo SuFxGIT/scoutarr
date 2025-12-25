@@ -21,7 +21,6 @@ interface SchedulerRunHistory {
 interface InstanceSchedulerTask {
   task: cron.ScheduledTask;
   schedule: string;
-  isRunning: boolean;
 }
 
 class SchedulerService {
@@ -122,8 +121,7 @@ class SchedulerService {
 
     const taskInfo: InstanceSchedulerTask = {
       task,
-      schedule,
-      isRunning: false
+      schedule
     };
 
     this.instanceTasks.set(instanceKey, taskInfo);

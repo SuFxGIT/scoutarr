@@ -13,7 +13,6 @@ interface SearchResults {
     series?: Array<{ id: number; title: string }>;
     artists?: Array<{ id: number; title: string }>;
     authors?: Array<{ id: number; title: string }>;
-    items?: Array<{ id: number; title: string }>;
     error?: string;
     instanceName?: string;
   };
