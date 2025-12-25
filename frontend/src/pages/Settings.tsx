@@ -1353,7 +1353,7 @@ function Settings() {
               <Flex direction="column" gap="4" p="4">
                 <Flex align="center" gap="2">
                   <Heading size="5">Global Schedule</Heading>
-                  <Tooltip content="Configure a schedule that applies to all instances. The global scheduler processes all instances except those that have per-instance scheduling enabled. When an instance has its own schedule enabled, it overrides the global schedule for that instance only.">
+                  <Tooltip content="Schedule for all instances. Per-instance schedules override this.">
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
                   </Tooltip>
                 </Flex>
@@ -1362,7 +1362,7 @@ function Settings() {
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
                     <Text size="2" weight="medium">Enable Scheduler</Text>
-                    <Tooltip content="When enabled, the global scheduler will run searches automatically according to the schedule below for all instances that don't have per-instance scheduling enabled.">
+                    <Tooltip content="Automatically run searches on schedule for instances without per-instance schedules.">
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
@@ -1387,7 +1387,7 @@ function Settings() {
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
                     <Text size="2" weight="medium">Unattended Mode</Text>
-                    <Tooltip content="When enabled, the scheduler will automatically remove tags from all media and re-filter when no media is found, allowing continuous operation without manual intervention.">
+                    <Tooltip content="Automatically clear tags and re-filter when no media is found.">
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
@@ -1468,7 +1468,7 @@ function Settings() {
               <Flex direction="column" gap="4" p="4">
                 <Flex align="center" gap="2">
                   <Heading size="5">Per-Instance Schedule</Heading>
-                  <Tooltip content="Configure individual schedules for each instance. When enabled for an instance, it overrides the global schedule for that instance only. The instance will run searches according to its own schedule, independent of the global scheduler. Instances without per-instance schedules enabled will continue to use the global schedule.">
+                  <Tooltip content="Set individual schedules per instance. Overrides global schedule when enabled.">
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
                   </Tooltip>
                 </Flex>
