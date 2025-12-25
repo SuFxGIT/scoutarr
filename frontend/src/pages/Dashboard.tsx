@@ -32,6 +32,7 @@ interface SearchResults {
     artists?: Array<{ id: number; title: string }>;
     authors?: Array<{ id: number; title: string }>;
     error?: string;
+    instanceName?: string;
   };
 }
 
@@ -249,7 +250,7 @@ function Dashboard() {
       
       Object.entries(previewResults).forEach(([app, result]: [string, any]) => {
         if (result.success) {
-          const appName = formatAppName(app);
+          const appName = result.instanceName || formatAppName(app);
           const count = result.count || 0;
           const total = result.total || 0;
           
@@ -328,7 +329,7 @@ function Dashboard() {
       if (entry.success) {
         Object.entries(entry.results).forEach(([app, result]: [string, any]) => {
           if (result.success) {
-            const appName = formatAppName(app);
+            const appName = result.instanceName || formatAppName(app);
             const searched = result.searched || 0;
             
             // Determine media type
@@ -356,10 +357,11 @@ function Dashboard() {
               });
             }
           } else {
+            const appName = result.instanceName || formatAppName(app);
             logs.push({
               timestamp,
               app,
-              message: `${formatAppName(app)}: Error - ${result.error || 'Unknown error'}`,
+              message: `${appName}: Error - ${result.error || 'Unknown error'}`,
               type: 'error'
             });
           }

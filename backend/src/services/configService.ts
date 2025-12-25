@@ -90,6 +90,13 @@ class ConfigService {
       }
       
       this.config = parsed as Config;
+      
+      // Update log level if specified in config
+      if ((parsed as any).logLevel) {
+        const { updateLogLevel } = await import('../utils/logger.js');
+        updateLogLevel((parsed as any).logLevel);
+      }
+      
       logger.debug('Configuration loaded successfully', { 
         configFile: CONFIG_FILE
       });

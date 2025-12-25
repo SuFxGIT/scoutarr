@@ -91,7 +91,9 @@ class StatsService {
       logger.debug('📊 Stats updated', { 
         application: appKey,
         instance,
-        count
+        instanceValue: instance,
+        count,
+        itemsCount: items.length
       });
     } catch (error: any) {
       logger.error('❌ Error saving stats', { 
@@ -249,11 +251,28 @@ class StatsService {
   }
 
   async resetStats(): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
     try {
-      this.db.exec('DELETE FROM upgrades');
-      logger.info('🔄 Stats reset');
+      // Close the database connection first
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+      
+      // Delete the database file for a complete reset
+      try {
+        await fs.unlink(DB_FILE);
+        logger.debug('🗑️  Deleted stats database file');
+      } catch (error: any) {
+        // If file doesn't exist, that's okay
+        if (error.code !== 'ENOENT') {
+          logger.warn('⚠️  Could not delete stats database file', { error: error.message });
+        }
+      }
+      
+      // Reinitialize the database (this will create a new file and tables)
+      await this.initialize();
+      
+      logger.info('🔄 Stats reset - database recreated');
     } catch (error: any) {
       logger.error('❌ Error resetting stats', { 
         error: error.message

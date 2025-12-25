@@ -49,8 +49,18 @@ const fileFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Determine log level from environment
-const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+// Determine log level from environment or config
+// We'll read from config after it's loaded, but default to env or production default
+let logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+
+// Function to update log level from config (called after config is loaded)
+export function updateLogLevel(level?: string): void {
+  if (level && ['error', 'warn', 'info', 'http', 'debug'].includes(level)) {
+    logLevel = level;
+    logger.level = level;
+    logger.info(`📝 Log level updated to: ${level}`);
+  }
+}
 
 // Create logger instance
 const logger = winston.createLogger({

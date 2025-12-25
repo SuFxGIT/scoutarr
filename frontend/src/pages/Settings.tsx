@@ -620,14 +620,13 @@ function Settings() {
 
   // Helper to render instance schedule configuration
   const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: any) => {
-    const appInfo = getAppInfo(appType);
     const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
     
     return (
       <Card key={instance.id} variant="surface">
         <Flex direction="column" gap="3" p="3">
           <Flex direction="row" align="center" justify="between">
-            <Text size="3" weight="medium">{instance.name || `${appInfo.name} ${instance.instanceId || ''}`}</Text>
+            <Text size="3" weight="medium">{instance.name}</Text>
             <Flex direction="row" align="center" gap="2">
               <Text size="2">Enable Schedule</Text>
               <Switch
@@ -826,13 +825,13 @@ function Settings() {
                 })()}
               </Flex>
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
-                {getInstances(selectedAppType).map((instance, idx) => {
+                {(() => {
                   const appInfo = getAppInfo(selectedAppType);
-                  const instanceKey = `${selectedAppType}-${instance.id}`;
-                  const isExpanded = expandedInstances.has(instanceKey);
-                  const displayName = instance.name || `${appInfo.name} ${instance.instanceId || idx + 1}`;
-                  
-                  return (
+                  return getInstances(selectedAppType).map((instance) => {
+                    const instanceKey = `${selectedAppType}-${instance.id}`;
+                    const isExpanded = expandedInstances.has(instanceKey);
+                    
+                    return (
                     <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
                       <Flex direction="column" gap="2">
                         <Collapsible.Root open={isExpanded} onOpenChange={(open) => {
@@ -862,7 +861,7 @@ function Settings() {
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Flex align="center" gap="2">
                                   <AppIcon app={selectedAppType} size={18} variant="light" />
-                                  <Text size="3" weight="bold">{displayName}</Text>
+                                  <Text size="3" weight="bold">{instance.name}</Text>
                                 </Flex>
                                 <Flex align="center" gap="2">
                                   {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
@@ -928,15 +927,15 @@ function Settings() {
                               <Separator />
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Name (optional)</Text>
-                                  <Tooltip content={`A friendly name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Leave empty to use default ID.`}>
+                                  <Text size="2" weight="medium">Name (required)</Text>
+                                  <Tooltip content={`A unique name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Must be unique across all instances.`}>
                                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                                   </Tooltip>
                                 </Flex>
                                 <TextField.Root
                                   value={instance.name || ''}
                                   onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
-                                  placeholder={`${appInfo.name} ${instance.instanceId || idx + 1}`}
+                                  placeholder={`Enter unique instance name`}
                                 />
                               </Flex>
 
@@ -1240,7 +1239,8 @@ function Settings() {
                       </Flex>
                     </Card>
                   );
-                })}
+                  });
+                })()}
               </Grid>
             </Flex>
           </Tabs.Content>

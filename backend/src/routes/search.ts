@@ -37,7 +37,7 @@ export function getResultKey(instanceId: string, appType: AppType, instanceCount
 // Helper to extract instance info from config
 export function getInstanceInfo(config: any, appType: AppType): { instanceName: string; instanceId: string } {
   return {
-    instanceName: config.name || appType,
+    instanceName: config.name,
     instanceId: config.id || `${appType}-1`
   };
 }
@@ -52,19 +52,24 @@ export async function saveStatsForResults(results: Record<string, any>): Promise
       // Get items - check all possible media type keys
       const items = extractItemsFromResult(result);
       
-      // Extract instance ID if present (e.g., "radarr-instance-id" -> "instance-id")
-      // Only pass instance if the key contains a dash and is a valid app type
-      let instanceId: string | undefined;
-      if (app.includes('-') && APP_TYPES.includes(appType as any)) {
-        // Extract everything after the first dash as the instance ID
-        instanceId = app.substring(app.indexOf('-') + 1);
-      }
+      // Use instanceName from result if available, otherwise undefined
+      const instanceName = result.instanceName;
+      
+      // Debug logging to see what's being saved
+      logger.debug('📊 Saving stats', {
+        app,
+        appType,
+        instanceName,
+        hasInstanceName: 'instanceName' in result,
+        resultKeys: Object.keys(result),
+        resultInstanceName: result.instanceName
+      });
       
       await statsService.addUpgrade(
         appType,
         result.searched,
         items,
-        instanceId
+        instanceName
       );
     }
   }
