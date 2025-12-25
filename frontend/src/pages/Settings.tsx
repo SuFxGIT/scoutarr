@@ -49,6 +49,7 @@ function Settings() {
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
   const [showIntroCallout, setShowIntroCallout] = useState(true);
   const [showHintCallout, setShowHintCallout] = useState(true);
+  const [showSchedulerHint, setShowSchedulerHint] = useState(true);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
 
@@ -111,11 +112,15 @@ function Settings() {
     try {
       const introDismissed = localStorage.getItem('scoutarr_settings_intro_dismissed') === 'true';
       const hintDismissed = localStorage.getItem('scoutarr_settings_hint_dismissed') === 'true';
+      const schedulerHintDismissed = localStorage.getItem('scoutarr_settings_scheduler_hint_dismissed') === 'true';
       if (introDismissed) {
         setShowIntroCallout(false);
       }
       if (hintDismissed) {
         setShowHintCallout(false);
+      }
+      if (schedulerHintDismissed) {
+        setShowSchedulerHint(false);
       }
     } catch {
       // Ignore storage errors and fall back to defaults
@@ -624,6 +629,25 @@ function Settings() {
     return appNames[appType];
   };
 
+  // Helper to render dismiss button for callouts
+  const renderDismissButton = (onDismiss: () => void, ariaLabel: string) => (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onDismiss}
+      style={{
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'pointer',
+        color: 'var(--gray-11)',
+        flexShrink: 0,
+      }}
+    >
+      <Cross2Icon />
+    </button>
+  );
+
   // Helper to render instance schedule configuration
   const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: any) => {
     const appInfo = getAppInfo(appType);
@@ -702,28 +726,14 @@ function Settings() {
                   </Text>
                 </Callout.Text>
               </Flex>
-              <button
-                type="button"
-                aria-label="Dismiss intro"
-                onClick={() => {
-                  setShowIntroCallout(false);
-                  try {
-                    localStorage.setItem('scoutarr_settings_intro_dismissed', 'true');
-                  } catch {
-                    // ignore
-                  }
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  cursor: 'pointer',
-                  color: 'var(--gray-11)',
-                  flexShrink: 0,
-                }}
-              >
-                <Cross2Icon />
-              </button>
+              {renderDismissButton(() => {
+                setShowIntroCallout(false);
+                try {
+                  localStorage.setItem('scoutarr_settings_intro_dismissed', 'true');
+                } catch {
+                  // ignore
+                }
+              }, 'Dismiss intro')}
             </Flex>
           </Callout.Root>
         )}
@@ -739,28 +749,14 @@ function Settings() {
                   <Text size="1">Hover over the question mark icons next to field labels to see descriptions and hints</Text>
                 </Callout.Text>
               </Flex>
-              <button
-                type="button"
-                aria-label="Dismiss hint"
-                onClick={() => {
-                  setShowHintCallout(false);
-                  try {
-                    localStorage.setItem('scoutarr_settings_hint_dismissed', 'true');
-                  } catch {
-                    // ignore
-                  }
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  cursor: 'pointer',
-                  color: 'var(--gray-11)',
-                  flexShrink: 0,
-                }}
-              >
-                <Cross2Icon />
-              </button>
+              {renderDismissButton(() => {
+                setShowHintCallout(false);
+                try {
+                  localStorage.setItem('scoutarr_settings_hint_dismissed', 'true');
+                } catch {
+                  // ignore
+                }
+              }, 'Dismiss hint')}
             </Flex>
           </Callout.Root>
         )}
@@ -1328,11 +1324,31 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="scheduler" style={{ paddingTop: '1rem' }}>
-            <Flex direction="column" gap="3" style={{ marginBottom: '1rem' }}>
-              <Text size="2" color="gray">
-                <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'underline' }}>Learn about cron expressions</a>
-              </Text>
-            </Flex>
+            {showSchedulerHint && (
+              <Callout.Root color="blue" size="1" mb="3">
+                <Flex align="center" justify="between" gap="2" style={{ width: '100%' }}>
+                  <Flex align="center" gap="2" style={{ flex: 1 }}>
+                    <Callout.Icon>
+                      <QuestionMarkCircledIcon />
+                    </Callout.Icon>
+                    <Callout.Text>
+                      <Text size="1">
+                        Need help with cron expressions?{' '}
+                        <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'underline' }}>Click here</a> to learn more.
+                      </Text>
+                    </Callout.Text>
+                  </Flex>
+                  {renderDismissButton(() => {
+                    setShowSchedulerHint(false);
+                    try {
+                      localStorage.setItem('scoutarr_settings_scheduler_hint_dismissed', 'true');
+                    } catch {
+                      // ignore
+                    }
+                  }, 'Dismiss scheduler hint')}
+                </Flex>
+              </Callout.Root>
+            )}
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Flex align="center" gap="2">
@@ -1539,9 +1555,11 @@ function Settings() {
                     onClick={() => {
                       setShowIntroCallout(true);
                       setShowHintCallout(true);
+                      setShowSchedulerHint(true);
                       try {
                         localStorage.removeItem('scoutarr_settings_intro_dismissed');
                         localStorage.removeItem('scoutarr_settings_hint_dismissed');
+                        localStorage.removeItem('scoutarr_settings_scheduler_hint_dismissed');
                       } catch {
                         // ignore
                       }
