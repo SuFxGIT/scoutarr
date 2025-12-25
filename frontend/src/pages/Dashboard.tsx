@@ -18,7 +18,7 @@ import ReactPaginate from 'react-paginate';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
-import { ITEMS_PER_PAGE, REFETCH_INTERVAL, APP_TYPES } from '../utils/constants';
+import { ITEMS_PER_PAGE, APP_TYPES } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 
 interface SearchResults {
@@ -76,27 +76,25 @@ function Dashboard() {
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
-  // Fetch status with auto-refresh
+  // Fetch status
   const { data: statusData, refetch: refetchStatus } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
       return response.data;
     },
-    refetchInterval: REFETCH_INTERVAL,
   });
 
   const connectionStatus = statusData || {};
   const schedulerStatus = statusData?.scheduler || null;
 
-  // Fetch scheduler history with auto-refresh
+  // Fetch scheduler history
   const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
     queryKey: ['schedulerHistory'],
     queryFn: async () => {
       const response = await axios.get('/api/status/scheduler/history');
       return response.data;
     },
-    refetchInterval: REFETCH_INTERVAL,
   });
 
   // Fetch manual run preview
@@ -108,14 +106,13 @@ function Dashboard() {
     },
   });
 
-  // Fetch stats with auto-refresh
+  // Fetch stats
   const { data: stats, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: async () => {
       const response = await axios.get('/api/stats');
       return response.data;
     },
-    refetchInterval: REFETCH_INTERVAL,
   });
 
   // Auto-scroll to bottom when scheduler history changes

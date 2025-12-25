@@ -28,7 +28,7 @@ import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, REFETCH_INTERVAL } from '../utils/constants';
+import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 
 function Settings() {
@@ -67,14 +67,13 @@ function Settings() {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch status with auto-refresh
+  // Fetch status
   const { data: statusData } = useQuery<Record<string, any>>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
       return response.data;
     },
-    refetchInterval: REFETCH_INTERVAL,
   });
 
   const connectionStatus = statusData || {};
@@ -136,39 +135,6 @@ function Settings() {
     setShowUnsavedDialog(false);
   }, []);
 
-  // Load cached quality profiles on mount
-  useEffect(() => {
-    const loadCachedProfiles = async () => {
-      try {
-        const response = await axios.get('/api/config/quality-profiles');
-        const cachedProfiles = response.data;
-        
-        // Validate cached profiles against current config
-        if (config) {
-          const validatedProfiles: Record<string, { id: number; name: string }[]> = {};
-          
-          for (const app of APP_TYPES) {
-            const instances = config.applications[app] || [];
-            for (const instance of instances) {
-              const key = `${app}-${instance.id}`;
-              if (cachedProfiles[key] && instance.url && instance.apiKey) {
-                validatedProfiles[key] = cachedProfiles[key];
-              }
-            }
-          }
-          
-          setQualityProfiles(validatedProfiles);
-        } else {
-          // Config not loaded yet, just set the profiles
-          setQualityProfiles(cachedProfiles);
-        }
-      } catch (error) {
-        // Silently fail - cache might not exist yet
-      }
-    };
-    
-    loadCachedProfiles();
-  }, [config]);
 
   // Persist active tab to localStorage whenever it changes
   useEffect(() => {
@@ -635,12 +601,6 @@ function Settings() {
       return;
     }
 
-    // Don't fetch if we already have profiles (unless forcing refresh)
-    // Backend cache handles preventing duplicate API calls
-    if (!forceRefresh && qualityProfiles[key]) {
-      return;
-    }
-
     setLoadingProfiles(prev => ({ ...prev, [key]: true }));
     try {
       const response = await axios.post(`/api/config/quality-profiles/${app}`, {
@@ -726,7 +686,7 @@ function Settings() {
         toast.success(`Connection test successful${versionText}`);
         // Fetch quality profiles after successful connection test
         if (instanceId && appConfig.url && appConfig.apiKey) {
-          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey);
+          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey, true);
         }
       } else {
         toast.error('Connection test failed', {
