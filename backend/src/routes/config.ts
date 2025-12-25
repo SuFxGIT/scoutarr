@@ -6,6 +6,7 @@ import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
+import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 import { promises as fs } from 'fs';
@@ -25,12 +26,13 @@ async function clearLogs(): Promise<void> {
   for (const logFile of logFiles) {
     const logPath = path.join(logsDir, logFile);
     try {
-      await fs.writeFile(logPath, '', 'utf8');
-      logger.debug(`Cleared log file: ${logFile}`);
+      // Delete the file instead of just clearing it
+      await fs.unlink(logPath);
+      logger.debug(`Deleted log file: ${logFile}`);
     } catch (error: any) {
       // If file doesn't exist, that's okay - just log and continue
       if (error.code !== 'ENOENT') {
-        logger.warn(`Failed to clear log file ${logFile}: ${error.message}`);
+        logger.warn(`Failed to delete log file ${logFile}: ${error.message}`);
       }
     }
   }
@@ -60,6 +62,9 @@ configRouter.post('/reset-app', async (_req, res) => {
     
     // Clear stats database
     await statsService.resetStats();
+    
+    // Clear scheduler history
+    schedulerService.clearHistory();
     
     // Clear log files
     await clearLogs();

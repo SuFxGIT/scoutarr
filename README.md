@@ -1,12 +1,14 @@
 # scoutarr
 
-Scoutarr automates media upgrades in your Starr applications (Radarr and Sonarr) by triggering manual searches for media items that meet your criteria and tagging what was triggered, so you can continuously chase better quality releases without babysitting your apps.
+Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by triggering manual searches for media items that meet your criteria and tagging what was triggered, so you can continuously chase better quality releases without babysitting your apps.
 
 > **Note:** This project uses [Upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/tree/main/Upgradinatorr) as its foundation. We've created a modern UI and enhanced the functionality while maintaining the core concept.
 
 ## Screenshots
 
-<img src="screenshots/image.png" alt="Scoutarr Dashboard" width="800">
+<div align="center">
+  <img src="screenshots/image.png" alt="Scoutarr Dashboard" width="800">
+</div>
 
 <table>
   <tr>
@@ -19,6 +21,8 @@ Scoutarr automates media upgrades in your Starr applications (Radarr and Sonarr)
 
 - 🎬 **Radarr Integration** – Automatically trigger focused manual searches for movies
 - 📺 **Sonarr Integration** – Automatically trigger focused manual searches for series
+- 🎵 **Lidarr Integration** – Automatically trigger focused manual searches for music
+- 📚 **Readarr Integration** – Automatically trigger focused manual searches for books
 - 🧠 **Smart Filtering** – Filter by monitored state, movie/series status (including an **Any** option), quality profile, and tags
 - 🏷️ **Tag-Aware Workflow** – Only search untagged items, then tag everything that was triggered to avoid duplicates
 - ⏱️ **Scheduler with Unattended Mode** – Run searches on a schedule; when unattended is enabled, tags are automatically cleared and re-applied when nothing matches, keeping things moving without manual intervention
@@ -90,7 +94,7 @@ Configuration is stored in `config/config.json`. On first run, the application w
 
 ## How It Works
 
-1. **Configure** – Set up your Radarr/Sonarr instances, filters, and scheduler in the Settings page.
+1. **Configure** – Set up your Radarr, Sonarr, Lidarr, and Readarr instances, filters, and scheduler in the Settings page.
 2. **Preview** – The Dashboard shows a live preview of what the next scheduled run will trigger for each instance.
 3. **Run** – Trigger a search manually from the Dashboard or let the scheduler run automatically.
 4. **Tag** – Items that are searched are automatically tagged, and future runs only consider untagged items (unless unattended mode clears tags to keep searching).
