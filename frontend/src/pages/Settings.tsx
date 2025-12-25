@@ -17,7 +17,7 @@ import {
   Tooltip
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, Cross2Icon, ReloadIcon, QuestionMarkCircledIcon, InfoCircledIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
@@ -26,7 +26,7 @@ import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS } from '../utils/constants';
+import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, REFETCH_INTERVAL } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 
 function Settings() {
@@ -47,9 +47,6 @@ function Settings() {
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
   const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
-  const [showIntroCallout, setShowIntroCallout] = useState(true);
-  const [showHintCallout, setShowHintCallout] = useState(true);
-  const [showSchedulerHint, setShowSchedulerHint] = useState(true);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
 
@@ -62,6 +59,18 @@ function Settings() {
     },
     refetchOnWindowFocus: true,
   });
+
+  // Fetch status with auto-refresh
+  const { data: statusData } = useQuery<Record<string, any>>({
+    queryKey: ['status'],
+    queryFn: async () => {
+      const response = await axios.get('/api/status');
+      return response.data;
+    },
+    refetchInterval: REFETCH_INTERVAL,
+  });
+
+  const connectionStatus = statusData || {};
 
   // Update local config when loaded config changes
   useEffect(() => {
@@ -106,26 +115,6 @@ function Settings() {
     
     loadCachedProfiles();
   }, [config]);
-
-  // Load persisted callout visibility once on mount
-  useEffect(() => {
-    try {
-      const introDismissed = localStorage.getItem('scoutarr_settings_intro_dismissed') === 'true';
-      const hintDismissed = localStorage.getItem('scoutarr_settings_hint_dismissed') === 'true';
-      const schedulerHintDismissed = localStorage.getItem('scoutarr_settings_scheduler_hint_dismissed') === 'true';
-      if (introDismissed) {
-        setShowIntroCallout(false);
-      }
-      if (hintDismissed) {
-        setShowHintCallout(false);
-      }
-      if (schedulerHintDismissed) {
-        setShowSchedulerHint(false);
-      }
-    } catch {
-      // Ignore storage errors and fall back to defaults
-    }
-  }, []);
 
   // Persist active tab to localStorage whenever it changes
   useEffect(() => {
@@ -629,25 +618,6 @@ function Settings() {
     return appNames[appType];
   };
 
-  // Helper to render dismiss button for callouts
-  const renderDismissButton = (onDismiss: () => void, ariaLabel: string) => (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      onClick={onDismiss}
-      style={{
-        border: 'none',
-        background: 'transparent',
-        padding: 0,
-        cursor: 'pointer',
-        color: 'var(--gray-11)',
-        flexShrink: 0,
-      }}
-    >
-      <Cross2Icon />
-    </button>
-  );
-
   // Helper to render instance schedule configuration
   const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: any) => {
     const appInfo = getAppInfo(appType);
@@ -693,13 +663,20 @@ function Settings() {
                 </Select.Content>
               </Select.Root>
               {instanceSchedulePreset === 'custom' && (
-                <TextField.Root
-                  value={instance.schedule || '0 */6 * * *'}
-                  onChange={(e) => {
-                    updateInstanceConfig(appType, instance.id, 'schedule', e.target.value);
-                  }}
-                  placeholder="0 */6 * * *"
-                />
+                <Flex direction="column" gap="1">
+                  <TextField.Root
+                    value={instance.schedule || '0 */6 * * *'}
+                    onChange={(e) => {
+                      updateInstanceConfig(appType, instance.id, 'schedule', e.target.value);
+                    }}
+                    placeholder="0 */6 * * *"
+                  />
+                  <Text size="1" color="gray">
+                    <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                      Need help? Visit crontab.guru →
+                    </a>
+                  </Text>
+                </Flex>
               )}
             </Flex>
           )}
@@ -711,56 +688,6 @@ function Settings() {
   return (
     <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
       <Flex direction="column" gap="3">
-        {showIntroCallout && (
-          <Callout.Root color="blue">
-            <Flex align="start" justify="between" gap="3" style={{ width: '100%' }}>
-              <Flex align="start" gap="3" style={{ flex: 1 }}>
-                <Callout.Icon>
-                  <InfoCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  <Text weight="bold" size="3">What is Scoutarr?</Text>
-                  <br />
-                  <Text size="2">
-                    Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, etc.) by triggering manual searches for media items that meet your criteria. It helps find better quality versions of your media.
-                  </Text>
-                </Callout.Text>
-              </Flex>
-              {renderDismissButton(() => {
-                setShowIntroCallout(false);
-                try {
-                  localStorage.setItem('scoutarr_settings_intro_dismissed', 'true');
-                } catch {
-                  // ignore
-                }
-              }, 'Dismiss intro')}
-            </Flex>
-          </Callout.Root>
-        )}
-
-        {showHintCallout && (
-          <Callout.Root color="blue" size="1">
-            <Flex align="center" justify="between" gap="2" style={{ width: '100%' }}>
-              <Flex align="center" gap="2" style={{ flex: 1 }}>
-                <Callout.Icon>
-                  <QuestionMarkCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  <Text size="1">Hover over the question mark icons next to field labels to see descriptions and hints</Text>
-                </Callout.Text>
-              </Flex>
-              {renderDismissButton(() => {
-                setShowHintCallout(false);
-                try {
-                  localStorage.setItem('scoutarr_settings_hint_dismissed', 'true');
-                } catch {
-                  // ignore
-                }
-              }, 'Dismiss hint')}
-            </Flex>
-          </Callout.Root>
-        )}
-
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <Flex align="center" justify="between" gap="3">
             <Tabs.List>
@@ -828,6 +755,75 @@ function Settings() {
                     </Select.Content>
                   </Select.Root>
                 </Flex>
+              </Flex>
+              <Flex gap="2" wrap="wrap">
+                {(() => {
+                  // Group status entries by app type
+                  const groupedStatus: Record<string, { connected: number; total: number; configured: boolean }> = {};
+                  
+                  // Initialize all app types
+                  APP_TYPES.forEach(appType => {
+                    groupedStatus[appType] = { connected: 0, total: 0, configured: true };
+                  });
+                  
+                  // Process connection status entries
+                  Object.entries(connectionStatus).forEach(([key, status]: [string, any]) => {
+                    if (key === 'scheduler') return;
+                    
+                    // Check if it's an app type directly (for backward compatibility or "not configured" case)
+                    if (APP_TYPES.includes(key as any)) {
+                      if (status.configured === false) {
+                        groupedStatus[key].configured = false;
+                      }
+                      return;
+                    }
+                    
+                    // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
+                    const appType = key.split('-')[0];
+                    if (APP_TYPES.includes(appType as any)) {
+                      groupedStatus[appType].total++;
+                      if (status.connected) {
+                        groupedStatus[appType].connected++;
+                      }
+                      groupedStatus[appType].configured = true; // Has at least one instance configured
+                    }
+                  });
+                  
+                  // Generate badges for each app type
+                  return APP_TYPES.map(appType => {
+                    const stats = groupedStatus[appType];
+                    const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
+                    let statusMessage = '';
+                    let badgeColor: 'green' | 'gray' | 'red' = 'red';
+                    
+                    if (!stats.configured) {
+                      statusMessage = 'Not Configured';
+                      badgeColor = 'gray';
+                    } else if (stats.connected > 0) {
+                      statusMessage = `${stats.connected} Instance${stats.connected === 1 ? '' : 's'} connected`;
+                      badgeColor = 'green';
+                    } else if (stats.total > 0) {
+                      statusMessage = `${stats.total} Instance${stats.total === 1 ? '' : 's'} disconnected`;
+                      badgeColor = 'red';
+                    } else {
+                      statusMessage = 'Not Configured';
+                      badgeColor = 'gray';
+                    }
+                    
+                    return (
+                      <Badge 
+                        key={appType} 
+                        color={badgeColor}
+                        size="2"
+                      >
+                        <Flex align="center" gap="1">
+                          <AppIcon app={appType} size={14} variant="light" />
+                          {appName}: {statusMessage}
+                        </Flex>
+                      </Badge>
+                    );
+                  });
+                })()}
               </Flex>
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {getInstances(selectedAppType).map((instance, idx) => {
@@ -1324,31 +1320,6 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="scheduler" style={{ paddingTop: '1rem' }}>
-            {showSchedulerHint && (
-              <Callout.Root color="blue" size="1" mb="3">
-                <Flex align="center" justify="between" gap="2" style={{ width: '100%' }}>
-                  <Flex align="center" gap="2" style={{ flex: 1 }}>
-                    <Callout.Icon>
-                      <QuestionMarkCircledIcon />
-                    </Callout.Icon>
-                    <Callout.Text>
-                      <Text size="1">
-                        Need help with cron expressions?{' '}
-                        <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'underline' }}>Click here</a> to learn more.
-                      </Text>
-                    </Callout.Text>
-                  </Flex>
-                  {renderDismissButton(() => {
-                    setShowSchedulerHint(false);
-                    try {
-                      localStorage.setItem('scoutarr_settings_scheduler_hint_dismissed', 'true');
-                    } catch {
-                      // ignore
-                    }
-                  }, 'Dismiss scheduler hint')}
-                </Flex>
-              </Callout.Root>
-            )}
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Flex align="center" gap="2">
@@ -1441,23 +1412,30 @@ function Settings() {
                     </Select.Content>
                   </Select.Root>
                   {schedulerPreset === 'custom' && (
-                    <TextField.Root
-                      value={config.scheduler?.schedule || '0 */6 * * *'}
-                      onChange={(e) => {
-                        if (!config.scheduler) {
-                          setConfig({
-                            ...config,
-                            scheduler: { enabled: false, schedule: e.target.value, unattended: false }
-                          });
-                        } else {
-                          setConfig({
-                            ...config,
-                            scheduler: { ...config.scheduler, schedule: e.target.value }
-                          });
-                        }
-                      }}
-                      placeholder="0 */6 * * *"
-                    />
+                    <Flex direction="column" gap="1">
+                      <TextField.Root
+                        value={config.scheduler?.schedule || '0 */6 * * *'}
+                        onChange={(e) => {
+                          if (!config.scheduler) {
+                            setConfig({
+                              ...config,
+                              scheduler: { enabled: false, schedule: e.target.value, unattended: false }
+                            });
+                          } else {
+                            setConfig({
+                              ...config,
+                              scheduler: { ...config.scheduler, schedule: e.target.value }
+                            });
+                          }
+                        }}
+                        placeholder="0 */6 * * *"
+                      />
+                      <Text size="1" color="gray">
+                        <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                          Need help? Visit crontab.guru →
+                        </a>
+                      </Text>
+                    </Flex>
                   )}
                 </Flex>
               </Flex>
@@ -1501,33 +1479,6 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>
-                <Separator />
-
-                <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">Intro Hints</Text>
-                  <Text size="1" color="gray">
-                    Show the introductory hints at the top of the Settings page again.
-                  </Text>
-                  <Button
-                    variant="outline"
-                    size="2"
-                    onClick={() => {
-                      setShowIntroCallout(true);
-                      setShowHintCallout(true);
-                      setShowSchedulerHint(true);
-                      try {
-                        localStorage.removeItem('scoutarr_settings_intro_dismissed');
-                        localStorage.removeItem('scoutarr_settings_hint_dismissed');
-                        localStorage.removeItem('scoutarr_settings_scheduler_hint_dismissed');
-                      } catch {
-                        // ignore
-                      }
-                    }}
-                  >
-                    Show Intro Hints
-                  </Button>
-                </Flex>
-
                 <Separator />
 
                 <Flex direction="column" gap="2">
