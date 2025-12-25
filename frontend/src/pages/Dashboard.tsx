@@ -436,6 +436,7 @@ function Dashboard() {
                     refetchHistory();
                     refetchPreview();
                     refetchStatus();
+                    toast.success('Logs refreshed');
                   }}
                 >
                   <ReloadIcon />
