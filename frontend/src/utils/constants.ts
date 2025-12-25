@@ -3,7 +3,15 @@
  */
 export const ITEMS_PER_PAGE = 15;
 export const MAX_INSTANCES_PER_APP = 4;
-export const REFETCH_INTERVAL = 10000; // 10 seconds
+
+/**
+ * UI Constants
+ */
+export const LOG_CONTAINER_HEIGHT = '400px';
+export const LOG_SCROLL_THRESHOLD = 100;
+export const AUTO_RELOAD_DELAY_MS = 1000;
+export const LOGO_HEIGHT = '2.5rem';
+export const LOG_BG_COLOR = '#1a1a1a';
 
 /**
  * Supported application types

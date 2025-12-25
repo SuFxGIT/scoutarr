@@ -18,64 +18,10 @@ import ReactPaginate from 'react-paginate';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
-import { ITEMS_PER_PAGE, APP_TYPES } from '../utils/constants';
+import { ITEMS_PER_PAGE, APP_TYPES, LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
-
-interface SearchResults {
-  [key: string]: {
-    success: boolean;
-    searched?: number;
-    count?: number;
-    total?: number;
-    movies?: Array<{ id: number; title: string }>;
-    series?: Array<{ id: number; title: string }>;
-    artists?: Array<{ id: number; title: string }>;
-    authors?: Array<{ id: number; title: string }>;
-    error?: string;
-    instanceName?: string;
-  };
-}
-
-interface Stats {
-  totalUpgrades: number;
-  upgradesByApplication: Record<string, number>;
-  upgradesByInstance: Record<string, number>;
-  recentUpgrades: Array<{
-    timestamp: string;
-    application: string;
-    instance?: string;
-    count: number;
-    items: Array<{ id: number; title: string }>;
-  }>;
-  lastUpgrade?: string;
-}
-
-interface InstanceStatus {
-  connected: boolean;
-  configured: boolean;
-  version?: string;
-  appName?: string;
-  error?: string;
-  instanceName?: string;
-}
-
-interface StatusResponse {
-  [key: string]: InstanceStatus | {
-    enabled: boolean;
-    globalEnabled?: boolean;
-    running: boolean;
-    schedule: string | null;
-    nextRun: string | null;
-    instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
-  };
-}
-
-interface SchedulerHistoryEntry {
-  timestamp: string;
-  results: SearchResults;
-  success: boolean;
-  error?: string;
-}
+import { ConnectionStatusBadges } from '../components/ConnectionStatusBadges';
+import type { SearchResults, Stats, StatusResponse, SchedulerHistoryEntry } from '../types/api';
 
 function Dashboard() {
   const queryClient = useQueryClient();
@@ -127,8 +73,8 @@ function Dashboard() {
   useEffect(() => {
     if (logContainerRef.current && schedulerHistory.length > 0) {
       const container = logContainerRef.current;
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-      
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < LOG_SCROLL_THRESHOLD;
+
       if (isNearBottom) {
         container.scrollTop = container.scrollHeight;
       }
@@ -456,11 +402,11 @@ function Dashboard() {
             </Tooltip>
           </Flex>
         </Flex>
-        <Card variant="surface" style={{ backgroundColor: '#1a1a1a', fontFamily: 'monospace' }}>
+        <Card variant="surface" style={{ backgroundColor: LOG_BG_COLOR, fontFamily: 'monospace' }}>
           <div
             ref={logContainerRef}
             style={{
-              height: '400px',
+              height: LOG_CONTAINER_HEIGHT,
               overflowY: 'auto',
               padding: '1rem',
               fontSize: '0.875rem',
@@ -511,75 +457,7 @@ function Dashboard() {
         <Card style={{ padding: '0.5rem' }}>
           <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
             <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
-              {(() => {
-                // Group status entries by app type
-                const groupedStatus: Record<string, { connected: number; total: number; configured: boolean }> = {};
-                
-                // Initialize all app types
-                APP_TYPES.forEach(appType => {
-                  groupedStatus[appType] = { connected: 0, total: 0, configured: true };
-                });
-                
-                // Process connection status entries
-                Object.entries(connectionStatus).forEach(([key, status]) => {
-                  if (key === 'scheduler') return;
-                  
-                  const statusData = status as InstanceStatus | undefined;
-                  
-                  // Check if it's an app type directly (for backward compatibility or "not configured" case)
-                  if (APP_TYPES.includes(key as typeof APP_TYPES[number])) {
-                    if (statusData?.configured === false) {
-                      groupedStatus[key].configured = false;
-                    }
-                    return;
-                  }
-                  
-                  // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
-                  const appType = key.split('-')[0];
-                  if (APP_TYPES.includes(appType as typeof APP_TYPES[number])) {
-                    groupedStatus[appType].total++;
-                    if (statusData?.connected) {
-                      groupedStatus[appType].connected++;
-                    }
-                    groupedStatus[appType].configured = true; // Has at least one instance configured
-                  }
-                });
-                
-                // Generate badges for each app type
-                return APP_TYPES.map(appType => {
-                  const stats = groupedStatus[appType];
-                  const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
-                  let statusMessage = '';
-                  let badgeColor: 'green' | 'gray' | 'red' = 'red';
-                  
-                  if (!stats.configured) {
-                    statusMessage = 'Not Configured';
-                    badgeColor = 'gray';
-                  } else if (stats.connected > 0) {
-                    statusMessage = `${stats.connected} Instance${stats.connected === 1 ? '' : 's'} connected`;
-                    badgeColor = 'green';
-                  } else if (stats.total > 0) {
-                    statusMessage = `${stats.total} Instance${stats.total === 1 ? '' : 's'} disconnected`;
-                    badgeColor = 'red';
-                  } else {
-                    statusMessage = 'Not Configured';
-                    badgeColor = 'gray';
-                  }
-                  
-                  return (
-                    <Badge 
-                      key={appType} 
-                      color={badgeColor}
-                      size="2"
-                    >
-                      <Flex align="center" gap="1">
-                        <AppIcon app={appType} size={14} variant="light" />
-                        {appName}: {statusMessage}
-                      </Flex>
-                    </Badge>
-                  );
-                });
-              })()}
+              <ConnectionStatusBadges connectionStatus={connectionStatus} />
             </Flex>
             <Flex>
               <Tooltip content="Clear recent triggers and statistics. This will remove all upgrade history and reset stats to zero, but keep the database structure intact.">

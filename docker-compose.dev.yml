@@ -1,0 +1,41 @@
+services:
+  scoutarr-dev:
+    image: node:22-alpine
+    container_name: scoutarr-dev
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "5839:5839"  # Backend API
+      - "7291:7291"  # Vite dev server
+    volumes:
+      # Mount source code for hot reloading (exclude node_modules)
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./frontend:/app/frontend
+      - ./backend:/app/backend
+
+      # Use named volumes for node_modules to avoid conflicts
+      - node_modules:/app/node_modules
+      - frontend_node_modules:/app/frontend/node_modules
+      - backend_node_modules:/app/backend/node_modules
+
+      # Mount config directory
+      - ./config:/app/config
+    environment:
+      - NODE_ENV=development
+      - TZ=Asia/Kuwait
+      - LOG_LEVEL=debug
+    networks:
+      - scoutarr-network
+    command: sh -c "apk add --no-cache python3 make g++ && npm install && npm run dev"
+    stdin_open: true
+    tty: true
+
+networks:
+  scoutarr-network:
+    driver: bridge
+
+volumes:
+  node_modules:
+  frontend_node_modules:
+  backend_node_modules:

@@ -21,15 +21,18 @@ import * as Collapsible from '@radix-ui/react-collapsible';
 import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import axios from 'axios';
 import type { Config } from '../types/config';
 import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
+import type { StatusResponse } from '../types/api';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS } from '../utils/constants';
+import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
+import { ConnectionStatusBadges } from '../components/ConnectionStatusBadges';
 import { useNavigation } from '../contexts/NavigationContext';
 
 function Settings() {
@@ -67,27 +70,6 @@ function Settings() {
     },
     refetchOnWindowFocus: true,
   });
-
-  // Type for status response
-  interface InstanceStatus {
-    connected: boolean;
-    configured: boolean;
-    version?: string;
-    appName?: string;
-    error?: string;
-    instanceName?: string;
-  }
-
-  interface StatusResponse {
-    [key: string]: InstanceStatus | {
-      enabled: boolean;
-      globalEnabled?: boolean;
-      running: boolean;
-      schedule: string | null;
-      nextRun: string | null;
-      instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
-    };
-  }
 
   // Fetch status
   const { data: statusData } = useQuery<StatusResponse>({
@@ -183,8 +165,6 @@ function Settings() {
     };
   }, [hasUnsavedChanges]);
 
-
-
   // Save config mutation with validation
   const saveConfigMutation = useMutation({
     mutationFn: async (configToSave: Config) => {
@@ -216,13 +196,7 @@ function Settings() {
       refetchConfig();
     },
     onError: (error: unknown) => {
-      toast.error('Failed to save config: ' + getErrorMessage(error), {
-        style: {
-          background: 'var(--red-9)',
-          color: 'white',
-          border: '1px solid var(--red-10)',
-        },
-      });
+      showErrorToast('Failed to save config: ' + getErrorMessage(error));
     },
   });
 
@@ -262,16 +236,10 @@ function Settings() {
       // Reload the page after a short delay to ensure fresh UI state
       setTimeout(() => {
         window.location.href = '/';
-      }, 1000);
+      }, AUTO_RELOAD_DELAY_MS);
     },
     onError: (error: unknown) => {
-      toast.error('Failed to reset app: ' + getErrorMessage(error), {
-        style: {
-          background: 'var(--red-9)',
-          color: 'white',
-          border: '1px solid var(--red-10)',
-        },
-      });
+      showErrorToast('Failed to reset app: ' + getErrorMessage(error));
       setConfirmingResetApp(false);
     },
   });
@@ -282,17 +250,11 @@ function Settings() {
       await axios.post(`/api/config/clear-tags/${app}/${instanceId}`);
     },
     onSuccess: () => {
-      toast.success('Tags cleared successfully');
+      showSuccessToast('Tags cleared successfully');
       setConfirmingClearTags(null);
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear tags: ' + getErrorMessage(error), {
-        style: {
-          background: 'var(--red-9)',
-          color: 'white',
-          border: '1px solid var(--red-10)',
-        },
-      });
+      showErrorToast('Failed to clear tags: ' + getErrorMessage(error));
       setConfirmingClearTags(null);
     },
   });
@@ -421,13 +383,7 @@ function Settings() {
     const instances = getInstances(app);
     // Limit instances per app
     if (instances.length >= MAX_INSTANCES_PER_APP) {
-      toast.error(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`, {
-        style: {
-          background: 'var(--red-9)',
-          color: 'white',
-          border: '1px solid var(--red-10)',
-        },
-      });
+      showErrorToast(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
       return;
     }
     const newId = `${app}-${Date.now()}`;
@@ -665,13 +621,7 @@ function Settings() {
 
     // Validate URL with validator library
     if (!validator.isURL(appConfig.url, { require_protocol: true })) {
-        toast.error('Invalid URL format', {
-          style: {
-            background: 'var(--red-9)',
-            color: 'white',
-            border: '1px solid var(--red-10)',
-          },
-        });
+        showErrorToast('Invalid URL format');
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
@@ -709,26 +659,14 @@ function Settings() {
           fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey, true);
         }
       } else {
-        toast.error('Connection test failed', {
-          style: {
-            background: 'var(--red-9)',
-            color: 'white',
-            border: '1px solid var(--red-10)',
-          },
-        });
+        showErrorToast('Connection test failed');
       }
     } catch (error: unknown) {
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
       }));
-      toast.error('Connection test failed: ' + getErrorMessage(error), {
-        style: {
-          background: 'var(--red-9)',
-          color: 'white',
-          border: '1px solid var(--red-10)',
-        },
-      });
+      showErrorToast('Connection test failed: ' + getErrorMessage(error));
     }
   };
 
@@ -881,73 +819,7 @@ function Settings() {
                 </Flex>
               </Flex>
               <Flex gap="2" wrap="wrap">
-                {(() => {
-                  // Group status entries by app type
-                  const groupedStatus: Record<string, { connected: number; total: number; configured: boolean }> = {};
-                  
-                  // Initialize all app types
-                  APP_TYPES.forEach(appType => {
-                    groupedStatus[appType] = { connected: 0, total: 0, configured: true };
-                  });
-                  
-                  // Process connection status entries
-                  Object.entries(connectionStatus).forEach(([key, status]: [string, any]) => {
-                    if (key === 'scheduler') return;
-                    
-                    // Check if it's an app type directly (for backward compatibility or "not configured" case)
-                    if (APP_TYPES.includes(key as any)) {
-                      if (status.configured === false) {
-                        groupedStatus[key].configured = false;
-                      }
-                      return;
-                    }
-                    
-                    // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
-                    const appType = key.split('-')[0];
-                    if (APP_TYPES.includes(appType as any)) {
-                      groupedStatus[appType].total++;
-                      if (status.connected) {
-                        groupedStatus[appType].connected++;
-                      }
-                      groupedStatus[appType].configured = true; // Has at least one instance configured
-                    }
-                  });
-                  
-                  // Generate badges for each app type
-                  return APP_TYPES.map(appType => {
-                    const stats = groupedStatus[appType];
-                    const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
-                    let statusMessage = '';
-                    let badgeColor: 'green' | 'gray' | 'red' = 'red';
-                    
-                    if (!stats.configured) {
-                      statusMessage = 'Not Configured';
-                      badgeColor = 'gray';
-                    } else if (stats.connected > 0) {
-                      statusMessage = `${stats.connected} Instance${stats.connected === 1 ? '' : 's'} connected`;
-                      badgeColor = 'green';
-                    } else if (stats.total > 0) {
-                      statusMessage = `${stats.total} Instance${stats.total === 1 ? '' : 's'} disconnected`;
-                      badgeColor = 'red';
-                    } else {
-                      statusMessage = 'Not Configured';
-                      badgeColor = 'gray';
-                    }
-                    
-                    return (
-                      <Badge 
-                        key={appType} 
-                        color={badgeColor}
-                        size="2"
-                      >
-                        <Flex align="center" gap="1">
-                          <AppIcon app={appType} size={14} variant="light" />
-                          {appName}: {statusMessage}
-                        </Flex>
-                      </Badge>
-                    );
-                  });
-                })()}
+                <ConnectionStatusBadges connectionStatus={connectionStatus} />
               </Flex>
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {(() => {

@@ -54,12 +54,12 @@ function randomSelect<T>(items: T[], count: number | 'max'): T[] {
 }
 
 // Helper to generate result key for instances
-export function getResultKey(instanceId: string, appType: AppType, instanceCount: number): string {
+function getResultKey(instanceId: string, appType: AppType, instanceCount: number): string {
   return instanceCount > 1 ? instanceId : appType;
 }
 
 // Helper to extract instance info from config
-export function getInstanceInfo(config: StarrInstanceConfig, appType: AppType): { instanceName: string; instanceId: string } {
+function getInstanceInfo(config: StarrInstanceConfig, appType: AppType): { instanceName: string; instanceId: string } {
   return {
     instanceName: config.name,
     instanceId: config.id || `${appType}-1`
@@ -67,7 +67,7 @@ export function getInstanceInfo(config: StarrInstanceConfig, appType: AppType): 
 }
 
 // Helper to save stats for results
-export async function saveStatsForResults(results: SearchResults): Promise<void> {
+async function saveStatsForResults(results: SearchResults): Promise<void> {
   for (const [app, result] of Object.entries(results)) {
     if (result.success && result.searched && result.searched > 0) {
       // Extract app type from result key (could be "radarr" or "radarr-instance-id")
