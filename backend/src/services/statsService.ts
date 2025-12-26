@@ -83,6 +83,15 @@ class StatsService {
       )
     `);
 
+    // Create run_preview table to store the last run preview
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS run_preview (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        preview_data TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `);
+
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
@@ -463,6 +472,79 @@ class StatsService {
         error: errorMessage
       });
       throw error;
+    }
+  }
+
+  async saveRunPreview(previewData: unknown): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Delete existing preview
+      const deleteStmt = this.db.prepare('DELETE FROM run_preview');
+      deleteStmt.run();
+      
+      // Insert new preview
+      const insertStmt = this.db.prepare(`
+        INSERT INTO run_preview (preview_data, created_at)
+        VALUES (?, ?)
+      `);
+      insertStmt.run(JSON.stringify(previewData), new Date().toISOString());
+      logger.debug('💾 Run preview saved to database');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error saving run preview', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
+    }
+  }
+
+  async getRunPreview(): Promise<unknown | null> {
+    if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning null for run preview');
+      return null;
+    }
+
+    try {
+      const stmt = this.db.prepare('SELECT preview_data FROM run_preview ORDER BY id DESC LIMIT 1');
+      const row = stmt.get() as { preview_data: string } | undefined;
+      if (!row) {
+        logger.debug('ℹ️  No run preview found in database');
+        return null;
+      }
+      const preview = JSON.parse(row.preview_data);
+      logger.debug('✅ Run preview retrieved from database');
+      return preview;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error getting run preview', {
+        error: errorMessage
+      });
+      return null;
+    }
+  }
+
+  async clearRunPreview(): Promise<void> {
+    if (!this.db) {
+      logger.debug('ℹ️  Database not initialized, nothing to clear');
+      return;
+    }
+
+    try {
+      const deleteStmt = this.db.prepare('DELETE FROM run_preview');
+      const result = deleteStmt.run();
+      logger.debug('🗑️  Cleared run preview from database', {
+        rowsDeleted: result.changes
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error clearing run preview', {
+        error: errorMessage
+      });
+      // Don't throw - clearing is not critical
     }
   }
 

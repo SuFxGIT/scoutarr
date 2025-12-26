@@ -185,7 +185,7 @@ function Settings() {
       }
       await axios.put('/api/config', configToSave);
     },
-    onSuccess: (_, configToSave) => {
+    onSuccess: async (_, configToSave) => {
       toast.success('Configuration saved successfully!');
       // Update ref with the saved config
       if (configToSave) {
@@ -194,6 +194,43 @@ function Settings() {
       queryClient.invalidateQueries({ queryKey: ['config'] });
       queryClient.invalidateQueries({ queryKey: ['runPreview'] });
       refetchConfig();
+      
+      // Refresh app data (same as Refresh App button)
+      try {
+        await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: ['status'],
+            queryFn: async () => {
+              const response = await axios.get('/api/status');
+              return response.data;
+            },
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['schedulerHistory'],
+            queryFn: async () => {
+              const response = await axios.get('/api/status/scheduler/history');
+              return response.data;
+            },
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['runPreview'],
+            queryFn: async () => {
+              const response = await axios.post('/api/search/run-preview');
+              return response.data;
+            },
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['stats'],
+            queryFn: async () => {
+              const response = await axios.get('/api/stats');
+              return response.data;
+            },
+          }),
+        ]);
+      } catch (error) {
+        // Silently fail refresh - config save was successful
+        // Refresh errors don't affect the success of config save
+      }
     },
     onError: (error: unknown) => {
       showErrorToast('Failed to save config: ' + getErrorMessage(error));
@@ -682,14 +719,15 @@ function Settings() {
   };
 
   // Helper to render instance schedule configuration
-  const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: StarrInstanceConfig) => {
+  const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: StarrInstanceConfig, index: number) => {
     const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
+    const appInfo = getAppInfo(appType);
     
     return (
       <Card key={instance.id} variant="surface">
         <Flex direction="column" gap="3" p="3">
           <Flex direction="row" align="center" justify="between">
-            <Text size="3" weight="medium">{instance.name}</Text>
+            <Text size="3" weight="medium">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
             <Flex direction="row" align="center" gap="2">
               <Text size="2">Enable Schedule</Text>
               <Switch
@@ -824,7 +862,7 @@ function Settings() {
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {(() => {
                   const appInfo = getAppInfo(selectedAppType);
-                  return getInstances(selectedAppType).map((instance) => {
+                  return getInstances(selectedAppType).map((instance, index) => {
                     const instanceKey = `${selectedAppType}-${instance.id}`;
                     const isExpanded = expandedInstances.has(instanceKey);
                     
@@ -858,7 +896,7 @@ function Settings() {
                               <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
                                 <Flex align="center" gap="2">
                                   <AppIcon app={selectedAppType} size={18} variant="light" />
-                                  <Text size="3" weight="bold">{instance.name}</Text>
+                                  <Text size="3" weight="bold">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
                                 </Flex>
                                 <Flex align="center" gap="2">
                                   {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
@@ -924,7 +962,7 @@ function Settings() {
                               <Separator />
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Name</Text>
+                                  <Text size="2" weight="medium">Name (optional)</Text>
                                   <Tooltip content={`A name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}').`}>
                                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                                   </Tooltip>
@@ -932,7 +970,7 @@ function Settings() {
                                 <TextField.Root
                                   value={instance.name || ''}
                                   onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
-                                  placeholder={`Enter instance name`}
+                                  placeholder={`${appInfo.name} ${index + 1}`}
                                 />
                               </Flex>
 
@@ -1455,7 +1493,7 @@ function Settings() {
                   return (
                     <Flex key={appType} direction="column" gap="3">
                       <Heading size="4">{appInfo.name} Instances</Heading>
-                      {instances.map(instance => renderInstanceSchedule(appType, instance))}
+                      {instances.map((instance, index) => renderInstanceSchedule(appType, instance, index))}
                     </Flex>
                   );
                 })}

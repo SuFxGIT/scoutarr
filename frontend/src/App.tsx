@@ -44,6 +44,7 @@ function NavigationLinks() {
         queryClient.fetchQuery({
           queryKey: ['runPreview'],
           queryFn: async () => {
+            // Always generate new preview when explicitly refreshing
             const response = await axios.post('/api/search/run-preview');
             return response.data;
           },

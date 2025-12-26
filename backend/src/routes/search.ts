@@ -545,6 +545,30 @@ async function processManualRunInstances(
 }
 
 // Get items that would be searched (run preview)
+// Get cached run preview from database
+searchRouter.get('/run-preview', async (req, res) => {
+  logger.debug('📖 Retrieving cached run preview from database');
+  try {
+    const preview = await statsService.getRunPreview();
+    if (preview) {
+      logger.debug('✅ Cached run preview found');
+      res.json(preview);
+    } else {
+      logger.debug('ℹ️  No cached run preview found');
+      res.status(404).json({ error: 'No preview found' });
+    }
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
+    logger.error('❌ Failed to get run preview from database', {
+      error: errorMessage
+    });
+    res.status(500).json({
+      error: 'Failed to get run preview',
+      message: errorMessage
+    });
+  }
+});
+
 searchRouter.post('/run-preview', async (req, res) => {
   logger.info('👀 Starting run preview');
   try {
@@ -555,6 +579,16 @@ searchRouter.post('/run-preview', async (req, res) => {
     for (const appType of APP_TYPES) {
       const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
       await processManualRunInstances(instances, appType, results);
+    }
+
+    // Save preview to database
+    try {
+      await statsService.saveRunPreview(results);
+    } catch (dbError: unknown) {
+      logger.warn('⚠️  Failed to save run preview to database', {
+        error: getErrorMessage(dbError)
+      });
+      // Continue even if DB save fails
     }
 
     logger.info('✅ Run Preview');

@@ -57,16 +57,32 @@ function Dashboard() {
     staleTime: Infinity, // History never goes stale - it only changes when runs happen
   });
 
-  // Fetch run preview - only fetch after runs, not on initial mount
+  // Fetch run preview - load from database on mount
   const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
     queryKey: ['runPreview'],
     queryFn: async () => {
-      const response = await axios.post('/api/search/run-preview');
-      return response.data;
+      // Try to get cached preview from database
+      try {
+        const cachedResponse = await axios.get('/api/search/run-preview');
+        if (cachedResponse.status === 200) {
+          return cachedResponse.data;
+        }
+      } catch (error) {
+        // If no cached preview exists, return empty object (don't generate new on mount)
+        return {};
+      }
+      return {};
     },
-    enabled: false, // Don't fetch on mount - only fetch when explicitly called
+    enabled: true, // Fetch on mount to load from database
     staleTime: Infinity, // Preview never goes stale - it only changes when config/runs happen
   });
+
+  // Function to generate new preview (used after runs)
+  const generateNewPreview = async () => {
+    const response = await axios.post('/api/search/run-preview');
+    queryClient.setQueryData(['runPreview'], response.data);
+    return response.data;
+  };
 
   // Fetch stats - only fetch after runs, not on initial mount
   // Stats start at 0 and only update when a run happens
@@ -107,7 +123,7 @@ function Dashboard() {
       toast.success('Search run completed');
       refetchStats();
       refetchHistory();
-      refetchPreview();
+      generateNewPreview(); // Generate new preview after run
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));

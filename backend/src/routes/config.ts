@@ -85,6 +85,17 @@ configRouter.put('/', async (req, res) => {
     logger.debug('💾 Saving updated configuration');
     await configService.saveConfig(req.body);
     
+    // Clear run preview since config changed
+    try {
+      await statsService.clearRunPreview();
+      logger.debug('🗑️  Cleared run preview due to config change');
+    } catch (previewError: unknown) {
+      logger.warn('⚠️  Failed to clear run preview', {
+        error: getErrorMessage(previewError)
+      });
+      // Continue even if clearing preview fails
+    }
+    
     logger.info('✅ Config update completed');
     res.json({ success: true });
   } catch (error: unknown) {
