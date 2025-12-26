@@ -6,6 +6,7 @@ import { GearIcon, HomeIcon, ReloadIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import axios from 'axios';
 
 function NavigationLinks() {
   const location = useLocation();
@@ -23,14 +24,42 @@ function NavigationLinks() {
   };
 
   const handleRefresh = async () => {
-    // Refetch all queries that should be refreshed
-    await Promise.all([
-      queryClient.refetchQueries({ queryKey: ['status'] }),
-      queryClient.refetchQueries({ queryKey: ['schedulerHistory'] }),
-      queryClient.refetchQueries({ queryKey: ['runPreview'] }),
-      queryClient.refetchQueries({ queryKey: ['stats'] }),
-    ]);
-    toast.success('Refreshed');
+    try {
+      // Use fetchQuery to force fetch regardless of enabled state or staleTime
+      await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['status'],
+          queryFn: async () => {
+            const response = await axios.get('/api/status');
+            return response.data;
+          },
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['schedulerHistory'],
+          queryFn: async () => {
+            const response = await axios.get('/api/status/scheduler/history');
+            return response.data;
+          },
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['runPreview'],
+          queryFn: async () => {
+            const response = await axios.post('/api/search/run-preview');
+            return response.data;
+          },
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['stats'],
+          queryFn: async () => {
+            const response = await axios.get('/api/stats');
+            return response.data;
+          },
+        }),
+      ]);
+      toast.success('Refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh');
+    }
   };
 
   return (
