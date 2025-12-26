@@ -44,13 +44,17 @@ function Dashboard() {
   const connectionStatus = statusData || {};
   const schedulerStatus = statusData?.scheduler || null;
 
-  // Fetch scheduler history
+  // Fetch scheduler history - only fetch after runs, not on initial mount
+  // History only changes when runs happen, so no need to fetch on every refresh
   const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
     queryKey: ['schedulerHistory'],
     queryFn: async () => {
       const response = await axios.get('/api/status/scheduler/history');
       return response.data;
     },
+    enabled: false, // Don't fetch on mount - only fetch when explicitly called after runs
+    initialData: [], // Start with empty history
+    staleTime: Infinity, // History never goes stale - it only changes when runs happen
   });
 
   // Fetch run preview
