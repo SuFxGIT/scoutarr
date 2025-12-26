@@ -3,19 +3,18 @@ import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 
 function NavigationLinks() {
   const location = useLocation();
+  const { handleNavigation } = useNavigation();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Only intercept if we're navigating away from settings
     if (location.pathname === '/settings' && path !== '/settings') {
-      const handleNavigation = (window as any).__scoutarr_handleNavigation;
-      if (handleNavigation) {
-        e.preventDefault();
-        handleNavigation(path);
-        return;
-      }
+      e.preventDefault();
+      handleNavigation(path);
+      return;
     }
     // Otherwise, let default Link behavior handle it
   };
@@ -46,6 +45,26 @@ function NavigationLinks() {
   );
 }
 
+function AppContent() {
+  return (
+    <Flex direction="column" style={{ minHeight: '100vh' }} align="center">
+      <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem 1rem 0 1rem' }}>
+        <Flex align="center" justify="between" mb="2">
+          <NavigationLinks />
+        </Flex>
+        <Separator size="4" mb="0" />
+      </div>
+
+      <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem', margin: '0 auto' }}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </div>
+    </Flex>
+  );
+}
+
 function App() {
   return (
     <Router
@@ -54,24 +73,11 @@ function App() {
         v7_relativeSplatPath: true,
       }}
     >
-      <Flex direction="column" style={{ minHeight: '100vh' }} align="center">
-        <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem 1rem 0 1rem' }}>
-          <Flex align="center" justify="between" mb="2">
-            <NavigationLinks />
-          </Flex>
-          <Separator size="4" mb="0" />
-        </div>
-
-        <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem', margin: '0 auto' }}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </div>
-      </Flex>
+      <NavigationProvider>
+        <AppContent />
+      </NavigationProvider>
     </Router>
   );
 }
 
 export default App;
-

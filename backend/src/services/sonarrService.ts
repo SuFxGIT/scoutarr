@@ -1,7 +1,5 @@
-import { AxiosInstance } from 'axios';
 import { SonarrInstance } from '../types/config.js';
-import { StarrQualityProfile } from '../types/starr.js';
-import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
+import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
@@ -9,33 +7,30 @@ export interface SonarrSeries extends FilterableMedia {
   title: string;
 }
 
-class SonarrService {
-  private createClient(config: SonarrInstance): AxiosInstance {
-    return createStarrClient(config.url, config.apiKey);
+class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
+  protected readonly appName = 'Sonarr';
+  protected readonly apiVersion = 'v3' as const;
+  protected readonly mediaEndpoint = 'series';
+  protected readonly qualityProfileEndpoint = 'qualityprofile';
+  protected readonly editorEndpoint = 'series/editor';
+  protected readonly mediaIdField = 'seriesIds' as const;
+
+  protected getMediaTypeName(): string {
+    return 'series';
   }
 
   async getSeries(config: SonarrInstance): Promise<SonarrSeries[]> {
     try {
       const client = this.createClient(config);
-      const response = await client.get<SonarrSeries[]>('/api/v3/series');
+      const response = await client.get<SonarrSeries[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       logger.debug('📥 Fetched series from Sonarr', { count: response.data.length, url: config.url });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to fetch series from Sonarr', { 
-        error: error.message,
+        error: errorMessage,
         url: config.url 
       });
-      throw error;
-    }
-  }
-
-  async getQualityProfiles(config: SonarrInstance): Promise<StarrQualityProfile[]> {
-    try {
-      const client = this.createClient(config);
-      const response = await client.get<StarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data;
-    } catch (error: any) {
-      logger.error('❌ Failed to fetch quality profiles from Sonarr', { error: error.message });
       throw error;
     }
   }
@@ -44,50 +39,28 @@ class SonarrService {
     try {
       const client = this.createClient(config);
       // Sonarr only supports searching one series at a time
-      await client.post(`/api/v3/command`, {
+      await client.post(`/api/${this.apiVersion}/command`, {
         name: 'SeriesSearch',
         seriesId
       });
       logger.debug('🔎 Triggered search for series', { seriesId });
-    } catch (error: any) {
-      logger.error('❌ Failed to search series in Sonarr', { error: error.message, seriesId });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to search series in Sonarr', { error: errorMessage, seriesId });
       throw error;
     }
   }
 
-  async addTagToSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v3/series/editor', {
-        seriesIds: seriesIds,
-        tags: [tagId],
-        applyTags: 'add'
-      });
-      logger.debug('🏷️  Added tag to series', { seriesIds, tagId, count: seriesIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to add tag to series in Sonarr', { error: error.message, seriesIds, tagId });
-      throw error;
-    }
+  // Implement abstract methods
+  async getMedia(config: SonarrInstance): Promise<SonarrSeries[]> {
+    return this.getSeries(config);
   }
 
-  async removeTagFromSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v3/series/editor', {
-        seriesIds: seriesIds,
-        tags: [tagId],
-        applyTags: 'remove'
-      });
-      logger.debug('🏷️  Removed tag from series', { seriesIds, tagId, count: seriesIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to remove tag from series in Sonarr', { error: error.message, seriesIds, tagId });
-      throw error;
+  async searchMedia(config: SonarrInstance, mediaIds: number[]): Promise<void> {
+    // Sonarr only supports searching one series at a time
+    if (mediaIds.length > 0) {
+      await this.searchSeries(config, mediaIds[0]);
     }
-  }
-
-  async getTagId(config: SonarrInstance, tagName: string): Promise<number | null> {
-    const client = this.createClient(config);
-    return getOrCreateTagId(client, tagName, 'Sonarr');
   }
 
   async filterSeries(config: SonarrInstance, series: SonarrSeries[]): Promise<SonarrSeries[]> {
@@ -103,8 +76,8 @@ class SonarrService {
           getQualityProfiles: () => this.getQualityProfiles(config),
           getTagId: (tagName: string) => this.getTagId(config, tagName)
         },
-        'Sonarr',
-        'series'
+        this.appName,
+        this.getMediaTypeName()
       );
 
       // Filter by series status
@@ -119,12 +92,25 @@ class SonarrService {
       }
 
       return filtered;
-    } catch (error: any) {
-      logger.error('❌ Failed to filter series', { error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to filter series', { error: errorMessage });
       throw error;
     }
+  }
+
+  async filterMedia(config: SonarrInstance, media: SonarrSeries[]): Promise<SonarrSeries[]> {
+    return this.filterSeries(config, media);
+  }
+
+  // Convenience methods for backward compatibility
+  async addTagToSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
+    return this.addTag(config, seriesIds, tagId);
+  }
+
+  async removeTagFromSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
+    return this.removeTag(config, seriesIds, tagId);
   }
 }
 
 export const sonarrService = new SonarrService();
-

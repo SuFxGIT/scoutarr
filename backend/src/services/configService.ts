@@ -11,33 +11,47 @@ const CONFIG_DIR = process.env.CONFIG_DIR || path.join(__dirname, '../../../conf
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const CONFIG_EXAMPLE = path.join(CONFIG_DIR, 'config.example.json');
 
+// Type for parsed config (may have additional properties)
+interface ParsedConfig extends Partial<Config> {
+  logLevel?: string;
+  [key: string]: unknown;
+}
+
 class ConfigService {
   private config: Config | null = null;
 
   async initialize(): Promise<void> {
+    logger.debug('⚙️  Initializing configuration service', { configDir: CONFIG_DIR, configFile: CONFIG_FILE });
     try {
       // Ensure config directory exists
+      logger.debug('📁 Ensuring config directory exists', { configDir: CONFIG_DIR });
       await fs.mkdir(CONFIG_DIR, { recursive: true });
+      logger.debug('✅ Config directory ready', { configDir: CONFIG_DIR });
 
       // Check if config file exists, if not create from example
       try {
         await fs.access(CONFIG_FILE);
+        logger.debug('✅ Config file exists', { configFile: CONFIG_FILE });
       } catch {
         // Config doesn't exist, copy from example
+        logger.debug('⚠️  Config file not found, checking for example file', { configFile: CONFIG_FILE, exampleFile: CONFIG_EXAMPLE });
         try {
           const exampleContent = await fs.readFile(CONFIG_EXAMPLE, 'utf-8');
           await fs.writeFile(CONFIG_FILE, exampleContent);
+          logger.info('📋 Created config file from example', { configFile: CONFIG_FILE, exampleFile: CONFIG_EXAMPLE });
         } catch {
           // Example doesn't exist, create default config
+          logger.debug('⚠️  Example file not found, creating default config', { exampleFile: CONFIG_EXAMPLE });
           await this.createDefaultConfig();
         }
       }
 
       await this.loadConfig();
       logger.info('✅ Configuration initialized successfully', { configFile: CONFIG_FILE });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.warn('⚠️  Error initializing config, creating default config', { 
-        error: error.message,
+        error: errorMessage,
         configFile: CONFIG_FILE 
       });
       await this.createDefaultConfig();
@@ -74,37 +88,58 @@ class ConfigService {
   }
 
   async loadConfig(): Promise<Config> {
+    logger.debug('📖 Loading configuration', { configFile: CONFIG_FILE });
     try {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
-      const parsed = JSON.parse(content) as any;
+      logger.debug('✅ Config file read successfully', { size: content.length });
+      
+      const parsed = JSON.parse(content) as ParsedConfig;
+      logger.debug('✅ Config JSON parsed successfully');
       
       // Normalize config: ensure lidarr and readarr arrays exist for backward compatibility
       if (!parsed.applications) {
+        logger.debug('⚠️  No applications in config, initializing empty object');
         parsed.applications = {};
       }
       if (!Array.isArray(parsed.applications.lidarr)) {
+        logger.debug('⚠️  Lidarr not an array, initializing empty array');
         parsed.applications.lidarr = [];
       }
       if (!Array.isArray(parsed.applications.readarr)) {
+        logger.debug('⚠️  Readarr not an array, initializing empty array');
         parsed.applications.readarr = [];
       }
+      
+      // Count configured instances
+      const instanceCounts = {
+        radarr: Array.isArray(parsed.applications.radarr) ? parsed.applications.radarr.length : 0,
+        sonarr: Array.isArray(parsed.applications.sonarr) ? parsed.applications.sonarr.length : 0,
+        lidarr: parsed.applications.lidarr.length,
+        readarr: parsed.applications.readarr.length
+      };
       
       this.config = parsed as Config;
       
       // Update log level if specified in config
-      if ((parsed as any).logLevel) {
+      if (parsed.logLevel) {
+        logger.debug('📝 Updating log level from config', { logLevel: parsed.logLevel });
         const { updateLogLevel } = await import('../utils/logger.js');
-        updateLogLevel((parsed as any).logLevel);
+        updateLogLevel(parsed.logLevel);
       }
       
-      logger.debug('Configuration loaded successfully', { 
-        configFile: CONFIG_FILE
+      logger.debug('✅ Configuration loaded successfully', { 
+        configFile: CONFIG_FILE,
+        instanceCounts,
+        schedulerEnabled: parsed.scheduler?.enabled || false,
+        schedulerSchedule: parsed.scheduler?.schedule || 'not set'
       });
       return this.config;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error loading configuration', { 
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         configFile: CONFIG_FILE 
       });
       throw error;
@@ -122,10 +157,12 @@ class ConfigService {
       schedulerService.restart();
 
       return config;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error resetting configuration to default', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         configFile: CONFIG_FILE
       });
       throw error;
@@ -133,20 +170,39 @@ class ConfigService {
   }
 
   async saveConfig(config: Config): Promise<void> {
+    logger.debug('💾 Saving configuration', { configFile: CONFIG_FILE });
     try {
-      await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+      const configJson = JSON.stringify(config, null, 2);
+      await fs.writeFile(CONFIG_FILE, configJson);
+      logger.debug('✅ Config file written successfully', { size: configJson.length });
+      
       this.config = config;
+      
+      // Count configured instances
+      const instanceCounts = {
+        radarr: Array.isArray(config.applications.radarr) ? config.applications.radarr.length : 0,
+        sonarr: Array.isArray(config.applications.sonarr) ? config.applications.sonarr.length : 0,
+        lidarr: Array.isArray(config.applications.lidarr) ? config.applications.lidarr.length : 0,
+        readarr: Array.isArray(config.applications.readarr) ? config.applications.readarr.length : 0
+      };
+      
       logger.info('💾 Configuration saved successfully', { 
-        configFile: CONFIG_FILE
+        configFile: CONFIG_FILE,
+        instanceCounts,
+        schedulerEnabled: config.scheduler?.enabled || false
       });
       
       // Restart scheduler if config changed
+      logger.debug('🔄 Restarting scheduler due to config change');
       const { schedulerService } = await import('./schedulerService.js');
       schedulerService.restart();
-    } catch (error: any) {
+      logger.debug('✅ Scheduler restarted');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error saving configuration', { 
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         configFile: CONFIG_FILE 
       });
       throw error;
@@ -155,11 +211,15 @@ class ConfigService {
 
   getConfig(): Config {
     if (!this.config) {
+      logger.error('❌ Attempted to get config before initialization');
       throw new Error('Config not loaded');
     }
+    logger.debug('📋 Config retrieved', { 
+      hasScheduler: !!this.config.scheduler,
+      schedulerEnabled: this.config.scheduler?.enabled || false
+    });
     return this.config;
   }
 }
 
 export const configService = new ConfigService();
-

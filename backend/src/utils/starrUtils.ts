@@ -75,7 +75,7 @@ export async function testStarrConnection(
       appName?: string;
       version?: string;
       instanceName?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }>(`/api/${apiVersion}/system/status`, { timeout: 5000 });
     
     const systemData = response.data;
@@ -120,11 +120,12 @@ export async function testStarrConnection(
       appName: actualAppName,
       version
     };
-  } catch (error: any) {
-    logger.debug(`❌ ${expectedApp} connection test failed`, { url, error: error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.debug(`❌ ${expectedApp} connection test failed`, { url, error: errorMessage });
     return {
       success: false,
-      error: error.message || 'Connection test failed'
+      error: errorMessage || 'Connection test failed'
     };
   }
 }
@@ -138,12 +139,17 @@ export async function getOrCreateTagId(
   tagName: string,
   appName: string
 ): Promise<number | null> {
+  logger.debug(`🏷️  Getting or creating tag`, { appName, tagName });
   try {
     // Determine API version based on app name
     const apiVersion = appName.toLowerCase().includes('lidarr') || appName.toLowerCase().includes('readarr') ? 'v1' : 'v3';
+    logger.debug(`📋 Using API version ${apiVersion} for ${appName}`);
     
     // Get all tags
+    logger.debug(`📋 Fetching all tags from ${appName}`);
     const tagsResponse = await client.get<Array<{ id: number; label: string }>>(`/api/${apiVersion}/tag`);
+    logger.debug(`✅ Fetched ${tagsResponse.data.length} tags from ${appName}`);
+    
     const tag = tagsResponse.data.find(t => t.label === tagName);
     
     if (tag) {
@@ -152,11 +158,13 @@ export async function getOrCreateTagId(
     }
 
     // Create tag if it doesn't exist
+    logger.debug(`🏷️  Tag not found, creating new tag in ${appName}`, { tagName });
     const newTagResponse = await client.post<{ id: number; label: string }>(`/api/${apiVersion}/tag`, { label: tagName });
     logger.debug(`🏷️  Created tag in ${appName}`, { tagName, tagId: newTagResponse.data.id });
     return newTagResponse.data.id;
-  } catch (error: any) {
-    logger.error(`❌ Failed to get/create tag in ${appName}`, { error: error.message, tagName });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`❌ Failed to get/create tag in ${appName}`, { error: errorMessage, tagName });
     throw error;
   }
 }

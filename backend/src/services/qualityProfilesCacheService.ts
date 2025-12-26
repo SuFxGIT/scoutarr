@@ -44,9 +44,10 @@ class QualityProfilesCacheService {
         await this.saveCache();
         logger.debug('✅ Quality profiles cache initialized (empty)', { cacheFile: CACHE_FILE });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.warn('⚠️  Error initializing quality profiles cache', {
-        error: error.message,
+        error: errorMessage,
         cacheFile: CACHE_FILE
       });
       this.cache = {};
@@ -57,9 +58,10 @@ class QualityProfilesCacheService {
     try {
       const content = await fs.readFile(CACHE_FILE, 'utf-8');
       this.cache = JSON.parse(content) as QualityProfilesCache;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error loading quality profiles cache', {
-        error: error.message,
+        error: errorMessage,
         cacheFile: CACHE_FILE
       });
       this.cache = {};
@@ -69,9 +71,10 @@ class QualityProfilesCacheService {
   private async saveCache(): Promise<void> {
     try {
       await fs.writeFile(CACHE_FILE, JSON.stringify(this.cache, null, 2));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error saving quality profiles cache', {
-        error: error.message,
+        error: errorMessage,
         cacheFile: CACHE_FILE
       });
       throw error;
@@ -94,8 +97,9 @@ class QualityProfilesCacheService {
     if (entry.url !== url || entry.apiKey !== apiKey) {
       // Cache entry is for different credentials, invalidate it
       delete this.cache[key];
-      this.saveCache().catch(err => {
-        logger.error('Failed to save cache after invalidation', { error: err.message });
+      this.saveCache().catch((err: unknown) => {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logger.error('Failed to save cache after invalidation', { error: errorMessage });
       });
       return null;
     }
@@ -147,4 +151,3 @@ class QualityProfilesCacheService {
 }
 
 export const qualityProfilesCacheService = new QualityProfilesCacheService();
-

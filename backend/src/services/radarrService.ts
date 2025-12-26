@@ -1,7 +1,5 @@
-import { AxiosInstance } from 'axios';
 import { RadarrInstance } from '../types/config.js';
-import { StarrQualityProfile } from '../types/starr.js';
-import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
+import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
@@ -9,33 +7,30 @@ export interface RadarrMovie extends FilterableMedia {
   title: string;
 }
 
-class RadarrService {
-  private createClient(config: RadarrInstance): AxiosInstance {
-    return createStarrClient(config.url, config.apiKey);
+class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
+  protected readonly appName = 'Radarr';
+  protected readonly apiVersion = 'v3' as const;
+  protected readonly mediaEndpoint = 'movie';
+  protected readonly qualityProfileEndpoint = 'qualityprofile';
+  protected readonly editorEndpoint = 'movie/editor';
+  protected readonly mediaIdField = 'movieIds' as const;
+
+  protected getMediaTypeName(): string {
+    return 'movies';
   }
 
   async getMovies(config: RadarrInstance): Promise<RadarrMovie[]> {
     try {
       const client = this.createClient(config);
-      const response = await client.get<RadarrMovie[]>('/api/v3/movie');
+      const response = await client.get<RadarrMovie[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       logger.debug('📥 Fetched movies from Radarr', { count: response.data.length, url: config.url });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to fetch movies from Radarr', { 
-        error: error.message,
+        error: errorMessage,
         url: config.url 
       });
-      throw error;
-    }
-  }
-
-  async getQualityProfiles(config: RadarrInstance): Promise<StarrQualityProfile[]> {
-    try {
-      const client = this.createClient(config);
-      const response = await client.get<StarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data;
-    } catch (error: any) {
-      logger.error('❌ Failed to fetch quality profiles from Radarr', { error: error.message });
       throw error;
     }
   }
@@ -43,50 +38,25 @@ class RadarrService {
   async searchMovies(config: RadarrInstance, movieIds: number[]): Promise<void> {
     try {
       const client = this.createClient(config);
-      await client.post(`/api/v3/command`, {
+      await client.post(`/api/${this.apiVersion}/command`, {
         name: 'MoviesSearch',
         movieIds: movieIds
       });
       logger.debug('🔎 Triggered search for movies', { movieIds, count: movieIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to search movies in Radarr', { error: error.message, movieIds });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to search movies in Radarr', { error: errorMessage, movieIds });
       throw error;
     }
   }
 
-  async addTagToMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v3/movie/editor', {
-        movieIds: movieIds,
-        tags: [tagId],
-        applyTags: 'add'
-      });
-      logger.debug('🏷️  Added tag to movies', { movieIds, tagId, count: movieIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to add tag to movies in Radarr', { error: error.message, movieIds, tagId });
-      throw error;
-    }
+  // Implement abstract methods
+  async getMedia(config: RadarrInstance): Promise<RadarrMovie[]> {
+    return this.getMovies(config);
   }
 
-  async removeTagFromMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v3/movie/editor', {
-        movieIds: movieIds,
-        tags: [tagId],
-        applyTags: 'remove'
-      });
-      logger.debug('🏷️  Removed tag from movies', { movieIds, tagId, count: movieIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to remove tag from movies in Radarr', { error: error.message, movieIds, tagId });
-      throw error;
-    }
-  }
-
-  async getTagId(config: RadarrInstance, tagName: string): Promise<number | null> {
-    const client = this.createClient(config);
-    return getOrCreateTagId(client, tagName, 'Radarr');
+  async searchMedia(config: RadarrInstance, mediaIds: number[]): Promise<void> {
+    return this.searchMovies(config, mediaIds);
   }
 
   async filterMovies(config: RadarrInstance, movies: RadarrMovie[]): Promise<RadarrMovie[]> {
@@ -102,8 +72,8 @@ class RadarrService {
           getQualityProfiles: () => this.getQualityProfiles(config),
           getTagId: (tagName: string) => this.getTagId(config, tagName)
         },
-        'Radarr',
-        'movies'
+        this.appName,
+        this.getMediaTypeName()
       );
 
       // Filter by movie status (skip when set to "any")
@@ -128,10 +98,24 @@ class RadarrService {
       }
 
       return filtered;
-    } catch (error: any) {
-      logger.error('❌ Failed to filter movies', { error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to filter movies', { error: errorMessage });
       throw error;
     }
+  }
+
+  async filterMedia(config: RadarrInstance, media: RadarrMovie[]): Promise<RadarrMovie[]> {
+    return this.filterMovies(config, media);
+  }
+
+  // Convenience methods for backward compatibility
+  async addTagToMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
+    return this.addTag(config, movieIds, tagId);
+  }
+
+  async removeTagFromMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
+    return this.removeTag(config, movieIds, tagId);
   }
 }
 

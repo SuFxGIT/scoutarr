@@ -50,9 +50,17 @@ interface Stats {
   lastUpgrade?: string;
 }
 
+interface InstanceStatus {
+  connected: boolean;
+  configured: boolean;
+  version?: string;
+  appName?: string;
+  error?: string;
+  instanceName?: string;
+}
+
 interface StatusResponse {
-  [key: string]: any;
-  scheduler?: {
+  [key: string]: InstanceStatus | {
     enabled: boolean;
     globalEnabled?: boolean;
     running: boolean;
@@ -64,7 +72,7 @@ interface StatusResponse {
 
 interface SchedulerHistoryEntry {
   timestamp: string;
-  results: any;
+  results: SearchResults;
   success: boolean;
   error?: string;
 }
@@ -245,7 +253,7 @@ function Dashboard() {
         type: 'info'
       });
       
-      Object.entries(previewResults).forEach(([app, result]: [string, any]) => {
+      Object.entries(previewResults).forEach(([app, result]) => {
         if (result.success) {
           const appName = result.instanceName || formatAppName(app);
           const count = result.count || 0;
@@ -307,7 +315,7 @@ function Dashboard() {
           }) || 'less than a minute';
           
           // Try to get instance name from connectionStatus if available, fallback to formatted key
-          const instanceStatusData = connectionStatus?.[instanceKey];
+          const instanceStatusData = connectionStatus?.[instanceKey] as InstanceStatus | undefined;
           const instanceName = instanceStatusData?.instanceName || formatAppName(instanceKey);
           
           logs.push({
@@ -324,7 +332,7 @@ function Dashboard() {
       const timestamp = format(new Date(entry.timestamp), 'HH:mm:ss');
       
       if (entry.success) {
-        Object.entries(entry.results).forEach(([app, result]: [string, any]) => {
+        Object.entries(entry.results).forEach(([app, result]) => {
           if (result.success) {
             const appName = result.instanceName || formatAppName(app);
             const searched = result.searched || 0;
@@ -343,7 +351,7 @@ function Dashboard() {
             // Show searched items (check all possible media type keys)
             const items = result.movies || result.series || result.artists || result.authors || [];
             if (items.length > 0) {
-              items.forEach((item: any) => {
+              items.forEach((item: { id: number; title: string }) => {
                 const itemLabel = mediaType === 'movies' ? 'Movie' : mediaType === 'artists' ? 'Artist' : mediaType === 'authors' ? 'Author' : 'Series';
                 logs.push({
                   timestamp,
@@ -513,12 +521,14 @@ function Dashboard() {
                 });
                 
                 // Process connection status entries
-                Object.entries(connectionStatus).forEach(([key, status]: [string, any]) => {
+                Object.entries(connectionStatus).forEach(([key, status]) => {
                   if (key === 'scheduler') return;
                   
+                  const statusData = status as InstanceStatus | undefined;
+                  
                   // Check if it's an app type directly (for backward compatibility or "not configured" case)
-                  if (APP_TYPES.includes(key as any)) {
-                    if (status.configured === false) {
+                  if (APP_TYPES.includes(key as typeof APP_TYPES[number])) {
+                    if (statusData?.configured === false) {
                       groupedStatus[key].configured = false;
                     }
                     return;
@@ -526,9 +536,9 @@ function Dashboard() {
                   
                   // It's an instance ID (e.g., "radarr-123" or "sonarr-instance-id")
                   const appType = key.split('-')[0];
-                  if (APP_TYPES.includes(appType as any)) {
+                  if (APP_TYPES.includes(appType as typeof APP_TYPES[number])) {
                     groupedStatus[appType].total++;
-                    if (status.connected) {
+                    if (statusData?.connected) {
                       groupedStatus[appType].connected++;
                     }
                     groupedStatus[appType].configured = true; // Has at least one instance configured

@@ -5,14 +5,33 @@ import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
 import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
 import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
+import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
 const require = createRequire(import.meta.url);
 const { parseExpression } = require('cron-parser');
 
+// Type for instance configs
+type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
+
+// Type for search results (from search.ts)
+interface SearchResults {
+  [key: string]: {
+    success: boolean;
+    searched?: number;
+    items?: Array<{ id: number; title: string }>;
+    error?: string;
+    instanceName?: string;
+    movies?: Array<{ id: number; title: string }>;
+    series?: Array<{ id: number; title: string }>;
+    artists?: Array<{ id: number; title: string }>;
+    authors?: Array<{ id: number; title: string }>;
+  };
+}
+
 interface SchedulerRunHistory {
   timestamp: string;
-  results: Record<string, any>;
+  results: SearchResults;
   success: boolean;
   error?: string;
   instanceKey?: string;
@@ -35,36 +54,65 @@ class SchedulerService {
   private maxHistorySize = 100;
 
   async initialize(): Promise<void> {
+    logger.debug('⚙️  Initializing scheduler service');
     const config = configService.getConfig();
     
     if (config.scheduler?.enabled && config.scheduler?.schedule) {
+      logger.debug('🕐 Global scheduler enabled, starting', { schedule: config.scheduler.schedule });
       this.startGlobal(config.scheduler.schedule);
       logger.info('✅ Global scheduler initialized', { schedule: config.scheduler.schedule });
     } else {
-      logger.info('ℹ️  Global scheduler disabled');
+      logger.info('ℹ️  Global scheduler disabled', { 
+        enabled: config.scheduler?.enabled || false,
+        hasSchedule: !!config.scheduler?.schedule
+      });
     }
 
+    logger.debug('🕐 Initializing per-instance schedulers');
     this.initializeInstanceSchedulers();
+    logger.debug('✅ Scheduler service initialization complete');
   }
 
   private initializeInstanceSchedulers(): void {
+    logger.debug('🕐 Initializing per-instance schedulers');
     const config = configService.getConfig();
     
+    logger.debug('🔄 Stopping all existing instance schedulers');
     this.stopAllInstanceSchedulers();
 
+    let totalFound = 0;
+    let totalStarted = 0;
+    
     for (const appType of APP_TYPES) {
-      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
+      logger.debug(`📋 Checking ${appType} instances for scheduling`, { instanceCount: instances.length });
+      
       for (const instance of instances) {
+        totalFound++;
         if (instance.scheduleEnabled && instance.schedule) {
           const instanceKey = `${appType}-${instance.id}`;
+          logger.debug(`🕐 Starting scheduler for instance`, { instanceKey, schedule: instance.schedule });
           this.startInstance(instanceKey, appType, instance.id, instance.schedule);
+          totalStarted++;
+        } else {
+          logger.debug(`⏸️  Instance scheduler disabled or no schedule`, { 
+            instanceId: instance.id,
+            scheduleEnabled: instance.scheduleEnabled || false,
+            hasSchedule: !!instance.schedule
+          });
         }
       }
     }
 
     const instanceCount = this.instanceTasks.size;
     if (instanceCount > 0) {
-      logger.info(`✅ Per-instance schedulers initialized: ${instanceCount} instance(s)`);
+      logger.info(`✅ Per-instance schedulers initialized: ${instanceCount} instance(s)`, { 
+        totalFound,
+        totalStarted,
+        totalSkipped: totalFound - totalStarted
+      });
+    } else {
+      logger.debug('ℹ️  No per-instance schedulers configured', { totalFound });
     }
   }
 
@@ -144,15 +192,20 @@ class SchedulerService {
   }
 
   restart(): void {
+    logger.info('🔄 Restarting scheduler service');
     const config = configService.getConfig();
     
     if (config.scheduler?.enabled && config.scheduler?.schedule) {
+      logger.debug('🕐 Global scheduler enabled, restarting', { schedule: config.scheduler.schedule });
       this.startGlobal(config.scheduler.schedule);
     } else {
+      logger.debug('⏸️  Global scheduler disabled, stopping');
       this.stopGlobal();
     }
 
+    logger.debug('🔄 Restarting per-instance schedulers');
     this.initializeInstanceSchedulers();
+    logger.info('✅ Scheduler service restarted');
   }
 
   private async runGlobalScheduledSearch(schedule: string): Promise<void> {
@@ -183,30 +236,34 @@ class SchedulerService {
 
       try {
         await notificationService.sendNotifications(results, true);
-      } catch (notificationError: any) {
+      } catch (notificationError: unknown) {
+        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
         logger.debug('Failed to send notifications', {
-          error: notificationError.message
+          error: errorMessage
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
         results: {},
         success: false,
-        error: error.message
+        error: errorMessage
       };
       this.addToHistory(historyEntry);
 
       logger.error('❌ Global scheduled search failed', {
-        error: error.message,
-        stack: error.stack
+        error: errorMessage,
+        stack: errorStack
       });
 
       try {
-        await notificationService.sendNotifications({}, false, error.message);
-      } catch (notificationError: any) {
+        await notificationService.sendNotifications({}, false, errorMessage);
+      } catch (notificationError: unknown) {
+        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
         logger.debug('Failed to send failure notifications', {
-          error: notificationError.message
+          error: errorMessage
         });
       }
     } finally {
@@ -245,32 +302,36 @@ class SchedulerService {
 
       try {
         await notificationService.sendNotifications(results, true);
-      } catch (notificationError: any) {
+      } catch (notificationError: unknown) {
+        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
         logger.debug('Failed to send notifications', {
-          error: notificationError.message
+          error: errorMessage
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
         results: {},
         success: false,
-        error: error.message,
+        error: errorMessage,
         instanceKey
       };
       this.addToHistory(historyEntry);
 
       logger.error('❌ Instance scheduled search failed', {
         instanceKey,
-        error: error.message,
-        stack: error.stack
+        error: errorMessage,
+        stack: errorStack
       });
 
       try {
-        await notificationService.sendNotifications({}, false, error.message);
-      } catch (notificationError: any) {
+        await notificationService.sendNotifications({}, false, errorMessage);
+      } catch (notificationError: unknown) {
+        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
         logger.debug('Failed to send failure notifications', {
-          error: notificationError.message
+          error: errorMessage
         });
       }
     } finally {
@@ -279,10 +340,19 @@ class SchedulerService {
   }
 
   addToHistory(entry: SchedulerRunHistory): void {
+    logger.debug('📝 Adding entry to scheduler history', { 
+      success: entry.success,
+      instanceKey: entry.instanceKey || 'global',
+      timestamp: entry.timestamp,
+      resultCount: Object.keys(entry.results).length
+    });
     this.runHistory.unshift(entry);
     if (this.runHistory.length > this.maxHistorySize) {
+      const removed = this.runHistory.length - this.maxHistorySize;
       this.runHistory = this.runHistory.slice(0, this.maxHistorySize);
+      logger.debug('🗑️  Trimmed scheduler history', { removed, maxSize: this.maxHistorySize });
     }
+    logger.debug('✅ History entry added', { totalEntries: this.runHistory.length });
   }
 
   getHistory(): SchedulerRunHistory[] {
@@ -290,7 +360,10 @@ class SchedulerService {
   }
 
   clearHistory(): void {
+    const count = this.runHistory.length;
+    logger.info('🗑️  Clearing scheduler history', { entryCount: count });
     this.runHistory = [];
+    logger.debug('✅ Scheduler history cleared');
   }
 
   getNextRunTime(schedule: string): Date | null {
@@ -303,8 +376,9 @@ class SchedulerService {
         tz: 'UTC'
       });
       return interval.next().toDate();
-    } catch (error: any) {
-      logger.debug('Could not parse cron for next run time', { schedule, error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.debug('Could not parse cron for next run time', { schedule, error: errorMessage });
       return null;
     }
   }

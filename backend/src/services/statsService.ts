@@ -30,15 +30,25 @@ class StatsService {
   private db: Database.Database | null = null;
 
   async initialize(): Promise<void> {
+    logger.debug('⚙️  Initializing stats service', { dbFile: DB_FILE, configDir: CONFIG_DIR });
     try {
+      logger.debug('📁 Ensuring config directory exists for stats database', { configDir: CONFIG_DIR });
       await fs.mkdir(CONFIG_DIR, { recursive: true });
+      logger.debug('✅ Config directory ready');
+      
+      logger.debug('💾 Opening stats database', { dbFile: DB_FILE });
       this.db = new Database(DB_FILE);
+      logger.debug('✅ Database connection established');
+      
+      logger.debug('📊 Creating database tables');
       this.createTables();
+      logger.debug('✅ Database tables created');
       
       logger.info('✅ Stats service initialized successfully', { dbFile: DB_FILE });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error initializing stats service', { 
-        error: error.message,
+        error: errorMessage,
         dbFile: DB_FILE 
       });
       throw error;
@@ -95,16 +105,19 @@ class StatsService {
         count,
         itemsCount: items.length
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error saving stats', { 
-        error: error.message
+        error: errorMessage
       });
       throw error;
     }
   }
 
   async getStats(limit: number = 100): Promise<Stats> {
+    logger.debug('📊 Getting stats', { limit });
     if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning empty stats');
       return {
         totalUpgrades: 0,
         upgradesByApplication: {},
@@ -114,11 +127,14 @@ class StatsService {
     }
 
     try {
+      logger.debug('📊 Querying total upgrades');
       // Get total upgrades
       const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
       const totalResult = totalStmt.get() as { total: number | null };
       const totalUpgrades = totalResult.total || 0;
+      logger.debug('✅ Total upgrades calculated', { totalUpgrades });
 
+      logger.debug('📊 Querying upgrades by application');
       // Get upgrades by application
       const byAppStmt = this.db.prepare(`
         SELECT application, SUM(count) as total
@@ -130,7 +146,9 @@ class StatsService {
       for (const row of byAppResults) {
         upgradesByApplication[row.application] = row.total;
       }
+      logger.debug('✅ Upgrades by application calculated', { applications: Object.keys(upgradesByApplication).length });
 
+      logger.debug('📊 Querying upgrades by instance');
       // Get upgrades by instance
       const byInstanceStmt = this.db.prepare(`
         SELECT 
@@ -147,7 +165,9 @@ class StatsService {
       for (const row of byInstanceResults) {
         upgradesByInstance[row.instance_key] = row.total;
       }
+      logger.debug('✅ Upgrades by instance calculated', { instances: Object.keys(upgradesByInstance).length });
 
+      logger.debug('📊 Querying recent upgrades', { limit });
       // Get recent upgrades (limited for API response)
       const recentStmt = this.db.prepare(`
         SELECT timestamp, application, instance, count, items
@@ -168,8 +188,9 @@ class StatsService {
         application: row.application,
         instance: row.instance || undefined,
         count: row.count,
-        items: JSON.parse(row.items)
+        items: JSON.parse(row.items) as Array<{ id: number; title: string }>
       }));
+      logger.debug('✅ Recent upgrades retrieved', { count: recentUpgrades.length });
 
       // Get last upgrade timestamp
       const lastStmt = this.db.prepare(`
@@ -180,6 +201,14 @@ class StatsService {
       `);
       const lastResult = lastStmt.get() as { timestamp: string } | undefined;
       const lastUpgrade = lastResult?.timestamp;
+      logger.debug('✅ Last upgrade timestamp retrieved', { lastUpgrade });
+
+      logger.debug('✅ Stats retrieved successfully', {
+        totalUpgrades,
+        applicationsCount: Object.keys(upgradesByApplication).length,
+        instancesCount: Object.keys(upgradesByInstance).length,
+        recentUpgradesCount: recentUpgrades.length
+      });
 
       return {
         totalUpgrades,
@@ -188,9 +217,10 @@ class StatsService {
         recentUpgrades,
         lastUpgrade
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error getting stats', { 
-        error: error.message
+        error: errorMessage
       });
       return {
         totalUpgrades: 0,
@@ -206,19 +236,24 @@ class StatsService {
     total: number;
     totalPages: number;
   }> {
+    logger.debug('📊 Getting recent upgrades (paginated)', { page, pageSize });
     if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning empty results');
       return { upgrades: [], total: 0, totalPages: 0 };
     }
 
     try {
+      logger.debug('📊 Counting total upgrades');
       // Get total count
       const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM upgrades');
       const countResult = countStmt.get() as { count: number };
       const total = countResult.count;
       const totalPages = Math.ceil(total / pageSize);
+      logger.debug('✅ Total count calculated', { total, totalPages });
 
       // Get paginated results
       const offset = (page - 1) * pageSize;
+      logger.debug('📊 Fetching paginated results', { offset, limit: pageSize });
       const stmt = this.db.prepare(`
         SELECT timestamp, application, instance, count, items
         FROM upgrades
@@ -238,13 +273,21 @@ class StatsService {
         application: row.application,
         instance: row.instance || undefined,
         count: row.count,
-        items: JSON.parse(row.items)
+        items: JSON.parse(row.items) as Array<{ id: number; title: string }>
       }));
 
+      logger.debug('✅ Recent upgrades retrieved', { 
+        count: upgrades.length, 
+        total, 
+        totalPages,
+        page 
+      });
+
       return { upgrades, total, totalPages };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error getting recent upgrades', { 
-        error: error.message
+        error: errorMessage
       });
       return { upgrades: [], total: 0, totalPages: 0 };
     }
@@ -262,10 +305,11 @@ class StatsService {
       try {
         await fs.unlink(DB_FILE);
         logger.debug('🗑️  Deleted stats database file');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If file doesn't exist, that's okay
-        if (error.code !== 'ENOENT') {
-          logger.warn('⚠️  Could not delete stats database file', { error: error.message });
+        const fileError = error as { code?: string; message?: string };
+        if (fileError.code !== 'ENOENT') {
+          logger.warn('⚠️  Could not delete stats database file', { error: fileError.message || 'Unknown error' });
         }
       }
       
@@ -273,9 +317,10 @@ class StatsService {
       await this.initialize();
       
       logger.info('🔄 Stats reset - database recreated');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error resetting stats', { 
-        error: error.message
+        error: errorMessage
       });
       throw error;
     }
@@ -302,9 +347,10 @@ class StatsService {
       logger.info('🗑️  Cleared all upgrade data from stats database', { 
         rowsDeleted: result.changes 
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error clearing data', { 
-        error: error.message
+        error: errorMessage
       });
       throw error;
     }
@@ -312,8 +358,12 @@ class StatsService {
 
   close(): void {
     if (this.db) {
+      logger.debug('🔄 Closing stats database connection');
       this.db.close();
       this.db = null;
+      logger.debug('✅ Stats database connection closed');
+    } else {
+      logger.debug('ℹ️  No database connection to close');
     }
   }
 }

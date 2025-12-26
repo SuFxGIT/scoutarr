@@ -20,35 +20,90 @@ interface SearchResults {
 
 class NotificationService {
   async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {
+    logger.debug('📤 Preparing to send notifications', { 
+      success, 
+      hasError: !!error,
+      resultCount: Object.keys(results).length
+    });
     const config = configService.getConfig();
     const notificationConfig = config.notifications;
 
+    const totalSearched = Object.values(results).reduce((sum, result) => sum + (result.searched || 0), 0);
+    logger.debug('📊 Notification summary', { 
+      totalSearched,
+      resultCount: Object.keys(results).length
+    });
+
+    let notificationsSent = 0;
+    let notificationsFailed = 0;
+
     // Send Discord notification
     if (notificationConfig.discordWebhook) {
-      await this.sendDiscordNotification(notificationConfig.discordWebhook, results, success, error);
+      logger.debug('📤 Sending Discord notification');
+      try {
+        await this.sendDiscordNotification(notificationConfig.discordWebhook, results, success, error);
+        notificationsSent++;
+        logger.debug('✅ Discord notification sent');
+      } catch (err: unknown) {
+        notificationsFailed++;
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logger.error('❌ Failed to send Discord notification', { error: errorMessage });
+      }
+    } else {
+      logger.debug('⏸️  Discord webhook not configured, skipping');
     }
 
     // Send Notifiarr notification
     if (notificationConfig.notifiarrPassthroughWebhook) {
-      await this.sendNotifiarrNotification(
-        notificationConfig.notifiarrPassthroughWebhook,
-        notificationConfig.notifiarrPassthroughDiscordChannelId,
-        results,
-        success,
-        error
-      );
+      logger.debug('📤 Sending Notifiarr notification');
+      try {
+        await this.sendNotifiarrNotification(
+          notificationConfig.notifiarrPassthroughWebhook,
+          notificationConfig.notifiarrPassthroughDiscordChannelId,
+          results,
+          success,
+          error
+        );
+        notificationsSent++;
+        logger.debug('✅ Notifiarr notification sent');
+      } catch (err: unknown) {
+        notificationsFailed++;
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logger.error('❌ Failed to send Notifiarr notification', { error: errorMessage });
+      }
+    } else {
+      logger.debug('⏸️  Notifiarr webhook not configured, skipping');
     }
 
     // Send Pushover notification
     if (notificationConfig.pushoverUserKey && notificationConfig.pushoverApiToken) {
-      await this.sendPushoverNotification(
-        notificationConfig.pushoverUserKey,
-        notificationConfig.pushoverApiToken,
-        results,
-        success,
-        error
-      );
+      logger.debug('📤 Sending Pushover notification');
+      try {
+        await this.sendPushoverNotification(
+          notificationConfig.pushoverUserKey,
+          notificationConfig.pushoverApiToken,
+          results,
+          success,
+          error
+        );
+        notificationsSent++;
+        logger.debug('✅ Pushover notification sent');
+      } catch (err: unknown) {
+        notificationsFailed++;
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logger.error('❌ Failed to send Pushover notification', { error: errorMessage });
+      }
+    } else {
+      logger.debug('⏸️  Pushover not configured, skipping');
     }
+
+    logger.info('📤 Notification sending complete', { 
+      sent: notificationsSent, 
+      failed: notificationsFailed,
+      totalConfigured: (notificationConfig.discordWebhook ? 1 : 0) + 
+                       (notificationConfig.notifiarrPassthroughWebhook ? 1 : 0) + 
+                       (notificationConfig.pushoverUserKey && notificationConfig.pushoverApiToken ? 1 : 0)
+    });
   }
 
   private async sendDiscordNotification(
@@ -85,14 +140,16 @@ class NotificationService {
         timestamp: new Date().toISOString(),
       };
 
+      logger.debug('📤 Sending Discord webhook request', { webhookUrl: webhookUrl.substring(0, 50) + '...' });
       await axios.post(webhookUrl, {
         embeds: [embed]
       });
 
-      logger.debug('📤 Discord notification sent');
-    } catch (error: any) {
+      logger.debug('✅ Discord notification sent successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to send Discord notification', {
-        error: error.message
+        error: errorMessage
       });
     }
   }
@@ -129,12 +186,14 @@ class NotificationService {
         title: success ? 'Scoutarr Search Completed' : 'Scoutarr Search Failed'
       };
 
+      logger.debug('📤 Sending Notifiarr webhook request', { webhookUrl: webhookUrl.substring(0, 50) + '...' });
       await axios.post(webhookUrl, payload);
 
-      logger.debug('📤 Notifiarr notification sent');
-    } catch (error: any) {
+      logger.debug('✅ Notifiarr notification sent successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to send Notifiarr notification', {
-        error: error.message
+        error: errorMessage
       });
     }
   }
@@ -176,16 +235,18 @@ class NotificationService {
       params.append('message', message);
       params.append('priority', success ? '0' : '1'); // Normal priority for success, high priority for failures
 
+      logger.debug('📤 Sending Pushover notification request');
       await axios.post('https://api.pushover.net/1/messages.json', params.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
 
-      logger.debug('📤 Pushover notification sent');
-    } catch (error: any) {
+      logger.debug('✅ Pushover notification sent successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to send Pushover notification', {
-        error: error.message
+        error: errorMessage
       });
     }
   }
@@ -202,4 +263,3 @@ class NotificationService {
 }
 
 export const notificationService = new NotificationService();
-

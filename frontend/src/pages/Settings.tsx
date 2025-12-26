@@ -23,17 +23,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import validator from 'validator';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 import type { Config } from '../types/config';
+import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
 import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
+import { useNavigation } from '../contexts/NavigationContext';
 
 function Settings() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const { handleNavigation: baseHandleNavigation } = useNavigation();
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
@@ -67,8 +68,29 @@ function Settings() {
     refetchOnWindowFocus: true,
   });
 
+  // Type for status response
+  interface InstanceStatus {
+    connected: boolean;
+    configured: boolean;
+    version?: string;
+    appName?: string;
+    error?: string;
+    instanceName?: string;
+  }
+
+  interface StatusResponse {
+    [key: string]: InstanceStatus | {
+      enabled: boolean;
+      globalEnabled?: boolean;
+      running: boolean;
+      schedule: string | null;
+      nextRun: string | null;
+      instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
+    };
+  }
+
   // Fetch status
-  const { data: statusData } = useQuery<Record<string, any>>({
+  const { data: statusData } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
@@ -111,14 +133,14 @@ function Settings() {
       setPendingNavigation(path);
       setShowUnsavedDialog(true);
     } else {
-      navigate(path);
+      baseHandleNavigation(path);
     }
-  }, [hasUnsavedChanges, navigate]);
+  }, [hasUnsavedChanges, baseHandleNavigation]);
 
   // Confirm navigation/tab change (discard changes)
   const confirmDiscardChanges = useCallback(() => {
     if (pendingNavigation) {
-      navigate(pendingNavigation);
+      baseHandleNavigation(pendingNavigation);
       setPendingNavigation(null);
     }
     if (pendingTab) {
@@ -126,7 +148,7 @@ function Settings() {
       setPendingTab(null);
     }
     setShowUnsavedDialog(false);
-  }, [pendingNavigation, pendingTab, navigate]);
+  }, [pendingNavigation, pendingTab, baseHandleNavigation]);
 
   // Cancel navigation/tab change
   const cancelDiscardChanges = useCallback(() => {
@@ -161,13 +183,6 @@ function Settings() {
     };
   }, [hasUnsavedChanges]);
 
-  // Expose navigation handler to parent via window (for App.tsx to use)
-  useEffect(() => {
-    (window as any).__scoutarr_handleNavigation = handleNavigation;
-    return () => {
-      delete (window as any).__scoutarr_handleNavigation;
-    };
-  }, [handleNavigation]);
 
 
   // Save config mutation with validation
@@ -282,8 +297,11 @@ function Settings() {
     },
   });
 
+  // Type for instance configs
+  type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
+
   // Helper to get next available instance ID
-  const getNextInstanceId = (_app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instances: any[]): number => {
+  const getNextInstanceId = (_app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instances: StarrInstanceConfig[]): number => {
     const existingIds = instances
       .map(inst => inst.instanceId)
       .filter(id => typeof id === 'number')
@@ -328,22 +346,22 @@ function Settings() {
     }
     
     // Ensure all app arrays exist and normalize instances
-    normalized.applications.radarr = (normalized.applications.radarr || []).map((inst: any, idx: number) => ({
+    normalized.applications.radarr = (normalized.applications.radarr || []).map((inst: RadarrInstance, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
 
-    normalized.applications.sonarr = (normalized.applications.sonarr || []).map((inst: any, idx: number) => ({
+    normalized.applications.sonarr = (normalized.applications.sonarr || []).map((inst: SonarrInstance, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
     
-    normalized.applications.lidarr = (normalized.applications.lidarr || []).map((inst: any, idx: number) => ({
+    normalized.applications.lidarr = (normalized.applications.lidarr || []).map((inst: LidarrInstance, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
     
-    normalized.applications.readarr = (normalized.applications.readarr || []).map((inst: any, idx: number) => ({
+    normalized.applications.readarr = (normalized.applications.readarr || []).map((inst: ReadarrInstance, idx: number) => ({
       ...inst,
       instanceId: inst.instanceId || idx + 1
     }));
@@ -352,13 +370,13 @@ function Settings() {
   };
 
   // Get instances for an app
-  const getInstances = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): any[] => {
+  const getInstances = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): StarrInstanceConfig[] => {
     if (!config) return [];
-    return config.applications[app] as any[];
+    return config.applications[app] as StarrInstanceConfig[];
   };
 
   // Update instance config
-  const updateInstanceConfig = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, field: string, value: any) => {
+  const updateInstanceConfig = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, field: string, value: unknown) => {
     if (!config) return;
     const instances = getInstances(app);
     const currentInstance = instances.find(inst => inst.id === instanceId);
@@ -415,7 +433,7 @@ function Settings() {
     const newId = `${app}-${Date.now()}`;
     const nextInstanceId = getNextInstanceId(app, instances);
     
-    let defaultConfig: any;
+    let defaultConfig: StarrInstanceConfig;
     if (app === 'radarr') {
       defaultConfig = {
         id: newId,
@@ -538,12 +556,13 @@ function Settings() {
   const renderTestButton = (app: string, instanceId?: string) => {
     const key = instanceId ? `${app}-${instanceId}` : app;
     const testResult = testResults[key];
-    let appConfig: any;
+    let appConfig: StarrInstanceConfig | undefined;
     if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as any[];
+      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as StarrInstanceConfig[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
-      appConfig = config.applications[app as keyof Config['applications']];
+      const appConfigs = config.applications[app as keyof Config['applications']];
+      appConfig = Array.isArray(appConfigs) && appConfigs.length > 0 ? appConfigs[0] : undefined;
     }
     const canTest = appConfig?.url && appConfig?.apiKey;
 
@@ -611,9 +630,9 @@ function Settings() {
       });
       setQualityProfiles(prev => ({
         ...prev,
-        [key]: response.data.map((p: any) => ({ id: p.id, name: p.name }))
+        [key]: response.data.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name }))
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Silently fail - don't show error toast as this is called automatically
       setQualityProfiles(prev => {
         const newProfiles = { ...prev };
@@ -628,12 +647,13 @@ function Settings() {
   const testConnection = async (app: string, instanceId?: string) => {
     if (!config) return;
     const key = instanceId ? `${app}-${instanceId}` : app;
-    let appConfig: any;
+    let appConfig: StarrInstanceConfig | undefined;
     if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as any[];
+      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as StarrInstanceConfig[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
-      appConfig = config.applications[app as keyof Config['applications']];
+      const appConfigs = config.applications[app as keyof Config['applications']];
+      appConfig = Array.isArray(appConfigs) && appConfigs.length > 0 ? appConfigs[0] : undefined;
     }
     if (!appConfig || !appConfig.url || !appConfig.apiKey) {
       setTestResults(prev => ({
@@ -697,7 +717,7 @@ function Settings() {
           },
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setTestResults(prev => ({
         ...prev,
         [key]: { status: false, testing: false }
@@ -724,7 +744,7 @@ function Settings() {
   };
 
   // Helper to render instance schedule configuration
-  const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: any) => {
+  const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: StarrInstanceConfig) => {
     const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
     
     return (

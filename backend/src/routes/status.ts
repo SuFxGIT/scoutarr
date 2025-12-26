@@ -3,22 +3,51 @@ import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
+import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
 
 export const statusRouter = express.Router();
 
+// Type for instance configs
+type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
+
+// Type for status response
+interface InstanceStatus {
+  connected: boolean;
+  configured: boolean;
+  version?: string;
+  appName?: string;
+  error?: string;
+  instanceName?: string;
+}
+
+interface StatusResponse {
+  [key: string]: InstanceStatus | {
+    enabled: boolean;
+    globalEnabled?: boolean;
+    running: boolean;
+    schedule: string | null;
+    nextRun: string | null;
+    instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
+  };
+}
+
 // Get status of all applications
 statusRouter.get('/', async (req, res) => {
+  const startTime = Date.now();
   logger.debug('📊 Status check requested');
   try {
     const config = configService.getConfig();
-    const status: Record<string, any> = {};
+    logger.debug('📋 Checking status for all applications', { 
+      appTypes: APP_TYPES.length 
+    });
+    const status: StatusResponse = {};
 
     // Helper to check application status
     const checkAppStatus = async (
       appType: AppType,
       appConfig: { url: string; apiKey: string },
       instanceName?: string
-    ) => {
+    ): Promise<InstanceStatus> => {
       // Check if configured (has URL and API key)
       const isConfigured = !!(appConfig.url && appConfig.apiKey);
       
@@ -41,8 +70,8 @@ statusRouter.get('/', async (req, res) => {
     };
 
     // Helper to check instances for an app
-    const checkInstances = async (appType: AppType, defaultName: string) => {
-      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+    const checkInstances = async (appType: AppType, defaultName: string): Promise<void> => {
+      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
 
       if (instances.length === 0) {
         // No configured instances - mark app as not configured
@@ -52,9 +81,9 @@ statusRouter.get('/', async (req, res) => {
 
       // Multiple instances
       for (const instance of instances) {
-        const instanceId = (instance as any).id;
-        const instanceName = (instance as any).name;
-        const instanceStatus = await checkAppStatus(appType, instance as any, instanceName);
+        const instanceId = instance.id;
+        const instanceName = instance.name;
+        const instanceStatus = await checkAppStatus(appType, instance, instanceName);
         status[instanceId] = {
           ...instanceStatus,
           instanceName
@@ -63,7 +92,7 @@ statusRouter.get('/', async (req, res) => {
     };
 
     // Check instances for all app types
-    const appTypeNames: Record<string, string> = {
+    const appTypeNames: Record<AppType, string> = {
       radarr: 'Radarr',
       sonarr: 'Sonarr',
       lidarr: 'Lidarr',
@@ -80,7 +109,7 @@ statusRouter.get('/', async (req, res) => {
     // Check if any instance schedulers are enabled
     let anyInstanceEnabled = false;
     for (const appType of APP_TYPES) {
-      const instances = getConfiguredInstances(config.applications[appType] as any[]);
+      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
       for (const instance of instances) {
         if (instance.scheduleEnabled && instance.schedule) {
           anyInstanceEnabled = true;
@@ -102,10 +131,17 @@ statusRouter.get('/', async (req, res) => {
       instances: schedulerStatus.instances
     };
 
+    const duration = Date.now() - startTime;
+    logger.debug('✅ Status check completed', { 
+      duration: `${duration}ms`,
+      instanceCount: Object.keys(status).filter(k => k !== 'scheduler').length,
+      schedulerEnabled: status.scheduler.enabled
+    });
     res.json(status);
-  } catch (error: any) {
-    logger.error('❌ Status check failed', { error: error.message });
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('❌ Status check failed', { error: errorMessage });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -114,9 +150,10 @@ statusRouter.get('/scheduler/history', async (req, res) => {
   try {
     const history = schedulerService.getHistory();
     res.json(history);
-  } catch (error: any) {
-    logger.error('❌ Failed to get scheduler history', { error: error.message });
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('❌ Failed to get scheduler history', { error: errorMessage });
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -125,9 +162,9 @@ statusRouter.post('/scheduler/history/clear', async (req, res) => {
   try {
     schedulerService.clearHistory();
     res.json({ success: true });
-  } catch (error: any) {
-    logger.error('❌ Failed to clear scheduler history', { error: error.message });
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('❌ Failed to clear scheduler history', { error: errorMessage });
+    res.status(500).json({ error: errorMessage });
   }
 });
-

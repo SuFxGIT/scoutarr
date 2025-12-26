@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { Server } from 'http';
 import { configRouter } from './routes/config.js';
 import { searchRouter } from './routes/search.js';
 import { statusRouter } from './routes/status.js';
@@ -44,35 +45,56 @@ app.get('*', (req, res) => {
 });
 
 // Initialize services and start server
-let server: any = null;
+let server: Server | null = null;
+
+logger.info('🚀 Starting application initialization', { 
+  port: PORT, 
+  environment: process.env.NODE_ENV || 'development',
+  nodeVersion: process.version
+});
 
 Promise.all([
   configService.initialize(),
   statsService.initialize(),
   qualityProfilesCacheService.initialize()
 ]).then(async () => {
+  logger.debug('✅ Core services initialized, initializing scheduler');
   await schedulerService.initialize();
+  
+  logger.debug('📡 Starting HTTP server', { port: PORT });
   server = app.listen(PORT, () => {
-    logger.info(`🚀 Server started successfully`, { port: PORT, environment: process.env.NODE_ENV || 'development' });
+    logger.info(`🚀 Server started successfully`, { 
+      port: PORT, 
+      environment: process.env.NODE_ENV || 'development',
+      pid: process.pid
+    });
   });
-}).catch((error) => {
-  logger.error('❌ Failed to initialize services', { error: error.message, stack: error.stack });
+}).catch((error: unknown) => {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorStack = error instanceof Error ? error.stack : undefined;
+  logger.error('❌ Failed to initialize services', { error: errorMessage, stack: errorStack });
   process.exit(1);
 });
 
 // Graceful shutdown
 const shutdown = async (signal: string) => {
-  logger.info(`📴 Received ${signal}, shutting down gracefully...`);
+  logger.info(`📴 Received ${signal}, shutting down gracefully...`, { signal, pid: process.pid });
   
   if (server) {
+    logger.debug('🔄 Closing HTTP server connections');
     server.close(() => {
       logger.info('✅ HTTP server closed');
     });
+  } else {
+    logger.debug('ℹ️  No HTTP server to close');
   }
   
   // Close database connections
+  logger.debug('🔄 Closing database connections');
   statsService.close();
+  logger.debug('✅ Database connections closed');
   
+  logger.info('👋 Shutdown complete');
   process.exit(0);
 };
 

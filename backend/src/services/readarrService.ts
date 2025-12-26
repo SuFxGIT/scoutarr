@@ -1,7 +1,5 @@
-import { AxiosInstance } from 'axios';
 import { ReadarrInstance } from '../types/config.js';
-import { StarrQualityProfile } from '../types/starr.js';
-import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
+import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
 
@@ -10,15 +8,22 @@ export interface ReadarrAuthor extends FilterableMedia {
   title?: string; // Alias for authorName for consistency
 }
 
-class ReadarrService {
-  private createClient(config: ReadarrInstance): AxiosInstance {
-    return createStarrClient(config.url, config.apiKey);
+class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
+  protected readonly appName = 'Readarr';
+  protected readonly apiVersion = 'v1' as const;
+  protected readonly mediaEndpoint = 'author';
+  protected readonly qualityProfileEndpoint = 'qualityprofile';
+  protected readonly editorEndpoint = 'author/editor';
+  protected readonly mediaIdField = 'authorIds' as const;
+
+  protected getMediaTypeName(): string {
+    return 'authors';
   }
 
   async getAuthors(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
     try {
       const client = this.createClient(config);
-      const response = await client.get<ReadarrAuthor[]>('/api/v1/author');
+      const response = await client.get<ReadarrAuthor[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       // Normalize authorName to title for consistency
       const authors = response.data.map(author => ({
         ...author,
@@ -26,22 +31,12 @@ class ReadarrService {
       }));
       logger.debug('📥 Fetched authors from Readarr', { count: authors.length, url: config.url });
       return authors;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to fetch authors from Readarr', { 
-        error: error.message,
+        error: errorMessage,
         url: config.url 
       });
-      throw error;
-    }
-  }
-
-  async getQualityProfiles(config: ReadarrInstance): Promise<StarrQualityProfile[]> {
-    try {
-      const client = this.createClient(config);
-      const response = await client.get<StarrQualityProfile[]>('/api/v1/qualityprofile');
-      return response.data;
-    } catch (error: any) {
-      logger.error('❌ Failed to fetch quality profiles from Readarr', { error: error.message });
       throw error;
     }
   }
@@ -50,50 +45,28 @@ class ReadarrService {
     try {
       const client = this.createClient(config);
       // Readarr only supports searching one author at a time
-      await client.post(`/api/v1/command`, {
+      await client.post(`/api/${this.apiVersion}/command`, {
         name: 'AuthorSearch',
         authorId
       });
       logger.debug('🔎 Triggered search for author', { authorId });
-    } catch (error: any) {
-      logger.error('❌ Failed to search author in Readarr', { error: error.message, authorId });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to search author in Readarr', { error: errorMessage, authorId });
       throw error;
     }
   }
 
-  async addTagToAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v1/author/editor', {
-        authorIds: authorIds,
-        tags: [tagId],
-        applyTags: 'add'
-      });
-      logger.debug('🏷️  Added tag to authors', { authorIds, tagId, count: authorIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to add tag to authors in Readarr', { error: error.message, authorIds, tagId });
-      throw error;
-    }
+  // Implement abstract methods
+  async getMedia(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
+    return this.getAuthors(config);
   }
 
-  async removeTagFromAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
-    try {
-      const client = this.createClient(config);
-      await client.put('/api/v1/author/editor', {
-        authorIds: authorIds,
-        tags: [tagId],
-        applyTags: 'remove'
-      });
-      logger.debug('🏷️  Removed tag from authors', { authorIds, tagId, count: authorIds.length });
-    } catch (error: any) {
-      logger.error('❌ Failed to remove tag from authors in Readarr', { error: error.message, authorIds, tagId });
-      throw error;
+  async searchMedia(config: ReadarrInstance, mediaIds: number[]): Promise<void> {
+    // Readarr only supports searching one author at a time
+    for (const authorId of mediaIds) {
+      await this.searchAuthors(config, authorId);
     }
-  }
-
-  async getTagId(config: ReadarrInstance, tagName: string): Promise<number | null> {
-    const client = this.createClient(config);
-    return getOrCreateTagId(client, tagName, 'Readarr');
   }
 
   async filterAuthors(config: ReadarrInstance, authors: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
@@ -109,8 +82,8 @@ class ReadarrService {
           getQualityProfiles: () => this.getQualityProfiles(config),
           getTagId: (tagName: string) => this.getTagId(config, tagName)
         },
-        'Readarr',
-        'authors'
+        this.appName,
+        this.getMediaTypeName()
       );
 
       // Filter by author status
@@ -125,12 +98,25 @@ class ReadarrService {
       }
 
       return filtered;
-    } catch (error: any) {
-      logger.error('❌ Failed to filter authors', { error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Failed to filter authors', { error: errorMessage });
       throw error;
     }
+  }
+
+  async filterMedia(config: ReadarrInstance, media: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
+    return this.filterAuthors(config, media);
+  }
+
+  // Convenience methods for backward compatibility
+  async addTagToAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
+    return this.addTag(config, authorIds, tagId);
+  }
+
+  async removeTagFromAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
+    return this.removeTag(config, authorIds, tagId);
   }
 }
 
 export const readarrService = new ReadarrService();
-
