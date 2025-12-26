@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from './logger.js';
+import { getErrorMessage } from './errorUtils.js';
 
 /**
  * Supported application types
@@ -125,7 +126,7 @@ export async function testStarrConnection(
       version
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.debug(`❌ ${expectedApp} connection test failed`, { url, error: errorMessage });
     return {
       success: false,
@@ -160,8 +161,7 @@ export async function getOrCreateTagId(
     const newTagResponse = await client.post<{ id: number; label: string }>(`/api/${apiVersion}/tag`, { label: tagName });
     return newTagResponse.data.id;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`❌ Failed to get/create tag in ${appName}`, { error: errorMessage, tagName });
+    logger.error(`❌ Failed to get/create tag in ${appName}`, { error: getErrorMessage(error), tagName });
     throw error;
   }
 }

@@ -10,9 +10,7 @@ import { notificationService } from '../services/notificationService.js';
 import logger from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
 import { serviceRegistry, getServiceForApp } from '../utils/serviceRegistry.js';
-import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
-import { StarrInstanceConfig } from '../types/starr.js';
-import { SearchResults, SearchResult } from '../types/api.js';
+import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
 import { FilterableMedia } from '../utils/filterUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
@@ -43,7 +41,7 @@ function getResultKey(instanceId: string, appType: AppType, instanceCount: numbe
 // Helper to extract instance info from config
 function getInstanceInfo(config: StarrInstanceConfig, appType: AppType): { instanceName: string; instanceId: string } {
   return {
-    instanceName: config.name,
+    instanceName: config.name || `${appType}-1`,
     instanceId: config.id || `${appType}-1`
   };
 }
@@ -90,19 +88,19 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
   unattended?: boolean
 ): ApplicationProcessor<TMedia> {
   const service = getServiceForApp(appType);
-  
+
   // Determine if search should be one-by-one based on app type
   const searchMediaOneByOne = appType === 'sonarr' || appType === 'lidarr' || appType === 'readarr';
-  
+
   return {
     name: instanceName,
     config,
     appType,
     instanceId,
     unattended,
-    getMedia: (cfg: TConfig) => service.getMedia(cfg),
-    filterMedia: (cfg: TConfig, media: TMedia[]) => service.filterMedia(cfg, media),
-    searchMedia: async (cfg: TConfig, mediaIds: number[]) => {
+    getMedia: (cfg: StarrInstanceConfig) => service.getMedia(cfg as TConfig) as Promise<TMedia[]>,
+    filterMedia: (cfg: StarrInstanceConfig, media: TMedia[]) => service.filterMedia(cfg as TConfig, media) as Promise<TMedia[]>,
+    searchMedia: async (cfg: StarrInstanceConfig, mediaIds: number[]) => {
       if (appType === 'radarr') {
         await radarrService.searchMovies(cfg as RadarrInstance, mediaIds);
       } else if (appType === 'sonarr') {
@@ -120,29 +118,9 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
       }
     },
     searchMediaOneByOne,
-    getTagId: (cfg: TConfig, tagName: string) => service.getTagId(cfg, tagName),
-    addTag: async (cfg: TConfig, mediaIds: number[], tagId: number) => {
-      if (appType === 'radarr') {
-        await radarrService.addTagToMovies(cfg as RadarrInstance, mediaIds, tagId);
-      } else if (appType === 'sonarr') {
-        await sonarrService.addTagToSeries(cfg as SonarrInstance, mediaIds, tagId);
-      } else if (appType === 'lidarr') {
-        await lidarrService.addTagToArtists(cfg as LidarrInstance, mediaIds, tagId);
-      } else if (appType === 'readarr') {
-        await readarrService.addTagToAuthors(cfg as ReadarrInstance, mediaIds, tagId);
-      }
-    },
-    removeTag: async (cfg: TConfig, mediaIds: number[], tagId: number) => {
-      if (appType === 'radarr') {
-        await radarrService.removeTagFromMovies(cfg as RadarrInstance, mediaIds, tagId);
-      } else if (appType === 'sonarr') {
-        await sonarrService.removeTagFromSeries(cfg as SonarrInstance, mediaIds, tagId);
-      } else if (appType === 'lidarr') {
-        await lidarrService.removeTagFromArtists(cfg as LidarrInstance, mediaIds, tagId);
-      } else if (appType === 'readarr') {
-        await readarrService.removeTagFromAuthors(cfg as ReadarrInstance, mediaIds, tagId);
-      }
-    },
+    getTagId: (cfg: StarrInstanceConfig, tagName: string) => service.getTagId(cfg as TConfig, tagName),
+    addTag: (cfg: StarrInstanceConfig, mediaIds: number[], tagId: number) => service.addTag(cfg as TConfig, mediaIds, tagId),
+    removeTag: (cfg: StarrInstanceConfig, mediaIds: number[], tagId: number) => service.removeTag(cfg as TConfig, mediaIds, tagId),
     getMediaId: service.getMediaId,
     getMediaTitle: service.getMediaTitle
   };
@@ -245,6 +223,7 @@ interface ApplicationProcessor<TMedia extends FilterableMedia> {
   config: StarrInstanceConfig;
   appType: AppType;
   instanceId: string;
+  unattended?: boolean;
   getMedia: (config: StarrInstanceConfig) => Promise<TMedia[]>;
   filterMedia: (config: StarrInstanceConfig, media: TMedia[]) => Promise<TMedia[]>;
   searchMedia: (config: StarrInstanceConfig, mediaIds: number[]) => Promise<void>;
@@ -444,18 +423,19 @@ async function processManualRun<TMedia extends FilterableMedia>(
   filterMedia: (config: StarrInstanceConfig, media: TMedia[]) => Promise<TMedia[]>,
   getMediaId: (media: TMedia) => number,
   getMediaTitle: (media: TMedia) => string,
+  unattended: boolean,
   getTagId?: (config: StarrInstanceConfig, tagName: string) => Promise<number | null>
 ): Promise<{ success: boolean; count: number; total: number; items: Array<{ id: number; title: string }>; error?: string }> {
   try {
     logger.debug(`Run preview: Processing ${name}`, {
       count: config.count,
-      unattended: config.unattended
+      unattended
     });
     let media = await getMedia(config);
     let filtered = await filterMedia(config, media);
 
     // Unattended mode: if no media found, simulate tag removal and re-filter (preview only, no actual changes)
-    if (config.unattended && filtered.length === 0 && getTagId) {
+    if (unattended && filtered.length === 0 && getTagId) {
       const tagId = await getTagId(config, config.tagName);
       if (tagId !== null) {
         // Simulate tag removal: create a copy of media with the tag removed from tags array
@@ -501,10 +481,11 @@ async function processManualRun<TMedia extends FilterableMedia>(
 async function processManualRunInstances(
   instances: StarrInstanceConfig[],
   appType: AppType,
-  results: SearchResults
+  results: SearchResults,
+  unattended: boolean
 ): Promise<void> {
   const service = getServiceForApp(appType);
-  
+
   for (const instanceConfig of instances) {
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
     const result = await processManualRun(
@@ -514,6 +495,7 @@ async function processManualRunInstances(
       service.filterMedia,
       service.getMediaId,
       service.getMediaTitle,
+      unattended,
       service.getTagId,
     );
     const resultKey = getResultKey(instanceId, appType, instances.length);
@@ -555,11 +537,12 @@ searchRouter.post('/run-preview', async (req, res) => {
   try {
     const config = configService.getConfig();
     const results: SearchResults = {};
+    const unattended = config.scheduler?.unattended || false;
 
     // Process all app types
     for (const appType of APP_TYPES) {
       const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-      await processManualRunInstances(instances, appType, results);
+      await processManualRunInstances(instances, appType, results, unattended);
     }
 
     // Save preview to database

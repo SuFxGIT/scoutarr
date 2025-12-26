@@ -1,6 +1,7 @@
 /**
  * Shared types for Starr applications (Radarr, Sonarr, Lidarr, Readarr)
  */
+import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from './config.js';
 
 export interface StarrTag {
   id: number;
@@ -18,7 +19,7 @@ export interface StarrQualityProfile {
 export interface BaseStarrInstance {
   id: string;
   instanceId?: number;
-  name: string;
+  name?: string; // Changed to optional to match actual instance types
   url: string;
   apiKey: string;
   count: number | 'max';
@@ -35,7 +36,7 @@ export interface BaseStarrInstance {
  * Union type for all Starr instance configurations
  */
 export type StarrInstanceConfig =
-  | import('./config.js').RadarrInstance
-  | import('./config.js').SonarrInstance
-  | import('./config.js').LidarrInstance
-  | import('./config.js').ReadarrInstance;
+  | RadarrInstance
+  | SonarrInstance
+  | LidarrInstance
+  | ReadarrInstance;

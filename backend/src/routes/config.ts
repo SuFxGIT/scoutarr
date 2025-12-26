@@ -3,15 +3,13 @@ import { configService } from '../services/configService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
-import { statsService } from '../services/statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { handleRouteError, getErrorMessage } from '../utils/errorUtils.js';
 import logger from '../utils/logger.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Config } from '../types/config.js';
-import { StarrInstanceConfig } from '../types/starr.js';
+import { Config, StarrInstanceConfig } from '@scoutarr/shared';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

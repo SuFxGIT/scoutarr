@@ -41,19 +41,3 @@ export function handleRouteError(
     message: errorMessage
   } as ErrorResponse);
 }
-
-/**
- * Logs warning for non-critical errors
- */
-export function logWarning(context: string, error: unknown): void {
-  const errorMessage = getErrorMessage(error);
-  logger.warn(`⚠️  ${context}`, { error: errorMessage });
-}
-
-/**
- * Logs debug information for expected failures
- */
-export function logDebug(context: string, error: unknown): void {
-  const errorMessage = getErrorMessage(error);
-  logger.debug(context, { error: errorMessage });
-}

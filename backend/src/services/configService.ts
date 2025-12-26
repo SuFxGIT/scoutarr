@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Config } from '../types/config.js';
+import { Config } from '@scoutarr/shared';
 import logger from '../utils/logger.js';
 import { getConfigDir } from '../utils/paths.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 const CONFIG_DIR = getConfigDir();
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
@@ -143,7 +144,7 @@ class ConfigService {
       });
       return this.config;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error loading configuration', { 
         error: errorMessage,
@@ -166,7 +167,7 @@ class ConfigService {
 
       return config;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error resetting configuration to default', {
         error: errorMessage,
@@ -206,7 +207,7 @@ class ConfigService {
       schedulerService.restart();
       logger.debug('✅ Scheduler restarted');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('❌ Error saving configuration', { 
         error: errorMessage,

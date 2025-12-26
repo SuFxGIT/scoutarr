@@ -3,8 +3,7 @@ import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
-import { StarrInstanceConfig } from '../types/starr.js';
-import { StatusResponse, InstanceStatus } from '../types/api.js';
+import { StarrInstanceConfig, StatusResponse, InstanceStatus } from '@scoutarr/shared';
 import { handleRouteError } from '../utils/errorUtils.js';
 
 export const statusRouter = express.Router();

@@ -1,4 +1,4 @@
-import { ReadarrInstance } from '../types/config.js';
+import { ReadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
@@ -32,11 +32,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
       logger.debug('📥 Fetched authors from Readarr', { count: authors.length, url: config.url });
       return authors;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to fetch authors from Readarr', { 
-        error: errorMessage,
-        url: config.url 
-      });
+      this.logError('Failed to fetch authors', error, { url: config.url });
       throw error;
     }
   }
@@ -51,8 +47,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
       });
       logger.debug('🔎 Triggered search for author', { authorId });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to search author in Readarr', { error: errorMessage, authorId });
+      this.logError('Failed to search author', error, { authorId });
       throw error;
     }
   }
@@ -90,17 +85,16 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
       if (config.authorStatus) {
         const before = filtered.length;
         filtered = filtered.filter(a => a.status === config.authorStatus);
-        logger.debug('🔽 Filtered by author status', { 
-          before, 
-          after: filtered.length, 
-          status: config.authorStatus 
+        logger.debug('🔽 Filtered by author status', {
+          before,
+          after: filtered.length,
+          status: config.authorStatus
         });
       }
 
       return filtered;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to filter authors', { error: errorMessage });
+      this.logError('Failed to filter authors', error);
       throw error;
     }
   }
@@ -109,14 +103,6 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
     return this.filterAuthors(config, media);
   }
 
-  // Convenience methods for backward compatibility
-  async addTagToAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
-    return this.addTag(config, authorIds, tagId);
-  }
-
-  async removeTagFromAuthors(config: ReadarrInstance, authorIds: number[], tagId: number): Promise<void> {
-    return this.removeTag(config, authorIds, tagId);
-  }
 }
 
 export const readarrService = new ReadarrService();

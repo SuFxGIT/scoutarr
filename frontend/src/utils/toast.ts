@@ -35,17 +35,3 @@ export function showSuccessToast(message: string) {
     style: SUCCESS_TOAST_STYLE,
   });
 }
-
-/**
- * Display a standardized info toast
- */
-export function showInfoToast(message: string) {
-  sonnerToast.info(message);
-}
-
-/**
- * Display a standardized warning toast
- */
-export function showWarningToast(message: string) {
-  sonnerToast.warning(message);
-}

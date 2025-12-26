@@ -4,6 +4,7 @@
   "description": "Web-based Upgradinatorr - Automate searching for upgrades in Radarr, Sonarr, Lidarr, and Readarr",
   "private": true,
   "workspaces": [
+    "shared",
     "frontend",
     "backend"
   ],

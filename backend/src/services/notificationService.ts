@@ -2,7 +2,8 @@ import axios from 'axios';
 import { configService } from './configService.js';
 import logger from '../utils/logger.js';
 import { extractItemsFromResult } from '../utils/starrUtils.js';
-import { SearchResults } from '../types/api.js';
+import { SearchResults } from '@scoutarr/shared';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 class NotificationService {
   async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {
@@ -133,7 +134,7 @@ class NotificationService {
 
       logger.debug('✅ Discord notification sent successfully');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Discord notification', {
         error: errorMessage
       });
@@ -177,7 +178,7 @@ class NotificationService {
 
       logger.debug('✅ Notifiarr notification sent successfully');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Notifiarr notification', {
         error: errorMessage
       });
@@ -230,7 +231,7 @@ class NotificationService {
 
       logger.debug('✅ Pushover notification sent successfully');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Pushover notification', {
         error: errorMessage
       });

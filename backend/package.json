@@ -10,6 +10,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@scoutarr/shared": "file:../shared",
     "axios": "^1.6.2",
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",

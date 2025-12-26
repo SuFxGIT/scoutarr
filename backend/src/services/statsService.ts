@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import logger from '../utils/logger.js';
 import { getConfigDir } from '../utils/paths.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 const CONFIG_DIR = getConfigDir();
 const DB_FILE = path.join(CONFIG_DIR, 'stats.db');
@@ -43,7 +44,7 @@ class StatsService {
       
       logger.info('✅ Stats service initialized successfully', { dbFile: DB_FILE });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error initializing stats service', { 
         error: errorMessage,
         dbFile: DB_FILE 
@@ -145,7 +146,7 @@ class StatsService {
         itemsCount: items.length
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error saving stats', { 
         error: errorMessage
       });
@@ -263,7 +264,7 @@ class StatsService {
       });
       return stats;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting stats', { 
         error: errorMessage
       });
@@ -330,7 +331,7 @@ class StatsService {
 
       return { triggers, total, totalPages };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting recent triggers', { 
         error: errorMessage
       });
@@ -363,7 +364,7 @@ class StatsService {
       
       logger.info('🔄 Stats reset - database recreated');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error resetting stats', { 
         error: errorMessage
       });
@@ -398,7 +399,7 @@ class StatsService {
         taggedMediaDeleted: taggedMediaResult.changes
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error clearing data', { 
         error: errorMessage
       });
@@ -435,7 +436,7 @@ class StatsService {
         count: mediaIds.length
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error recording tagged media', {
         error: errorMessage
       });
@@ -459,7 +460,7 @@ class StatsService {
       const results = stmt.all(appKey, instanceId, tagId) as Array<{ media_id: number }>;
       return results.map(row => row.media_id);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting tagged media IDs', {
         error: errorMessage
       });
@@ -487,7 +488,7 @@ class StatsService {
         rowsDeleted: result.changes
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error clearing tagged media', {
         error: errorMessage
       });
@@ -513,7 +514,7 @@ class StatsService {
       insertStmt.run(JSON.stringify(previewData), new Date().toISOString());
       logger.debug('💾 Run preview saved to database');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error saving run preview', {
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined
@@ -539,7 +540,7 @@ class StatsService {
       logger.debug('✅ Run preview retrieved from database');
       return preview;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting run preview', {
         error: errorMessage
       });
@@ -560,7 +561,7 @@ class StatsService {
         rowsDeleted: result.changes
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error clearing run preview', {
         error: errorMessage
       });
@@ -607,7 +608,7 @@ class StatsService {
         configured
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error saving connection status', {
         error: errorMessage
       });
@@ -653,7 +654,7 @@ class StatsService {
       logger.debug('✅ Connection status retrieved', { count: Object.keys(status).length });
       return status;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting connection status', {
         error: errorMessage
       });

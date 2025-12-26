@@ -1,4 +1,4 @@
-import { SonarrInstance } from '../types/config.js';
+import { SonarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
@@ -26,11 +26,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
       logger.debug('📥 Fetched series from Sonarr', { count: response.data.length, url: config.url });
       return response.data;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to fetch series from Sonarr', { 
-        error: errorMessage,
-        url: config.url 
-      });
+      this.logError('Failed to fetch series', error, { url: config.url });
       throw error;
     }
   }
@@ -45,8 +41,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
       });
       logger.debug('🔎 Triggered search for series', { seriesId });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to search series in Sonarr', { error: errorMessage, seriesId });
+      this.logError('Failed to search series', error, { seriesId });
       throw error;
     }
   }
@@ -84,17 +79,16 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
       if (config.seriesStatus) {
         const before = filtered.length;
         filtered = filtered.filter(s => s.status === config.seriesStatus);
-        logger.debug('🔽 Filtered by series status', { 
-          before, 
-          after: filtered.length, 
-          status: config.seriesStatus 
+        logger.debug('🔽 Filtered by series status', {
+          before,
+          after: filtered.length,
+          status: config.seriesStatus
         });
       }
 
       return filtered;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to filter series', { error: errorMessage });
+      this.logError('Failed to filter series', error);
       throw error;
     }
   }
@@ -103,14 +97,6 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
     return this.filterSeries(config, media);
   }
 
-  // Convenience methods for backward compatibility
-  async addTagToSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
-    return this.addTag(config, seriesIds, tagId);
-  }
-
-  async removeTagFromSeries(config: SonarrInstance, seriesIds: number[], tagId: number): Promise<void> {
-    return this.removeTag(config, seriesIds, tagId);
-  }
 }
 
 export const sonarrService = new SonarrService();

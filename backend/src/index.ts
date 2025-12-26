@@ -8,6 +8,7 @@ import { statsRouter } from './routes/stats.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
+import { getErrorMessage } from './utils/errorUtils.js';
 import logger from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import path from 'path';
@@ -68,7 +69,7 @@ Promise.all([
     });
   });
 }).catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorMessage = getErrorMessage(error);
   const errorStack = error instanceof Error ? error.stack : undefined;
   logger.error('❌ Failed to initialize services', { error: errorMessage, stack: errorStack });
   process.exit(1);

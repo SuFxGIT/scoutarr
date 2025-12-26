@@ -1,4 +1,4 @@
-import { LidarrInstance } from '../types/config.js';
+import { LidarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
@@ -32,11 +32,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
       logger.debug('📥 Fetched artists from Lidarr', { count: artists.length, url: config.url });
       return artists;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to fetch artists from Lidarr', { 
-        error: errorMessage,
-        url: config.url 
-      });
+      this.logError('Failed to fetch artists', error, { url: config.url });
       throw error;
     }
   }
@@ -51,8 +47,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
       });
       logger.debug('🔎 Triggered search for artist', { artistId });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to search artist in Lidarr', { error: errorMessage, artistId });
+      this.logError('Failed to search artist', error, { artistId });
       throw error;
     }
   }
@@ -90,17 +85,16 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
       if (config.artistStatus) {
         const before = filtered.length;
         filtered = filtered.filter(a => a.status === config.artistStatus);
-        logger.debug('🔽 Filtered by artist status', { 
-          before, 
-          after: filtered.length, 
-          status: config.artistStatus 
+        logger.debug('🔽 Filtered by artist status', {
+          before,
+          after: filtered.length,
+          status: config.artistStatus
         });
       }
 
       return filtered;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to filter artists', { error: errorMessage });
+      this.logError('Failed to filter artists', error);
       throw error;
     }
   }
@@ -109,14 +103,6 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
     return this.filterArtists(config, media);
   }
 
-  // Convenience methods for backward compatibility
-  async addTagToArtists(config: LidarrInstance, artistIds: number[], tagId: number): Promise<void> {
-    return this.addTag(config, artistIds, tagId);
-  }
-
-  async removeTagFromArtists(config: LidarrInstance, artistIds: number[], tagId: number): Promise<void> {
-    return this.removeTag(config, artistIds, tagId);
-  }
 }
 
 export const lidarrService = new LidarrService();

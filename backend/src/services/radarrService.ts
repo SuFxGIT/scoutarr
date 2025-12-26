@@ -1,4 +1,4 @@
-import { RadarrInstance } from '../types/config.js';
+import { RadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
@@ -25,11 +25,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
       const response = await client.get<RadarrMovie[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       return response.data;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to fetch movies from Radarr', { 
-        error: errorMessage,
-        url: config.url 
-      });
+      this.logError('Failed to fetch movies', error, { url: config.url });
       throw error;
     }
   }
@@ -42,8 +38,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
         movieIds: movieIds
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to search movies in Radarr', { error: errorMessage, movieIds });
+      this.logError('Failed to search movies', error, { movieIds });
       throw error;
     }
   }
@@ -92,8 +87,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
 
       return filtered;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Failed to filter movies', { error: errorMessage });
+      this.logError('Failed to filter movies', error);
       throw error;
     }
   }
@@ -102,14 +96,6 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
     return this.filterMovies(config, media);
   }
 
-  // Convenience methods for backward compatibility
-  async addTagToMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
-    return this.addTag(config, movieIds, tagId);
-  }
-
-  async removeTagFromMovies(config: RadarrInstance, movieIds: number[], tagId: number): Promise<void> {
-    return this.removeTag(config, movieIds, tagId);
-  }
 }
 
 export const radarrService = new RadarrService();

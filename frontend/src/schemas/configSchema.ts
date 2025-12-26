@@ -141,5 +141,3 @@ export const configSchema = z.object({
   scheduler: schedulerConfigSchema,
 });
 
-export type ConfigFormData = z.infer<typeof configSchema>;
-

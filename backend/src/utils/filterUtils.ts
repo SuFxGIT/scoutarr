@@ -1,5 +1,5 @@
 import logger from './logger.js';
-import { StarrQualityProfile } from '../types/starr.js';
+import { StarrQualityProfile } from '@scoutarr/shared';
 
 /**
  * Common interface for media items that can be filtered

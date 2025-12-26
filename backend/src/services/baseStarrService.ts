@@ -1,9 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { BaseStarrInstance } from '../types/starr.js';
-import { StarrQualityProfile } from '../types/starr.js';
+import { BaseStarrInstance, StarrQualityProfile } from '@scoutarr/shared';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 /**
  * Base class for Starr application services
@@ -25,6 +25,16 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
   }
 
   /**
+   * Helper for consistent error logging
+   */
+  protected logError(operation: string, error: unknown, context?: Record<string, unknown>): void {
+    logger.error(`❌ ${operation} failed for ${this.appName}`, {
+      error: getErrorMessage(error),
+      ...context
+    });
+  }
+
+  /**
    * Gets quality profiles from the Starr application
    */
   async getQualityProfiles(config: TConfig): Promise<StarrQualityProfile[]> {
@@ -33,11 +43,7 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
       const response = await client.get<StarrQualityProfile[]>(`/api/${this.apiVersion}/${this.qualityProfileEndpoint}`);
       return response.data;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to fetch quality profiles from ${this.appName}`, { 
-        error: errorMessage,
-        url: config.url
-      });
+      this.logError('Failed to fetch quality profiles', error, { url: config.url });
       throw error;
     }
   }
@@ -63,12 +69,7 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         applyTags: 'add'
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to add tag to ${this.getMediaTypeName()} in ${this.appName}`, { 
-        error: errorMessage, 
-        mediaIds, 
-        tagId 
-      });
+      this.logError(`Failed to add tag to ${this.getMediaTypeName()}`, error, { mediaIds, tagId });
       throw error;
     }
   }
@@ -84,18 +85,13 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tags: [tagId],
         applyTags: 'remove'
       });
-      logger.debug(`🏷️  Removed tag from ${this.getMediaTypeName()}`, { 
-        mediaIds, 
-        tagId, 
-        count: mediaIds.length 
+      logger.debug(`🏷️  Removed tag from ${this.getMediaTypeName()}`, {
+        mediaIds,
+        tagId,
+        count: mediaIds.length
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to remove tag from ${this.getMediaTypeName()} in ${this.appName}`, { 
-        error: errorMessage, 
-        mediaIds, 
-        tagId 
-      });
+      this.logError(`Failed to remove tag from ${this.getMediaTypeName()}`, error, { mediaIds, tagId });
       throw error;
     }
   }
@@ -104,6 +100,20 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Gets the media type name for logging (movies, series, artists, authors)
    */
   protected abstract getMediaTypeName(): string;
+
+  /**
+   * Gets media ID from media object
+   */
+  getMediaId(media: TMedia): number {
+    return media.id;
+  }
+
+  /**
+   * Gets media title from media object
+   */
+  getMediaTitle(media: TMedia): string {
+    return (media as any).title || (media as any).artistName || (media as any).authorName || 'Unknown';
+  }
 
   /**
    * Fetches all media items from the Starr application

@@ -5,9 +5,8 @@ import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
 import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
 import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
-import { StarrInstanceConfig } from '../types/starr.js';
-import { SearchResults } from '../types/api.js';
-import { Config } from '../types/config.js';
+import { StarrInstanceConfig, SearchResults, Config } from '@scoutarr/shared';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
 const require = createRequire(import.meta.url);
@@ -36,6 +35,17 @@ class SchedulerService {
 
   private runHistory: SchedulerRunHistory[] = [];
   private maxHistorySize = 100;
+
+  /**
+   * Helper to send notifications with error logging
+   */
+  private async sendNotificationsWithLogging(results: SearchResults, success: boolean, error?: string): Promise<void> {
+    try {
+      await notificationService.sendNotifications(results, success, error);
+    } catch (notificationError: unknown) {
+      logger.debug('Failed to send notifications', { error: getErrorMessage(notificationError) });
+    }
+  }
 
   async initialize(): Promise<void> {
     logger.debug('⚙️  Initializing scheduler service');
@@ -218,16 +228,9 @@ class SchedulerService {
         }))
       });
 
-      try {
-        await notificationService.sendNotifications(results, true);
-      } catch (notificationError: unknown) {
-        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-        logger.debug('Failed to send notifications', {
-          error: errorMessage
-        });
-      }
+      await this.sendNotificationsWithLogging(results, true);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
@@ -284,16 +287,9 @@ class SchedulerService {
         }))
       });
 
-      try {
-        await notificationService.sendNotifications(results, true);
-      } catch (notificationError: unknown) {
-        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-        logger.debug('Failed to send notifications', {
-          error: errorMessage
-        });
-      }
+      await this.sendNotificationsWithLogging(results, true);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
@@ -361,8 +357,7 @@ class SchedulerService {
       });
       return interval.next().toDate();
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.debug('Could not parse cron for next run time', { schedule, error: errorMessage });
+      logger.debug('Could not parse cron for next run time', { schedule, error: getErrorMessage(error) });
       return null;
     }
   }
