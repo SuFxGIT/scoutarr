@@ -80,7 +80,7 @@ statusRouter.get('/', async (req, res) => {
     }
 
     // Add scheduler status
-    const schedulerStatus = schedulerService.getStatus();
+    const schedulerStatus = schedulerService.getStatus(config);
     
     // Check if any instance schedulers are enabled
     let anyInstanceEnabled = false;
@@ -116,6 +116,41 @@ statusRouter.get('/', async (req, res) => {
     res.json(status);
   } catch (error: unknown) {
     handleRouteError(res, error, 'Status check failed');
+  }
+});
+
+// Get scheduler status only (without connection checks)
+statusRouter.get('/scheduler', async (req, res) => {
+  try {
+    const config = configService.getConfig();
+    const schedulerStatus = schedulerService.getStatus(config);
+    
+    // Check if any instance schedulers are enabled
+    let anyInstanceEnabled = false;
+    for (const appType of APP_TYPES) {
+      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
+      for (const instance of instances) {
+        if (instance.scheduleEnabled && instance.schedule) {
+          anyInstanceEnabled = true;
+          break;
+        }
+      }
+      if (anyInstanceEnabled) break;
+    }
+    
+    // Enabled if global OR any instance scheduler is enabled
+    const globalEnabled = config.scheduler?.enabled || false;
+    
+    res.json({
+      enabled: globalEnabled || anyInstanceEnabled,
+      globalEnabled: globalEnabled,
+      running: schedulerStatus.running,
+      schedule: schedulerStatus.schedule,
+      nextRun: schedulerStatus.nextRun,
+      instances: schedulerStatus.instances
+    });
+  } catch (error: unknown) {
+    handleRouteError(res, error, 'Failed to get scheduler status');
   }
 });
 

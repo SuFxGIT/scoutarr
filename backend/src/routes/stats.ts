@@ -13,8 +13,8 @@ statsRouter.get('/', async (req, res) => {
     logger.debug('📊 Fetching stats', { limit });
     const stats = await statsService.getStats(limit);
     logger.debug('✅ Stats retrieved successfully', { 
-      totalUpgrades: stats.totalUpgrades,
-      recentCount: stats.recentUpgrades.length
+      totalTriggers: stats.totalTriggers,
+      recentCount: stats.recentTriggers.length
     });
     res.json(stats);
   } catch (error: unknown) {
@@ -35,7 +35,7 @@ statsRouter.get('/recent', async (req, res) => {
       return res.status(400).json({ error: 'Page size must be between 1 and 1000' });
     }
 
-    const result = await statsService.getRecentUpgrades(page, pageSize);
+    const result = await statsService.getRecentTriggers(page, pageSize);
     res.json(result);
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to get recent triggers');
@@ -57,7 +57,7 @@ statsRouter.post('/reset', async (req, res) => {
 // Clear recent triggers only
 statsRouter.post('/clear-recent', async (req, res) => {
   try {
-    await statsService.clearRecentUpgrades();
+    await statsService.clearRecentTriggers();
     res.json({ success: true, message: 'Recent triggers cleared successfully' });
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to clear recent triggers');

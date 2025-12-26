@@ -20,17 +20,17 @@ export interface SearchResults {
 }
 
 export interface Stats {
-  totalUpgrades: number;
-  upgradesByApplication: Record<string, number>;
-  upgradesByInstance: Record<string, number>;
-  recentUpgrades: Array<{
+  totalTriggers: number;
+  triggersByApplication: Record<string, number>;
+  triggersByInstance: Record<string, number>;
+  recentTriggers: Array<{
     timestamp: string;
     application: string;
     instance?: string;
     count: number;
     items: Array<{ id: number; title: string }>;
   }>;
-  lastUpgrade?: string;
+  lastTrigger?: string;
 }
 
 export interface InstanceStatus {

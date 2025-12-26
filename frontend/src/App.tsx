@@ -1,17 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Flex, Heading, Button, Separator, Tooltip } from '@radix-ui/themes';
+import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
-import { GearIcon, HomeIcon, ReloadIcon } from '@radix-ui/react-icons';
+import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import axios from 'axios';
 
 function NavigationLinks() {
   const location = useLocation();
   const { handleNavigation } = useNavigation();
-  const queryClient = useQueryClient();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Only intercept if we're navigating away from settings
@@ -21,46 +17,6 @@ function NavigationLinks() {
       return;
     }
     // Otherwise, let default Link behavior handle it
-  };
-
-  const handleRefresh = async () => {
-    try {
-      // Use fetchQuery to force fetch regardless of enabled state or staleTime
-      await Promise.all([
-        queryClient.fetchQuery({
-          queryKey: ['status'],
-          queryFn: async () => {
-            const response = await axios.get('/api/status');
-            return response.data;
-          },
-        }),
-        queryClient.fetchQuery({
-          queryKey: ['schedulerHistory'],
-          queryFn: async () => {
-            const response = await axios.get('/api/status/scheduler/history');
-            return response.data;
-          },
-        }),
-        queryClient.fetchQuery({
-          queryKey: ['runPreview'],
-          queryFn: async () => {
-            // Always generate new preview when explicitly refreshing
-            const response = await axios.post('/api/search/run-preview');
-            return response.data;
-          },
-        }),
-        queryClient.fetchQuery({
-          queryKey: ['stats'],
-          queryFn: async () => {
-            const response = await axios.get('/api/stats');
-            return response.data;
-          },
-        }),
-      ]);
-      toast.success('Refreshed');
-    } catch (error) {
-      toast.error('Failed to refresh');
-    }
   };
 
   return (
@@ -84,11 +40,6 @@ function NavigationLinks() {
             <GearIcon /> Settings
           </Link>
         </Button>
-        <Tooltip content="Refresh app">
-          <Button variant="ghost" onClick={handleRefresh}>
-            <ReloadIcon /> Refresh
-          </Button>
-        </Tooltip>
       </Flex>
     </>
   );

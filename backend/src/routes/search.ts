@@ -71,7 +71,7 @@ async function saveStatsForResults(results: SearchResults): Promise<void> {
         resultInstanceName: result.instanceName
       });
       
-      await statsService.addUpgrade(
+      await statsService.addTrigger(
         appType,
         result.searched,
         items,

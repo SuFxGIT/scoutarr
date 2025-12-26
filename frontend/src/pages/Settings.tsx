@@ -25,13 +25,11 @@ import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import axios from 'axios';
 import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
-import type { StatusResponse } from '../types/api';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
 import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
-import { ConnectionStatusBadges } from '../components/ConnectionStatusBadges';
 import { useNavigation } from '../contexts/NavigationContext';
 
 function Settings() {
@@ -70,18 +68,6 @@ function Settings() {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch status - don't fetch automatically, only when explicitly refreshed
-  const { data: statusData } = useQuery<StatusResponse>({
-    queryKey: ['status'],
-    queryFn: async () => {
-      const response = await axios.get('/api/status');
-      return response.data;
-    },
-    enabled: false, // Don't fetch on mount - only fetch when explicitly called
-    staleTime: Infinity, // Status never goes stale - only changes when config changes
-  });
-
-  const connectionStatus = statusData || {};
 
   // Update local config when loaded config changes
   useEffect(() => {
@@ -182,45 +168,7 @@ function Settings() {
         loadedConfigRef.current = configToSave;
       }
       queryClient.invalidateQueries({ queryKey: ['config'] });
-      queryClient.invalidateQueries({ queryKey: ['runPreview'] });
       refetchConfig();
-      
-      // Refresh app data (same as Refresh App button)
-      try {
-        await Promise.all([
-          queryClient.fetchQuery({
-            queryKey: ['status'],
-            queryFn: async () => {
-              const response = await axios.get('/api/status');
-              return response.data;
-            },
-          }),
-          queryClient.fetchQuery({
-            queryKey: ['schedulerHistory'],
-            queryFn: async () => {
-              const response = await axios.get('/api/status/scheduler/history');
-              return response.data;
-            },
-          }),
-          queryClient.fetchQuery({
-            queryKey: ['runPreview'],
-            queryFn: async () => {
-              const response = await axios.post('/api/search/run-preview');
-              return response.data;
-            },
-          }),
-          queryClient.fetchQuery({
-            queryKey: ['stats'],
-            queryFn: async () => {
-              const response = await axios.get('/api/stats');
-              return response.data;
-            },
-          }),
-        ]);
-      } catch (error) {
-        // Silently fail refresh - config save was successful
-        // Refresh errors don't affect the success of config save
-      }
     },
     onError: (error: unknown) => {
       showErrorToast('Failed to save config: ' + getErrorMessage(error));
@@ -845,9 +793,6 @@ function Settings() {
                     </Select.Content>
                   </Select.Root>
                 </Flex>
-              </Flex>
-              <Flex gap="2" wrap="wrap">
-                <ConnectionStatusBadges connectionStatus={connectionStatus} />
               </Flex>
               <Grid columns={{ initial: '1', md: '2' }} gap="3">
                 {(() => {

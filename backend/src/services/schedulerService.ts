@@ -7,6 +7,7 @@ import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.
 import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { StarrInstanceConfig } from '../types/starr.js';
 import { SearchResults } from '../types/api.js';
+import { Config } from '../types/config.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
 const require = createRequire(import.meta.url);
@@ -366,14 +367,14 @@ class SchedulerService {
     }
   }
 
-  getStatus(): { 
+  getStatus(config?: Config): { 
     running: boolean; 
     schedule: string | null; 
     nextRun: string | null;
     instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
   } {
-    const config = configService.getConfig();
-    const globalSchedule = this.globalCurrentSchedule || config.scheduler?.schedule || null;
+    const configToUse = config || configService.getConfig();
+    const globalSchedule = this.globalCurrentSchedule || configToUse.scheduler?.schedule || null;
     const globalNextRun = globalSchedule ? this.getNextRunTime(globalSchedule) : null;
     
     const instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }> = {};

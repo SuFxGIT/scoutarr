@@ -7,7 +7,7 @@ import { getConfigDir } from '../utils/paths.js';
 const CONFIG_DIR = getConfigDir();
 const DB_FILE = path.join(CONFIG_DIR, 'stats.db');
 
-export interface UpgradeEntry {
+export interface TriggerEntry {
   timestamp: string;
   application: string;
   instance?: string; // Instance name/ID
@@ -16,11 +16,11 @@ export interface UpgradeEntry {
 }
 
 export interface Stats {
-  totalUpgrades: number;
-  upgradesByApplication: Record<string, number>;
-  upgradesByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
-  recentUpgrades: UpgradeEntry[];
-  lastUpgrade?: string;
+  totalTriggers: number;
+  triggersByApplication: Record<string, number>;
+  triggersByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
+  recentTriggers: TriggerEntry[];
+  lastTrigger?: string;
 }
 
 class StatsService {
@@ -55,7 +55,7 @@ class StatsService {
   private createTables(): void {
     if (!this.db) throw new Error('Database not initialized');
 
-    // Create upgrades table
+    // Create triggers table (keeping table name as 'upgrades' for database compatibility)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS upgrades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,6 +89,22 @@ class StatsService {
       )
     `);
 
+    // Create connection_status table to store connection test results
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS connection_status (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        application TEXT NOT NULL,
+        instance_id TEXT,
+        connected INTEGER NOT NULL,
+        configured INTEGER NOT NULL,
+        version TEXT,
+        app_name TEXT,
+        error TEXT,
+        timestamp TEXT NOT NULL,
+        UNIQUE(application, instance_id)
+      )
+    `);
+
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
@@ -97,10 +113,11 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_tagged_media_app_instance ON tagged_media(application, instance_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_tag_id ON tagged_media(tag_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_media_id ON tagged_media(media_id);
+      CREATE INDEX IF NOT EXISTS idx_connection_status_app_instance ON connection_status(application, instance_id);
     `);
   }
 
-  async addUpgrade(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
+  async addTrigger(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
@@ -136,136 +153,142 @@ class StatsService {
     }
   }
 
+  private calculateStats(limit: number = 100): Stats {
+    if (!this.db) {
+      return {
+        totalTriggers: 0,
+        triggersByApplication: {},
+        triggersByInstance: {},
+        recentTriggers: [],
+        lastTrigger: undefined
+      };
+    }
+
+    // Get total triggers
+    const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
+    const totalResult = totalStmt.get() as { total: number | null };
+    const totalTriggers = totalResult.total || 0;
+
+    // Get triggers by application
+    const byAppStmt = this.db.prepare(`
+      SELECT application, SUM(count) as total
+      FROM upgrades
+      GROUP BY application
+    `);
+    const byAppResults = byAppStmt.all() as Array<{ application: string; total: number }>;
+    const triggersByApplication: Record<string, number> = {};
+    for (const row of byAppResults) {
+      triggersByApplication[row.application] = row.total;
+    }
+
+    // Get triggers by instance
+    const byInstanceStmt = this.db.prepare(`
+      SELECT 
+        CASE 
+          WHEN instance IS NOT NULL THEN application || '-' || instance
+          ELSE application
+        END as instance_key,
+        SUM(count) as total
+      FROM upgrades
+      GROUP BY instance_key
+    `);
+    const byInstanceResults = byInstanceStmt.all() as Array<{ instance_key: string; total: number }>;
+    const triggersByInstance: Record<string, number> = {};
+    for (const row of byInstanceResults) {
+      triggersByInstance[row.instance_key] = row.total;
+    }
+
+    // Get recent triggers (limited for API response)
+    const recentStmt = this.db.prepare(`
+      SELECT timestamp, application, instance, count, items
+      FROM upgrades
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `);
+    const recentResults = recentStmt.all(limit) as Array<{
+      timestamp: string;
+      application: string;
+      instance: string | null;
+      count: number;
+      items: string;
+    }>;
+
+    const recentTriggers: TriggerEntry[] = recentResults.map(row => ({
+      timestamp: row.timestamp,
+      application: row.application,
+      instance: row.instance || undefined,
+      count: row.count,
+      items: JSON.parse(row.items) as Array<{ id: number; title: string }>
+    }));
+
+    // Get last trigger timestamp
+    const lastStmt = this.db.prepare(`
+      SELECT timestamp
+      FROM upgrades
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `);
+    const lastResult = lastStmt.get() as { timestamp: string } | undefined;
+    const lastTrigger = lastResult?.timestamp;
+
+    return {
+      totalTriggers,
+      triggersByApplication,
+      triggersByInstance,
+      recentTriggers,
+      lastTrigger
+    };
+  }
+
   async getStats(limit: number = 100): Promise<Stats> {
     logger.debug('📊 Getting stats', { limit });
     if (!this.db) {
       logger.warn('⚠️  Database not initialized, returning empty stats');
       return {
-        totalUpgrades: 0,
-        upgradesByApplication: {},
-        upgradesByInstance: {},
-        recentUpgrades: []
+        totalTriggers: 0,
+        triggersByApplication: {},
+        triggersByInstance: {},
+        recentTriggers: []
       };
     }
 
     try {
-      logger.debug('📊 Querying total upgrades');
-      // Get total upgrades
-      const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
-      const totalResult = totalStmt.get() as { total: number | null };
-      const totalUpgrades = totalResult.total || 0;
-      logger.debug('✅ Total upgrades calculated', { totalUpgrades });
-
-      logger.debug('📊 Querying upgrades by application');
-      // Get upgrades by application
-      const byAppStmt = this.db.prepare(`
-        SELECT application, SUM(count) as total
-        FROM upgrades
-        GROUP BY application
-      `);
-      const byAppResults = byAppStmt.all() as Array<{ application: string; total: number }>;
-      const upgradesByApplication: Record<string, number> = {};
-      for (const row of byAppResults) {
-        upgradesByApplication[row.application] = row.total;
-      }
-      logger.debug('✅ Upgrades by application calculated', { applications: Object.keys(upgradesByApplication).length });
-
-      logger.debug('📊 Querying upgrades by instance');
-      // Get upgrades by instance
-      const byInstanceStmt = this.db.prepare(`
-        SELECT 
-          CASE 
-            WHEN instance IS NOT NULL THEN application || '-' || instance
-            ELSE application
-          END as instance_key,
-          SUM(count) as total
-        FROM upgrades
-        GROUP BY instance_key
-      `);
-      const byInstanceResults = byInstanceStmt.all() as Array<{ instance_key: string; total: number }>;
-      const upgradesByInstance: Record<string, number> = {};
-      for (const row of byInstanceResults) {
-        upgradesByInstance[row.instance_key] = row.total;
-      }
-      logger.debug('✅ Upgrades by instance calculated', { instances: Object.keys(upgradesByInstance).length });
-
-      logger.debug('📊 Querying recent triggers', { limit });
-      // Get recent upgrades (limited for API response)
-      const recentStmt = this.db.prepare(`
-        SELECT timestamp, application, instance, count, items
-        FROM upgrades
-        ORDER BY timestamp DESC
-        LIMIT ?
-      `);
-      const recentResults = recentStmt.all(limit) as Array<{
-        timestamp: string;
-        application: string;
-        instance: string | null;
-        count: number;
-        items: string;
-      }>;
-
-      const recentUpgrades: UpgradeEntry[] = recentResults.map(row => ({
-        timestamp: row.timestamp,
-        application: row.application,
-        instance: row.instance || undefined,
-        count: row.count,
-        items: JSON.parse(row.items) as Array<{ id: number; title: string }>
-      }));
-      logger.debug('✅ Recent triggers retrieved', { count: recentUpgrades.length });
-
-      // Get last upgrade timestamp
-      const lastStmt = this.db.prepare(`
-        SELECT timestamp
-        FROM upgrades
-        ORDER BY timestamp DESC
-        LIMIT 1
-      `);
-      const lastResult = lastStmt.get() as { timestamp: string } | undefined;
-      const lastUpgrade = lastResult?.timestamp;
-      logger.debug('✅ Last upgrade timestamp retrieved', { lastUpgrade });
-
+      logger.debug('📊 Calculating stats');
+      const stats = this.calculateStats(limit);
       logger.debug('✅ Stats retrieved successfully', {
-        totalUpgrades,
-        applicationsCount: Object.keys(upgradesByApplication).length,
-        instancesCount: Object.keys(upgradesByInstance).length,
-        recentUpgradesCount: recentUpgrades.length
+        totalTriggers: stats.totalTriggers,
+        applicationsCount: Object.keys(stats.triggersByApplication).length,
+        instancesCount: Object.keys(stats.triggersByInstance).length,
+        recentTriggersCount: stats.recentTriggers.length
       });
-
-      return {
-        totalUpgrades,
-        upgradesByApplication,
-        upgradesByInstance,
-        recentUpgrades,
-        lastUpgrade
-      };
+      return stats;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error getting stats', { 
         error: errorMessage
       });
       return {
-        totalUpgrades: 0,
-        upgradesByApplication: {},
-        upgradesByInstance: {},
-        recentUpgrades: []
+        totalTriggers: 0,
+        triggersByApplication: {},
+        triggersByInstance: {},
+        recentTriggers: []
       };
     }
   }
 
-  async getRecentUpgrades(page: number = 1, pageSize: number = 15): Promise<{
-    upgrades: UpgradeEntry[];
+  async getRecentTriggers(page: number = 1, pageSize: number = 15): Promise<{
+    triggers: TriggerEntry[];
     total: number;
     totalPages: number;
   }> {
     logger.debug('📊 Getting recent triggers (paginated)', { page, pageSize });
     if (!this.db) {
       logger.warn('⚠️  Database not initialized, returning empty results');
-      return { upgrades: [], total: 0, totalPages: 0 };
+      return { triggers: [], total: 0, totalPages: 0 };
     }
 
     try {
-      logger.debug('📊 Counting total upgrades');
+      logger.debug('📊 Counting total triggers');
       // Get total count
       const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM upgrades');
       const countResult = countStmt.get() as { count: number };
@@ -290,7 +313,7 @@ class StatsService {
         items: string;
       }>;
 
-      const upgrades: UpgradeEntry[] = results.map(row => ({
+      const triggers: TriggerEntry[] = results.map(row => ({
         timestamp: row.timestamp,
         application: row.application,
         instance: row.instance || undefined,
@@ -299,19 +322,19 @@ class StatsService {
       }));
 
       logger.debug('✅ Recent triggers retrieved', { 
-        count: upgrades.length, 
+        count: triggers.length, 
         total, 
         totalPages,
         page 
       });
 
-      return { upgrades, total, totalPages };
+      return { triggers, total, totalPages };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error getting recent triggers', { 
         error: errorMessage
       });
-      return { upgrades: [], total: 0, totalPages: 0 };
+      return { triggers: [], total: 0, totalPages: 0 };
     }
   }
 
@@ -348,8 +371,8 @@ class StatsService {
     }
   }
 
-  async clearRecentUpgrades(): Promise<void> {
-    // Note: Since we're using a single database table for all upgrades,
+  async clearRecentTriggers(): Promise<void> {
+    // Note: Since we're using a single database table for all triggers,
     // "clearing recent triggers" effectively clears all stats.
     // This method exists for API compatibility with the frontend.
     await this.resetStats();
@@ -361,17 +384,17 @@ class StatsService {
     }
 
     try {
-      // Delete all entries from the upgrades table
+      // Delete all entries from the triggers table
       // This clears recent triggers and stats but keeps the database structure
-      const deleteUpgradesStmt = this.db.prepare('DELETE FROM upgrades');
-      const upgradesResult = deleteUpgradesStmt.run();
+      const deleteTriggersStmt = this.db.prepare('DELETE FROM upgrades');
+      const triggersResult = deleteTriggersStmt.run();
       
       // Also clear all tagged media records
       const deleteTaggedMediaStmt = this.db.prepare('DELETE FROM tagged_media');
       const taggedMediaResult = deleteTaggedMediaStmt.run();
       
-      logger.info('🗑️  Cleared all upgrade data and tagged media records from stats database', { 
-        upgradesDeleted: upgradesResult.changes,
+      logger.info('🗑️  Cleared all trigger data and tagged media records from stats database', { 
+        triggersDeleted: triggersResult.changes,
         taggedMediaDeleted: taggedMediaResult.changes
       });
     } catch (error: unknown) {
@@ -542,6 +565,99 @@ class StatsService {
         error: errorMessage
       });
       // Don't throw - clearing is not critical
+    }
+  }
+
+  async saveConnectionStatus(
+    application: string,
+    instanceId: string | null,
+    connected: boolean,
+    configured: boolean,
+    version?: string,
+    appName?: string,
+    error?: string
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const timestamp = new Date().toISOString();
+      const appKey = application.toLowerCase();
+
+      const insertStmt = this.db.prepare(`
+        INSERT OR REPLACE INTO connection_status 
+        (application, instance_id, connected, configured, version, app_name, error, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      insertStmt.run(
+        appKey,
+        instanceId || null,
+        connected ? 1 : 0,
+        configured ? 1 : 0,
+        version || null,
+        appName || null,
+        error || null,
+        timestamp
+      );
+
+      logger.debug('💾 Connection status saved', {
+        application: appKey,
+        instanceId,
+        connected,
+        configured
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error saving connection status', {
+        error: errorMessage
+      });
+      throw error;
+    }
+  }
+
+  async getConnectionStatus(): Promise<Record<string, { connected: boolean; configured: boolean; version?: string; appName?: string; error?: string; instanceName?: string }>> {
+    if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning empty connection status');
+      return {};
+    }
+
+    try {
+      const stmt = this.db.prepare(`
+        SELECT application, instance_id, connected, configured, version, app_name, error
+        FROM connection_status
+        ORDER BY timestamp DESC
+      `);
+      const results = stmt.all() as Array<{
+        application: string;
+        instance_id: string | null;
+        connected: number;
+        configured: number;
+        version: string | null;
+        app_name: string | null;
+        error: string | null;
+      }>;
+
+      const status: Record<string, { connected: boolean; configured: boolean; version?: string; appName?: string; error?: string; instanceName?: string }> = {};
+      
+      for (const row of results) {
+        const key = row.instance_id ? `${row.application}-${row.instance_id}` : row.application;
+        status[key] = {
+          connected: row.connected === 1,
+          configured: row.configured === 1,
+          version: row.version || undefined,
+          appName: row.app_name || undefined,
+          error: row.error || undefined
+        };
+      }
+
+      logger.debug('✅ Connection status retrieved', { count: Object.keys(status).length });
+      return status;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error getting connection status', {
+        error: errorMessage
+      });
+      return {};
     }
   }
 

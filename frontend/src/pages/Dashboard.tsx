@@ -20,29 +20,45 @@ import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { ITEMS_PER_PAGE, LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
-import { ConnectionStatusBadges } from '../components/ConnectionStatusBadges';
-import type { SearchResults, Stats, StatusResponse, SchedulerHistoryEntry, InstanceStatus } from '../types/api';
+import type { SearchResults, Stats, SchedulerHistoryEntry } from '../types/api';
+import type { Config } from '../types/config';
 
 function Dashboard() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
-  const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
+  const [selectedTrigger, setSelectedTrigger] = useState<Stats['recentTriggers'][number] | null>(null);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
 
-  // Fetch status - only fetch on initial mount, not on every refresh
-  const { data: statusData } = useQuery<StatusResponse>({
-    queryKey: ['status'],
+  // Fetch config to get instance names
+  const { data: config } = useQuery<Config>({
+    queryKey: ['config'],
     queryFn: async () => {
-      const response = await axios.get('/api/status');
+      const response = await axios.get('/api/config');
       return response.data;
     },
-    enabled: false, // Don't fetch on mount - only fetch when explicitly called
-    staleTime: Infinity, // Status never goes stale - only changes when config changes
+    enabled: true,
+    staleTime: Infinity,
   });
 
-  const connectionStatus = statusData || {};
-  const schedulerStatus = statusData?.scheduler || null;
+  // Fetch scheduler status only (without connection checks)
+  const { data: schedulerStatus } = useQuery<{
+    enabled: boolean;
+    globalEnabled: boolean;
+    running: boolean;
+    schedule: string | null;
+    nextRun: string | null;
+    instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
+  }>({
+    queryKey: ['schedulerStatus'],
+    queryFn: async () => {
+      const response = await axios.get('/api/status/scheduler');
+      return response.data;
+    },
+    enabled: true,
+    staleTime: Infinity,
+  });
 
   // Fetch scheduler history - load from database on mount
   // History is persisted in the backend, so we should load it on mount
@@ -57,7 +73,7 @@ function Dashboard() {
   });
 
   // Fetch run preview - load from database on mount
-  const { data: manualRunResults } = useQuery<SearchResults>({
+  const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
     queryKey: ['runPreview'],
     queryFn: async () => {
       // Try to get cached preview from database
@@ -72,16 +88,9 @@ function Dashboard() {
       }
       return {};
     },
-    enabled: true, // Fetch on mount to load from database
+    enabled: false, // Don't fetch on mount - only fetch when button is clicked
     staleTime: Infinity, // Preview never goes stale - it only changes when config/runs happen
   });
-
-  // Function to generate new preview (used after runs)
-  const generateNewPreview = async () => {
-    const response = await axios.post('/api/search/run-preview');
-    queryClient.setQueryData(['runPreview'], response.data);
-    return response.data;
-  };
 
   // Fetch stats - load from database on mount
   // Stats are persisted in the backend database, so we should load them on mount
@@ -116,14 +125,13 @@ function Dashboard() {
       toast.success('Search run completed');
       refetchStats();
       refetchHistory();
-      generateNewPreview(); // Generate new preview after run
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));
     },
   });
 
-  // Mutation for clearing recent upgrades
+  // Mutation for clearing recent triggers
   const clearRecentMutation = useMutation({
     mutationFn: async () => {
       await axios.post('/api/stats/clear-recent');
@@ -209,44 +217,9 @@ function Dashboard() {
     history: SchedulerHistoryEntry[], 
     nextRun: string | null, 
     schedulerEnabled: boolean, 
-    previewResults?: SearchResults | null,
-    instanceSchedules?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>,
-    connectionStatus?: StatusResponse
+    instanceSchedules?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>
   ): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
-    
-    // Add preview of what will be triggered next
-    if (previewResults && Object.keys(previewResults).length > 0) {
-      const now = new Date();
-      logs.push({
-        timestamp: format(now, 'HH:mm:ss'),
-        app: 'Preview',
-        message: 'Next run will trigger:',
-        type: 'info'
-      });
-      
-      Object.entries(previewResults).forEach(([app, result]) => {
-        if (result.success) {
-          const appName = result.instanceName || formatAppName(app);
-          const count = result.count || 0;
-          const total = result.total || 0;
-          
-          logs.push({
-            timestamp: format(now, 'HH:mm:ss'),
-            app: 'Preview',
-            message: `${appName}: Will search ${count} of ${total} items`,
-            type: 'info'
-          });
-        }
-      });
-      
-      logs.push({
-        timestamp: format(now, 'HH:mm:ss'),
-        app: 'Preview',
-        message: '---',
-        type: 'info'
-      });
-    }
     
     // Add global scheduler next run time if global scheduler is enabled
     if (schedulerEnabled && nextRun) {
@@ -286,9 +259,18 @@ function Dashboard() {
             serialComma: false,
           }) || 'less than a minute';
           
-          // Try to get instance name from connectionStatus if available, fallback to formatted key
-          const instanceStatusData = connectionStatus?.[instanceKey] as InstanceStatus | undefined;
-          const instanceName = instanceStatusData?.instanceName || formatAppName(instanceKey);
+          // Get instance name from config if available, fallback to formatted key
+          let instanceName = formatAppName(instanceKey);
+          if (config) {
+            const [appType, instanceId] = instanceKey.split('-');
+            const appConfigs = config.applications[appType as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'];
+            if (Array.isArray(appConfigs)) {
+              const instance = appConfigs.find(inst => inst.id === instanceId);
+              if (instance?.name) {
+                instanceName = instance.name;
+              }
+            }
+          }
           
           logs.push({
             timestamp: format(now, 'HH:mm:ss'),
@@ -356,15 +338,14 @@ function Dashboard() {
     return logs;
   };
 
+
   const renderAutomaticRunPreview = () => {
-    const scheduler = schedulerStatus && 'nextRun' in schedulerStatus ? schedulerStatus : null;
+    const scheduler = schedulerStatus || null;
     const logs = convertHistoryToLogs(
       schedulerHistory, 
       scheduler?.nextRun || null, 
       scheduler?.globalEnabled || false, 
-      manualRunResults || null,
-      scheduler?.instances,
-      connectionStatus
+      scheduler?.instances
     );
 
     return (
@@ -398,6 +379,24 @@ function Dashboard() {
                   <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
                 </Button>
               </span>
+            </Tooltip>
+            <Tooltip content="Generate and preview what will be searched in the next run.">
+              <Button
+                size="2"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    // Generate new preview and store in database
+                    const response = await axios.post('/api/search/run-preview');
+                    queryClient.setQueryData(['runPreview'], response.data);
+                    setShowPreviewDialog(true);
+                  } catch (error: unknown) {
+                    toast.error('Failed to generate preview: ' + getErrorMessage(error));
+                  }
+                }}
+              >
+                Next Run Preview
+              </Button>
             </Tooltip>
             <Tooltip content="Clear log history.">
               <span>
@@ -465,30 +464,6 @@ function Dashboard() {
       <Flex direction="column" gap="3">
         {renderAutomaticRunPreview()}
 
-        <Card style={{ padding: '0.5rem' }}>
-          <Flex align="center" justify="between" gap="2" wrap="wrap" style={{ margin: 0, padding: 0 }}>
-            <Flex gap="2" wrap="wrap" style={{ margin: 0, padding: 0, flex: 1 }}>
-              <ConnectionStatusBadges connectionStatus={connectionStatus} />
-            </Flex>
-            <Flex>
-              <Tooltip content="Clear recent triggers and statistics. This will remove all upgrade history and reset stats to zero, but keep the database structure intact.">
-                <span>
-                  {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
-                    <Button 
-                      variant="outline" 
-                      color="red"
-                      size="2" 
-                      onClick={() => setConfirmingClear('stats')}
-                    >
-                      Clear Data
-                    </Button>
-                  )}
-                </span>
-              </Tooltip>
-            </Flex>
-          </Flex>
-        </Card>
-
         {stats && (() => {
           // Calculate totals for all app types
           let lidarrTotal = 0;
@@ -496,7 +471,7 @@ function Dashboard() {
           let sonarrTotal = 0;
           let readarrTotal = 0;
           
-          Object.entries(stats.upgradesByInstance || {}).forEach(([instanceKey, count]) => {
+          Object.entries(stats.triggersByInstance || {}).forEach(([instanceKey, count]) => {
             if (instanceKey.startsWith('lidarr')) {
               lidarrTotal += count as number;
             } else if (instanceKey.startsWith('radarr')) {
@@ -508,12 +483,12 @@ function Dashboard() {
             }
           });
           
-          // Fallback to upgradesByApplication if upgradesByInstance is empty
+          // Fallback to triggersByApplication if triggersByInstance is empty
           if (lidarrTotal === 0 && radarrTotal === 0 && sonarrTotal === 0 && readarrTotal === 0) {
-            lidarrTotal = stats.upgradesByApplication?.lidarr || 0;
-            radarrTotal = stats.upgradesByApplication?.radarr || 0;
-            sonarrTotal = stats.upgradesByApplication?.sonarr || 0;
-            readarrTotal = stats.upgradesByApplication?.readarr || 0;
+            lidarrTotal = stats.triggersByApplication?.lidarr || 0;
+            radarrTotal = stats.triggersByApplication?.radarr || 0;
+            sonarrTotal = stats.triggersByApplication?.sonarr || 0;
+            readarrTotal = stats.triggersByApplication?.readarr || 0;
           }
           
           return (
@@ -521,6 +496,20 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Statistics</Heading>
+                  <Tooltip content="Clear recent triggers and statistics. This will remove all trigger history and reset stats to zero, but keep the database structure intact.">
+                    <span>
+                      {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
+                        <Button 
+                          variant="outline" 
+                          color="red"
+                          size="2" 
+                          onClick={() => setConfirmingClear('stats')}
+                        >
+                          Clear Data
+                        </Button>
+                      )}
+                    </span>
+                  </Tooltip>
                 </Flex>
                 <Separator />
                 <Flex gap="3" wrap="wrap" justify="center">
@@ -545,7 +534,7 @@ function Dashboard() {
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Text size="2" color="gray" style={{ textAlign: 'center' }}>Total Triggered</Text>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{stats.totalUpgrades}</Heading>
+                      <Heading size="7" style={{ textAlign: 'center' }}>{stats.totalTriggers}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
@@ -567,9 +556,9 @@ function Dashboard() {
                     </Flex>
                   </Card>
                 </Flex>
-                {stats.lastUpgrade && (
+                {stats.lastTrigger && (
                   <Text size="2" color="gray">
-                    Last upgrade: {format(new Date(stats.lastUpgrade), 'PPpp')}
+                    Last trigger: {format(new Date(stats.lastTrigger), 'PPpp')}
                   </Text>
                 )}
               </Flex>
@@ -578,12 +567,12 @@ function Dashboard() {
         })()}
 
         {stats && (() => {
-          const recentUpgrades = stats.recentUpgrades || [];
-          const totalItems = recentUpgrades.length;
+          const recentTriggers = stats.recentTriggers || [];
+          const totalItems = recentTriggers.length;
           const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
           const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
           const endIndex = startIndex + ITEMS_PER_PAGE;
-          const currentItems = recentUpgrades.slice(startIndex, endIndex);
+          const currentItems = recentTriggers.slice(startIndex, endIndex);
           
           return (
             <Card>
@@ -604,13 +593,13 @@ function Dashboard() {
                 ) : (
                   <>
                     <Flex direction="column" gap="1" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                      {currentItems.map((upgrade, idx) => {
-                        const timestamp = new Date(upgrade.timestamp);
-                        const appName = upgrade.instance 
-                          ? `${upgrade.application} (${upgrade.instance})`
-                          : upgrade.application;
-                        const itemsPreview = upgrade.items.length > 0
-                          ? upgrade.items.slice(0, 2).map(i => i.title).join(', ') + (upgrade.items.length > 2 ? ` +${upgrade.items.length - 2}` : '')
+                      {currentItems.map((trigger, idx) => {
+                        const timestamp = new Date(trigger.timestamp);
+                        const appName = trigger.instance 
+                          ? `${trigger.application} (${trigger.instance})`
+                          : trigger.application;
+                        const itemsPreview = trigger.items.length > 0
+                          ? trigger.items.slice(0, 2).map(i => i.title).join(', ') + (trigger.items.length > 2 ? ` +${trigger.items.length - 2}` : '')
                           : 'No items';
                         
                         return (
@@ -623,9 +612,9 @@ function Dashboard() {
                               borderBottom: idx < currentItems.length - 1 ? '1px solid var(--gray-6)' : 'none',
                               cursor: 'pointer'
                             }}
-                            onClick={() => setSelectedUpgrade(upgrade)}
+                            onClick={() => setSelectedTrigger(trigger)}
                           >
-                            <AppIcon app={upgrade.application} size={16} variant="light" />
+                            <AppIcon app={trigger.application} size={16} variant="light" />
                             <Badge size="1" style={{ textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>
                               {appName}
                             </Badge>
@@ -636,7 +625,7 @@ function Dashboard() {
                               {format(timestamp, 'PPp')}
                             </Text>
                             <Text size="1" color="gray" style={{ minWidth: '50px', textAlign: 'right' }}>
-                              {upgrade.count} {upgrade.count === 1 ? 'item' : 'items'}
+                              {trigger.count} {trigger.count === 1 ? 'item' : 'items'}
                             </Text>
                           </Flex>
                         );
@@ -686,31 +675,69 @@ function Dashboard() {
           );
         })()}
 
-        {/* Dialog for viewing all items in a recent upgrade entry */}
+        {/* Dialog for preview of next run */}
+        <Dialog.Root open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+          <Dialog.Content maxWidth="500px">
+            <Dialog.Title>Next Run Preview</Dialog.Title>
+            <Separator mb="4" />
+            {manualRunResults && Object.keys(manualRunResults).length > 0 ? (
+              <Flex direction="column" gap="2">
+                {Object.entries(manualRunResults).map(([appKey, result]) => {
+                  if (!result.success) {
+                    return null;
+                  }
+
+                  const appName = result.instanceName || formatAppName(appKey);
+                  const count = result.count || 0;
+                  const total = result.total || 0;
+                  const mediaType = result.movies ? 'movies' : result.artists ? 'artists' : result.authors ? 'authors' : 'series';
+                  const mediaTypeLabel = mediaType === 'movies' ? 'Movie' : mediaType === 'artists' ? 'Artist' : mediaType === 'authors' ? 'Author' : 'Series';
+                  const mediaTypeLabelPlural = count === 1 ? mediaTypeLabel : mediaTypeLabel + 's';
+
+                  return (
+                    <Flex key={appKey} align="center" gap="2" py="2">
+                      <AppIcon app={appKey} size={16} variant="light" />
+                      <Text size="3" weight="medium" style={{ flex: 1 }}>{appName}</Text>
+                      <Text size="2" color="gray">
+                        Will search {count} {mediaTypeLabelPlural} out of {total}
+                      </Text>
+                    </Flex>
+                  );
+                })}
+              </Flex>
+            ) : (
+              <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
+                No preview available
+              </Text>
+            )}
+          </Dialog.Content>
+        </Dialog.Root>
+
+        {/* Dialog for viewing all items in a recent trigger entry */}
         <Dialog.Root
-          open={!!selectedUpgrade}
+          open={!!selectedTrigger}
           onOpenChange={(open) => {
             if (!open) {
-              setSelectedUpgrade(null);
+              setSelectedTrigger(null);
             }
           }}
         >
           <Dialog.Content maxWidth="480px">
-            {selectedUpgrade && (
+            {selectedTrigger && (
               <Flex direction="column" gap="3">
                 <Dialog.Title>
-                  {selectedUpgrade.instance
-                    ? `${formatAppName(selectedUpgrade.application)} (${selectedUpgrade.instance})`
-                    : formatAppName(selectedUpgrade.application)}
+                  {selectedTrigger.instance
+                    ? `${formatAppName(selectedTrigger.application)} (${selectedTrigger.instance})`
+                    : formatAppName(selectedTrigger.application)}
                 </Dialog.Title>
                 <Dialog.Description>
-                  {selectedUpgrade.count} {selectedUpgrade.count === 1 ? 'item' : 'items'} triggered on{' '}
-                  {format(new Date(selectedUpgrade.timestamp), 'PPpp')}
+                  {selectedTrigger.count} {selectedTrigger.count === 1 ? 'item' : 'items'} triggered on{' '}
+                  {format(new Date(selectedTrigger.timestamp), 'PPpp')}
                 </Dialog.Description>
                 <Separator />
-                {selectedUpgrade.items.length === 0 ? (
+                {selectedTrigger.items.length === 0 ? (
                   <Text size="2" color="gray">
-                    No items recorded for this upgrade.
+                    No items recorded for this trigger.
                   </Text>
                 ) : (
                   <Flex
@@ -718,7 +745,7 @@ function Dashboard() {
                     gap="2"
                     style={{ maxHeight: '320px', overflowY: 'auto' }}
                     >
-                    {selectedUpgrade.items.map((item) => (
+                    {selectedTrigger.items.map((item) => (
                       <Text
                         key={item.id}
                         size="2"

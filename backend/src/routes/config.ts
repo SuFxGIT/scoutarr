@@ -3,6 +3,7 @@ import { configService } from '../services/configService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
+import { statsService } from '../services/statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { handleRouteError, getErrorMessage } from '../utils/errorUtils.js';
 import logger from '../utils/logger.js';
@@ -83,17 +84,6 @@ configRouter.put('/', async (req, res) => {
     logger.debug('💾 Saving updated configuration');
     await configService.saveConfig(req.body);
     
-    // Clear run preview since config changed
-    try {
-      await statsService.clearRunPreview();
-      logger.debug('🗑️  Cleared run preview due to config change');
-    } catch (previewError: unknown) {
-      logger.warn('⚠️  Failed to clear run preview', {
-        error: getErrorMessage(previewError)
-      });
-      // Continue even if clearing preview fails
-    }
-    
     logger.info('✅ Config update completed');
     res.json({ success: true });
   } catch (error: unknown) {
@@ -142,11 +132,43 @@ configRouter.post('/test/:app', async (req, res) => {
     // Test connection using utility function
     const testResult = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
 
+    // Find instanceId from config by matching URL and API key
+    let instanceId: string | null = null;
+    const config = configService.getConfig();
+    const appConfigs = config.applications[app as AppType] as StarrInstanceConfig[] | undefined;
+    if (Array.isArray(appConfigs)) {
+      const matchingInstance = appConfigs.find(
+        (inst: StarrInstanceConfig) => inst.url === appConfig.url && inst.apiKey === appConfig.apiKey
+      );
+      if (matchingInstance) {
+        instanceId = matchingInstance.id;
+      }
+    }
+
+    // Save connection status to database
+    try {
+      await statsService.saveConnectionStatus(
+        app,
+        instanceId,
+        testResult.success,
+        true, // configured since we have URL and API key
+        testResult.version,
+        testResult.appName,
+        testResult.error
+      );
+    } catch (statusError: unknown) {
+      // Log but don't fail the test if status save fails
+      logger.warn('⚠️  Failed to save connection status', {
+        error: statusError instanceof Error ? statusError.message : 'Unknown error'
+      });
+    }
+
     if (testResult.success) {
       logger.info(`✅ Connection test successful for ${app}`, { 
         url: appConfig.url, 
         appName: testResult.appName, 
-        version: testResult.version 
+        version: testResult.version,
+        instanceId
       });
       res.json({ 
         success: true, 
@@ -156,7 +178,8 @@ configRouter.post('/test/:app', async (req, res) => {
     } else {
       logger.error(`❌ Connection test failed for ${app}`, { 
         url: appConfig.url, 
-        error: testResult.error 
+        error: testResult.error,
+        instanceId
       });
       res.status(500).json({
         error: 'Connection test failed',
