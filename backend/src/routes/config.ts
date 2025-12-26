@@ -274,37 +274,30 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
 
     logger.debug(`✅ Tag ID found`, { tagId });
 
-    // Get all media based on app type
-    logger.debug(`📥 Fetching all media from ${app}`);
-    let allMedia: Array<{ id: number; tags?: number[] }> = [];
-    try {
-      allMedia = await service.getAllMedia(instanceConfig);
-      logger.debug(`✅ Fetched ${allMedia.length} media items`);
-    } catch (error: unknown) {
-      return res.status(400).json({ error: getErrorMessage(error) });
-    }
-
-    // Filter media that has the tag
-    const mediaWithTag = allMedia.filter((m) => m.tags && m.tags.includes(tagId));
-    logger.debug(`🔽 Filtered media with tag`, { 
-      total: allMedia.length,
-      withTag: mediaWithTag.length
+    // Get media IDs that were tagged by this application (from database)
+    const trackedMediaIds = await statsService.getTaggedMediaIds(app, instanceId, tagId);
+    logger.debug(`📋 Found ${trackedMediaIds.length} tracked media items with tag`, {
+      app,
+      instanceId,
+      tagId
     });
     
-    if (mediaWithTag.length === 0) {
-      logger.info(`ℹ️  No media found with tag`, { tagName: instanceConfig.tagName });
-      return res.json({ success: true, message: 'No media found with this tag' });
+    if (trackedMediaIds.length === 0) {
+      logger.info(`ℹ️  No tracked media found with tag`, { tagName: instanceConfig.tagName });
+      return res.json({ success: true, message: 'No tracked media found with this tag' });
     }
 
-    // Get media IDs
-    const mediaIds = mediaWithTag.map((m) => m.id);
-    logger.debug(`📋 Prepared ${mediaIds.length} media IDs for tag removal`);
+    logger.debug(`📋 Prepared ${trackedMediaIds.length} tracked media IDs for tag removal`);
 
-    // Remove tag from all media based on app type
-    logger.debug(`🏷️  Removing tag from media`, { count: mediaIds.length });
+    // Remove tag from tracked media based on app type
+    logger.debug(`🏷️  Removing tag from tracked media`, { count: trackedMediaIds.length });
     try {
-      await service.removeTagFromMedia(instanceConfig, mediaIds, tagId);
+      await service.removeTagFromMedia(instanceConfig, trackedMediaIds, tagId);
       logger.debug(`✅ Tag removal request completed`);
+      
+      // Clear tracked media records from database after successful removal
+      await statsService.clearTaggedMedia(app, instanceId, tagId);
+      logger.debug(`✅ Cleared tracked media records from database`);
     } catch (error: unknown) {
       return res.status(400).json({ error: getErrorMessage(error) });
     }
@@ -312,17 +305,17 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     // Get media type name for logging
     const mediaTypeName = getMediaTypeKey(app as AppType);
 
-    logger.info(`✅ Cleared tag from ${mediaIds.length} ${mediaTypeName}`, {
+    logger.info(`✅ Cleared tag from ${trackedMediaIds.length} ${mediaTypeName}`, {
       app,
       instanceId,
       tagName: instanceConfig.tagName,
       tagId,
-      count: mediaIds.length
+      count: trackedMediaIds.length
     });
     res.json({
       success: true,
-      message: `Cleared tag from ${mediaIds.length} ${mediaTypeName}`,
-      count: mediaIds.length
+      message: `Cleared tag from ${trackedMediaIds.length} ${mediaTypeName}`,
+      count: trackedMediaIds.length
     });
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to clear tags');

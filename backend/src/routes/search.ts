@@ -104,7 +104,8 @@ async function saveStatsForResults(results: SearchResults): Promise<void> {
 function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends FilterableMedia>(
   instanceName: string,
   config: TConfig,
-  appType: AppType
+  appType: AppType,
+  instanceId: string
 ): ApplicationProcessor<TMedia> {
   const service = getServiceForApp(appType);
   
@@ -114,6 +115,8 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
   return {
     name: instanceName,
     config,
+    appType,
+    instanceId,
     getMedia: (cfg: TConfig) => service.getMedia(cfg),
     filterMedia: (cfg: TConfig, media: TMedia[]) => service.filterMedia(cfg, media),
     searchMedia: async (cfg: TConfig, mediaIds: number[]) => {
@@ -173,10 +176,10 @@ async function processAppInstances<T extends StarrInstanceConfig>(
     const instanceConfig = instances[i];
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
     
-    // Merge unattended mode into config if provided
-    const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
-    const processor = createProcessor(instanceName, config, appType);
-    const result = await processApplication(processor);
+      // Merge unattended mode into config if provided
+      const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
+      const processor = createProcessor(instanceName, config, appType, instanceId);
+      const result = await processApplication(processor);
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
@@ -259,6 +262,8 @@ export async function executeSearchRunForInstance(appType: AppType, instanceId: 
 interface ApplicationProcessor<TMedia extends FilterableMedia> {
   name: string;
   config: StarrInstanceConfig;
+  appType: AppType;
+  instanceId: string;
   getMedia: (config: StarrInstanceConfig) => Promise<TMedia[]>;
   filterMedia: (config: StarrInstanceConfig, media: TMedia[]) => Promise<TMedia[]>;
   searchMedia: (config: StarrInstanceConfig, mediaIds: number[]) => Promise<void>;
@@ -331,6 +336,8 @@ export async function processApplication<TMedia extends FilterableMedia>(
     const tagId = await processor.getTagId(processor.config, processor.config.tagName);
     if (tagId !== null && mediaIds.length > 0) {
       await processor.addTag(processor.config, mediaIds, tagId);
+      // Record tagged media in database so we can track which tags were added by this app
+      await statsService.addTaggedMedia(processor.appType, processor.instanceId, tagId, mediaIds);
       logger.debug(`🏷️  Tagged ${processor.name}`, { mediaIds, tagId, count: mediaIds.length });
     }
 

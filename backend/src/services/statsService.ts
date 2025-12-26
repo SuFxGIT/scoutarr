@@ -70,11 +70,27 @@ class StatsService {
       )
     `);
 
+    // Create tagged_media table to track which tags were added by this application
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS tagged_media (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        application TEXT NOT NULL,
+        instance_id TEXT NOT NULL,
+        tag_id INTEGER NOT NULL,
+        media_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        UNIQUE(application, instance_id, tag_id, media_id)
+      )
+    `);
+
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_upgrades_application ON upgrades(application);
       CREATE INDEX IF NOT EXISTS idx_upgrades_instance ON upgrades(instance);
+      CREATE INDEX IF NOT EXISTS idx_tagged_media_app_instance ON tagged_media(application, instance_id);
+      CREATE INDEX IF NOT EXISTS idx_tagged_media_tag_id ON tagged_media(tag_id);
+      CREATE INDEX IF NOT EXISTS idx_tagged_media_media_id ON tagged_media(media_id);
     `);
   }
 
@@ -341,15 +357,109 @@ class StatsService {
     try {
       // Delete all entries from the upgrades table
       // This clears recent triggers and stats but keeps the database structure
-      const deleteStmt = this.db.prepare('DELETE FROM upgrades');
-      const result = deleteStmt.run();
+      const deleteUpgradesStmt = this.db.prepare('DELETE FROM upgrades');
+      const upgradesResult = deleteUpgradesStmt.run();
       
-      logger.info('🗑️  Cleared all upgrade data from stats database', { 
-        rowsDeleted: result.changes 
+      // Also clear all tagged media records
+      const deleteTaggedMediaStmt = this.db.prepare('DELETE FROM tagged_media');
+      const taggedMediaResult = deleteTaggedMediaStmt.run();
+      
+      logger.info('🗑️  Cleared all upgrade data and tagged media records from stats database', { 
+        upgradesDeleted: upgradesResult.changes,
+        taggedMediaDeleted: taggedMediaResult.changes
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Error clearing data', { 
+        error: errorMessage
+      });
+      throw error;
+    }
+  }
+
+  async addTaggedMedia(
+    application: string,
+    instanceId: string,
+    tagId: number,
+    mediaIds: number[]
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const timestamp = new Date().toISOString();
+      const appKey = application.toLowerCase();
+
+      const insertStmt = this.db.prepare(`
+        INSERT OR IGNORE INTO tagged_media (application, instance_id, tag_id, media_id, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      // Insert each media ID individually
+      for (const mediaId of mediaIds) {
+        insertStmt.run(appKey, instanceId, tagId, mediaId, timestamp);
+      }
+
+      logger.debug('🏷️  Tagged media recorded', {
+        application: appKey,
+        instanceId,
+        tagId,
+        count: mediaIds.length
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error recording tagged media', {
+        error: errorMessage
+      });
+      throw error;
+    }
+  }
+
+  async getTaggedMediaIds(application: string, instanceId: string, tagId: number): Promise<number[]> {
+    if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning empty array');
+      return [];
+    }
+
+    try {
+      const appKey = application.toLowerCase();
+      const stmt = this.db.prepare(`
+        SELECT DISTINCT media_id
+        FROM tagged_media
+        WHERE application = ? AND instance_id = ? AND tag_id = ?
+      `);
+      const results = stmt.all(appKey, instanceId, tagId) as Array<{ media_id: number }>;
+      return results.map(row => row.media_id);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error getting tagged media IDs', {
+        error: errorMessage
+      });
+      return [];
+    }
+  }
+
+  async clearTaggedMedia(application: string, instanceId: string, tagId: number): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      const appKey = application.toLowerCase();
+      const deleteStmt = this.db.prepare(`
+        DELETE FROM tagged_media
+        WHERE application = ? AND instance_id = ? AND tag_id = ?
+      `);
+      const result = deleteStmt.run(appKey, instanceId, tagId);
+      
+      logger.info('🗑️  Cleared tagged media records', {
+        application: appKey,
+        instanceId,
+        tagId,
+        rowsDeleted: result.changes
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('❌ Error clearing tagged media', {
         error: errorMessage
       });
       throw error;
