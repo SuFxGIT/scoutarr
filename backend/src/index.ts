@@ -8,7 +8,6 @@ import { statsRouter } from './routes/stats.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
-import { qualityProfilesCacheService } from './services/qualityProfilesCacheService.js';
 import logger from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import path from 'path';
@@ -55,8 +54,7 @@ logger.info('🚀 Starting application initialization', {
 
 Promise.all([
   configService.initialize(),
-  statsService.initialize(),
-  qualityProfilesCacheService.initialize()
+  statsService.initialize()
 ]).then(async () => {
   logger.debug('✅ Core services initialized, initializing scheduler');
   await schedulerService.initialize();

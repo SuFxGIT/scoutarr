@@ -550,7 +550,7 @@ searchRouter.post('/manual-run', async (req, res) => {
       await processManualRunInstances(instances, appType, results);
     }
 
-    logger.info('✅ Manual run preview completed');
+    logger.info('✅ Run Preview');
     res.json(results);
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);

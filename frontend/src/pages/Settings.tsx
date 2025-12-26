@@ -18,7 +18,7 @@ import {
   AlertDialog
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
@@ -137,24 +137,6 @@ function Settings() {
     setPendingTab(null);
     setShowUnsavedDialog(false);
   }, []);
-
-  // Load cached quality profiles on mount
-  useEffect(() => {
-    const loadCachedProfiles = async () => {
-      try {
-        const response = await axios.get('/api/config/quality-profiles');
-        const cachedProfiles = response.data;
-
-        // Just set the cached profiles without validation
-        // The cache service on the backend already validates against current config
-        setQualityProfiles(cachedProfiles);
-      } catch (error) {
-        // Silently fail - cache might not exist yet
-      }
-    };
-
-    loadCachedProfiles();
-  }, []); // Only run once on mount
 
   // Persist active tab to localStorage whenever it changes
   useEffect(() => {
@@ -1110,7 +1092,7 @@ function Settings() {
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
                                   <Text size="2" weight="medium">Quality Profile</Text>
-                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Leave empty to include all quality profiles.`}>
+                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Use "Test Connection" to refresh the quality profiles list.`}>
                                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                                   </Tooltip>
                                 </Flex>
@@ -1142,14 +1124,47 @@ function Settings() {
                                           );
                                         }
                                         
+                                        // If profiles haven't been fetched yet, show selected profile name if one exists, otherwise show message to test connection
+                                        if (profiles.length === 0) {
+                                          const savedProfileName = instance.qualityProfileName;
+                                          if (savedProfileName) {
+                                            // Show the selected profile name even if profiles haven't been loaded yet
+                                            return (
+                                              <Select.Root
+                                                value={savedProfileName}
+                                                onValueChange={() => {}}
+                                                disabled
+                                              >
+                                                <Select.Trigger style={{ width: '100%' }} />
+                                                <Select.Content position="popper" sideOffset={5}>
+                                                  <Select.Item value={savedProfileName}>{savedProfileName}</Select.Item>
+                                                </Select.Content>
+                                              </Select.Root>
+                                            );
+                                          }
+                                          return (
+                                            <Select.Root
+                                              value={undefined}
+                                              onValueChange={() => {}}
+                                              disabled
+                                            >
+                                              <Select.Trigger placeholder="Click 'Test Connection' to load profiles" style={{ width: '100%' }} />
+                                            </Select.Root>
+                                          );
+                                        }
+                                        
                                         // Use a special value "__all__" to represent "all profiles" (empty string in config)
-                                        const selectValue = instance.qualityProfileName || '__all__';
+                                        // If a profile is selected, use its name; otherwise use "__all__"
+                                        const selectedProfileName = instance.qualityProfileName || '';
+                                        const selectValue = selectedProfileName || '__all__';
                                         
                                         return (
                                           <Select.Root
                                             value={selectValue}
                                             onValueChange={(value) => {
-                                              // Convert "__all__" back to empty string for config
+                                              // Save quality profile name only when a profile is selected (not "__all__")
+                                              // Empty string means "all profiles" - backend will skip quality profile filtering
+                                              // This matches upgradinatorr script behavior: empty/null/whitespace = no filtering
                                               const configValue = value === '__all__' ? '' : value;
                                               updateInstanceConfig(selectedAppType, instance.id, 'qualityProfileName', configValue);
                                             }}
@@ -1167,42 +1182,6 @@ function Settings() {
                                         );
                                       })()}
                                     </Flex>
-                                  {(() => {
-                                    const profileKey = `${selectedAppType}-${instance.id}`;
-                                    const isLoading = loadingProfiles[profileKey];
-                                    const hasUrlAndApiKey = instance.url && instance.apiKey;
-                                    
-                                    if (!hasUrlAndApiKey) {
-                                      return null;
-                                    }
-                                    
-                                    return (
-                                      <Tooltip content="Refresh quality profiles">
-                                        <Button
-                                          variant="soft"
-                                          size="1"
-                                          onClick={async () => {
-                                            // Clear existing profiles to show loading state
-                                            setQualityProfiles(prev => {
-                                              const newProfiles = { ...prev };
-                                              delete newProfiles[profileKey];
-                                              return newProfiles;
-                                            });
-                                            // Fetch fresh profiles with force refresh
-                                            await fetchQualityProfiles(selectedAppType, instance.id, instance.url, instance.apiKey, true);
-                                          }}
-                                          disabled={isLoading}
-                                          style={{ minWidth: '32px', width: '32px', height: '32px', padding: 0, flexShrink: 0 }}
-                                        >
-                                          {isLoading ? (
-                                            <Spinner size="1" />
-                                          ) : (
-                                            <ReloadIcon width="14" height="14" />
-                                          )}
-                                        </Button>
-                                      </Tooltip>
-                                    );
-                                  })()}
                                 </Flex>
                               </Flex>
 

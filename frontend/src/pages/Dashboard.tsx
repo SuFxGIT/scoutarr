@@ -103,13 +103,13 @@ function Dashboard() {
       await axios.post('/api/stats/clear-recent');
     },
     onSuccess: () => {
-      toast.success('Recent upgrades cleared');
+      toast.success('Recent triggers cleared');
       setCurrentPage(1);
       setConfirmingClear(null);
       refetchStats();
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear recent upgrades: ' + getErrorMessage(error));
+      toast.error('Failed to clear recent triggers: ' + getErrorMessage(error));
       setConfirmingClear(null);
     },
   });
@@ -588,7 +588,7 @@ function Dashboard() {
                 <Separator />
                 {totalItems === 0 ? (
                   <Text size="2" color="gray" style={{ textAlign: 'center', padding: '1rem' }}>
-                    No recent upgrades yet
+                    No recent triggers yet
                   </Text>
                 ) : (
                   <>
