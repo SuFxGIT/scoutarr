@@ -12,6 +12,7 @@ import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractIte
 import { serviceRegistry, getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export const searchRouter = express.Router();
 
@@ -416,7 +417,7 @@ export async function processApplication<TMedia extends FilterableMedia>(
       items
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`❌ ${processor.name} search failed`, {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
@@ -462,7 +463,7 @@ searchRouter.post('/run', async (req, res) => {
       });
     } catch (historyError: unknown) {
       logger.warn('⚠️  Failed to record manual run in scheduler history', {
-        error: historyError instanceof Error ? historyError.message : 'Unknown error'
+        error: getErrorMessage(historyError)
       });
     }
 
@@ -472,13 +473,13 @@ searchRouter.post('/run', async (req, res) => {
       await notificationService.sendNotifications(results, true);
     } catch (notificationError: unknown) {
       logger.warn('⚠️  Failed to send notifications', {
-        error: notificationError instanceof Error ? notificationError.message : 'Unknown error'
+        error: getErrorMessage(notificationError)
       });
     }
 
     res.json(results);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error('❌ Search operation failed', {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
@@ -494,7 +495,7 @@ searchRouter.post('/run', async (req, res) => {
       });
     } catch (historyError: unknown) {
       logger.warn('⚠️  Failed to record failed manual run in scheduler history', {
-        error: historyError instanceof Error ? historyError.message : 'Unknown error'
+        error: getErrorMessage(historyError)
       });
     }
 
@@ -503,7 +504,7 @@ searchRouter.post('/run', async (req, res) => {
       await notificationService.sendNotifications({}, false, errorMessage);
     } catch (notificationError: unknown) {
       logger.warn('⚠️  Failed to send failure notifications', {
-        error: notificationError instanceof Error ? notificationError.message : 'Unknown error'
+        error: getErrorMessage(notificationError)
       });
     }
 
@@ -574,7 +575,7 @@ async function processManualRun<TMedia extends FilterableMedia>(
       items: toSearch.map(m => ({ id: getMediaId(m), title: getMediaTitle(m) }))
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`Manual run preview: ${name} failed`, { error: errorMessage });
     return {
       success: false,
@@ -630,7 +631,7 @@ searchRouter.post('/manual-run', async (req, res) => {
     logger.info('✅ Manual run preview completed');
     res.json(results);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error('❌ Manual run preview failed', {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined

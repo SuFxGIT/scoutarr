@@ -138,8 +138,6 @@ function Settings() {
     setShowUnsavedDialog(false);
   }, []);
 
-<<<<<<< HEAD
-=======
   // Load cached quality profiles on mount
   useEffect(() => {
     const loadCachedProfiles = async () => {
@@ -157,7 +155,6 @@ function Settings() {
 
     loadCachedProfiles();
   }, []); // Only run once on mount
->>>>>>> 238166e (Fixed! The issue was that the useEffect had config in its dependency array, causing it to refetch quality profiles from the backend every time any config field changed (including on every keystroke))
 
   // Persist active tab to localStorage whenever it changes
   useEffect(() => {
