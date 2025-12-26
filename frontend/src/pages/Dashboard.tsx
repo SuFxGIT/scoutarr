@@ -496,7 +496,7 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Statistics</Heading>
-                  <Tooltip content="Clear recent triggers and statistics. This will remove all trigger history and reset stats to zero, but keep the database structure intact.">
+                  <Tooltip content="Delete all trigger history and tagged media records from the database. This will reset all statistics to zero.">
                     <span>
                       {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
                         <Button 
