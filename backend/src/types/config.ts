@@ -9,7 +9,7 @@ export interface NotificationConfig {
 export interface RadarrInstance {
   id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string; // Display name
+  name?: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max';
@@ -26,7 +26,7 @@ export interface RadarrInstance {
 export interface SonarrInstance {
   id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string; // Display name
+  name?: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max';
@@ -43,7 +43,7 @@ export interface SonarrInstance {
 export interface LidarrInstance {
   id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string; // Display name
+  name?: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max';
@@ -60,7 +60,7 @@ export interface LidarrInstance {
 export interface ReadarrInstance {
   id: string; // Unique identifier for this instance
   instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name: string; // Display name
+  name?: string; // Display name
   url: string;
   apiKey: string;
   count: number | 'max';

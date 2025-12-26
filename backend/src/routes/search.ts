@@ -114,8 +114,8 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
   return {
     name: instanceName,
     config,
-    getMedia: service.getMedia.bind(null, config) as (config: TConfig) => Promise<TMedia[]>,
-    filterMedia: service.filterMedia.bind(null, config) as (config: TConfig, media: TMedia[]) => Promise<TMedia[]>,
+    getMedia: (cfg: TConfig) => service.getMedia(cfg),
+    filterMedia: (cfg: TConfig, media: TMedia[]) => service.filterMedia(cfg, media),
     searchMedia: async (cfg: TConfig, mediaIds: number[]) => {
       if (appType === 'radarr') {
         await radarrService.searchMovies(cfg as RadarrInstance, mediaIds);
@@ -134,7 +134,7 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
       }
     },
     searchMediaOneByOne,
-    getTagId: service.getTagId.bind(null, config) as (config: TConfig, tagName: string) => Promise<number | null>,
+    getTagId: (cfg: TConfig, tagName: string) => service.getTagId(cfg, tagName),
     addTag: async (cfg: TConfig, mediaIds: number[], tagId: number) => {
       if (appType === 'radarr') {
         await radarrService.addTagToMovies(cfg as RadarrInstance, mediaIds, tagId);
@@ -169,20 +169,9 @@ async function processAppInstances<T extends StarrInstanceConfig>(
   results: SearchResults,
   unattended?: boolean
 ): Promise<void> {
-  logger.debug(`📋 Processing ${instances.length} ${appType} instance(s)`, { 
-    appType, 
-    instanceCount: instances.length,
-    unattended: unattended || false
-  });
-  
   for (let i = 0; i < instances.length; i++) {
     const instanceConfig = instances[i];
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
-    logger.debug(`🔄 Processing instance ${i + 1}/${instances.length}`, { 
-      instanceName, 
-      instanceId, 
-      appType 
-    });
     
     // Merge unattended mode into config if provided
     const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
@@ -194,19 +183,7 @@ async function processAppInstances<T extends StarrInstanceConfig>(
       [getMediaTypeKey(appType)]: result.items,
       instanceName
     };
-    
-    logger.debug(`✅ Instance ${i + 1}/${instances.length} processed`, { 
-      instanceName, 
-      success: result.success, 
-      searched: result.searched 
-    });
   }
-  
-  logger.debug(`✅ All ${appType} instances processed`, { 
-    appType, 
-    instanceCount: instances.length,
-    resultCount: Object.keys(results).length
-  });
 }
 
 // Shared function to execute search run (used by both manual and scheduled runs)
@@ -217,41 +194,19 @@ export async function executeSearchRun(): Promise<SearchResults> {
   
   // Use scheduler's unattended mode setting
   const unattended = config.scheduler?.unattended || false;
-  logger.debug('⚙️  Search run configuration', { unattended });
-
-  let totalInstancesProcessed = 0;
-  let totalInstancesSkipped = 0;
 
   // Process all app types
   for (const appType of APP_TYPES) {
-    logger.debug(`📋 Processing ${appType} instances`);
     // Get all configured instances, then filter out those with per-instance scheduling enabled
     // Global scheduler should only process instances without per-instance schedules
     const allInstances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
     const instances = allInstances.filter((instance: StarrInstanceConfig) => !instance.scheduleEnabled);
     
-    logger.debug(`📊 ${appType} instance filtering`, { 
-      total: allInstances.length, 
-      afterFilter: instances.length,
-      skipped: allInstances.length - instances.length
-    });
-    
-    totalInstancesProcessed += instances.length;
-    totalInstancesSkipped += (allInstances.length - instances.length);
-    
     await processAppInstances(instances, appType, results, unattended);
   }
 
-  logger.debug('📊 Search run summary', {
-    totalInstancesProcessed,
-    totalInstancesSkipped,
-    resultCount: Object.keys(results).length
-  });
-
   // Save stats for successful searches
-  logger.debug('💾 Saving stats for search results');
   await saveStatsForResults(results);
-  logger.debug('✅ Stats saved');
 
   logger.info('✅ Search run execution completed', {
     resultCount: Object.keys(results).length,
@@ -327,14 +282,7 @@ export async function processApplication<TMedia extends FilterableMedia>(
     });
 
     let allMedia = await processor.getMedia(processor.config);
-    logger.debug(`📥 Fetched ${processor.name} media`, { total: allMedia.length });
-
     let filtered = await processor.filterMedia(processor.config, allMedia);
-    logger.debug(`🔽 Filtered ${processor.name} media`, {
-      total: allMedia.length,
-      filtered: filtered.length,
-      unattended: processor.config.unattended
-    });
 
     // Unattended mode: if no media found, remove tag from all and re-filter
     if (processor.config.unattended && filtered.length === 0) {
@@ -347,15 +295,10 @@ export async function processApplication<TMedia extends FilterableMedia>(
         if (mediaWithTag.length > 0) {
           const mediaIds = mediaWithTag.map(processor.getMediaId);
           await processor.removeTag(processor.config, mediaIds, tagId);
-          logger.debug(`🏷️  Removed tag from ${processor.name}`, { count: mediaIds.length });
 
           // Re-fetch and re-filter
           allMedia = await processor.getMedia(processor.config);
           filtered = await processor.filterMedia(processor.config, allMedia);
-          logger.debug(`🔄 Re-filtered ${processor.name} after tag removal`, {
-            total: allMedia.length,
-            filtered: filtered.length
-          });
         }
       }
     }
@@ -371,27 +314,17 @@ export async function processApplication<TMedia extends FilterableMedia>(
 
     // Select random media based on count
     const toSearch = randomSelect(filtered, processor.config.count);
-    logger.debug(`🎲 Selected ${processor.name} to search`, {
-      selected: toSearch.length,
-      available: filtered.length,
-      count: processor.config.count
-    });
 
     // Search media
     const mediaIds = toSearch.map(processor.getMediaId);
     if (processor.searchMediaOneByOne) {
       // Search one at a time (Sonarr/Lidarr/Readarr)
       for (const media of toSearch) {
-        logger.debug(`🔎 Searching ${processor.name}`, {
-          id: processor.getMediaId(media),
-          title: processor.getMediaTitle(media)
-        });
         await processor.searchMedia(processor.config, [processor.getMediaId(media)]);
       }
     } else {
       // Search all at once (Radarr)
       await processor.searchMedia(processor.config, mediaIds);
-      logger.debug(`🔎 Triggered search for ${processor.name}`, { mediaIds, count: mediaIds.length });
     }
 
     // Add tag using editor endpoint
@@ -535,7 +468,6 @@ async function processManualRun<TMedia extends FilterableMedia>(
 
     // Unattended mode: if no media found, simulate tag removal and re-filter (preview only, no actual changes)
     if (config.unattended && filtered.length === 0 && getTagId) {
-      logger.debug(`🔄 Unattended mode preview: No media found, simulating tag removal and re-filter for ${name}`);
       const tagId = await getTagId(config, config.tagName);
       if (tagId !== null) {
         // Simulate tag removal: create a copy of media with the tag removed from tags array
@@ -553,20 +485,10 @@ async function processManualRun<TMedia extends FilterableMedia>(
         
         // Re-filter with simulated tag removal to see what would be available after tag removal
         filtered = await filterMedia(config, mediaWithTagRemoved);
-        logger.debug(`🔄 Simulated re-filter for ${name} after tag removal`, {
-          total: media.length,
-          filtered: filtered.length
-        });
       }
     }
 
     const toSearch = randomSelect(filtered, config.count);
-
-    logger.debug(`Manual run preview: ${name} results`, {
-      total: media.length,
-      filtered: filtered.length,
-      toSearch: toSearch.length
-    });
 
     return {
       success: true,

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const radarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
-  name: z.string().min(1, 'Instance name is required'),
+  name: z.string().optional(),
   url: z.string().refine((val) => {
     if (val === '') return true;
     try {
@@ -32,7 +32,7 @@ export const radarrInstanceSchema = z.object({
 export const sonarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
-  name: z.string().min(1, 'Instance name is required'),
+  name: z.string().optional(),
   url: z.string().refine((val) => {
     if (val === '') return true;
     try {
@@ -61,7 +61,7 @@ export const sonarrInstanceSchema = z.object({
 export const lidarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
-  name: z.string().min(1, 'Instance name is required'),
+  name: z.string().optional(),
   url: z.string().refine((val) => {
     if (val === '') return true;
     try {
@@ -90,7 +90,7 @@ export const lidarrInstanceSchema = z.object({
 export const readarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
-  name: z.string().min(1, 'Instance name is required'),
+  name: z.string().optional(),
   url: z.string().refine((val) => {
     if (val === '') return true;
     try {
@@ -139,20 +139,6 @@ export const configSchema = z.object({
     readarr: z.array(readarrInstanceSchema),
   }),
   scheduler: schedulerConfigSchema,
-}).refine((data) => {
-  // Validate that all instance names are unique across all app types
-  const allInstances = [
-    ...data.applications.radarr,
-    ...data.applications.sonarr,
-    ...data.applications.lidarr,
-    ...data.applications.readarr,
-  ];
-  const names = allInstances.map(inst => inst.name);
-  const uniqueNames = new Set(names);
-  return names.length === uniqueNames.size;
-}, {
-  message: 'Instance names must be unique across all instances',
-  path: ['applications'],
 });
 
 export type ConfigFormData = z.infer<typeof configSchema>;

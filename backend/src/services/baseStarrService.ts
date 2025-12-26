@@ -21,7 +21,6 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Creates an axios client for API calls
    */
   protected createClient(config: TConfig): AxiosInstance {
-    logger.debug(`🔌 Creating ${this.appName} API client`, { url: config.url });
     return createStarrClient(config.url, config.apiKey);
   }
 
@@ -29,18 +28,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Gets quality profiles from the Starr application
    */
   async getQualityProfiles(config: TConfig): Promise<StarrQualityProfile[]> {
-    logger.debug(`📋 Fetching quality profiles from ${this.appName}`, { 
-      url: config.url,
-      apiVersion: this.apiVersion,
-      endpoint: this.qualityProfileEndpoint
-    });
     try {
       const client = this.createClient(config);
       const response = await client.get<StarrQualityProfile[]>(`/api/${this.apiVersion}/${this.qualityProfileEndpoint}`);
-      logger.debug(`✅ Fetched quality profiles from ${this.appName}`, { 
-        count: response.data.length,
-        profiles: response.data.map(p => p.name)
-      });
       return response.data;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -56,10 +46,8 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Gets or creates a tag ID
    */
   async getTagId(config: TConfig, tagName: string): Promise<number | null> {
-    logger.debug(`🏷️  Getting/creating tag ID for ${this.appName}`, { tagName, url: config.url });
     const client = this.createClient(config);
     const tagId = await getOrCreateTagId(client, tagName, this.appName);
-    logger.debug(`✅ Tag ID retrieved/created for ${this.appName}`, { tagName, tagId });
     return tagId;
   }
 
@@ -73,11 +61,6 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         [this.mediaIdField]: mediaIds,
         tags: [tagId],
         applyTags: 'add'
-      });
-      logger.debug(`🏷️  Added tag to ${this.getMediaTypeName()}`, { 
-        mediaIds, 
-        tagId, 
-        count: mediaIds.length 
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

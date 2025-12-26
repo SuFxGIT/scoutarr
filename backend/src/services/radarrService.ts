@@ -23,7 +23,6 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
     try {
       const client = this.createClient(config);
       const response = await client.get<RadarrMovie[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      logger.debug('📥 Fetched movies from Radarr', { count: response.data.length, url: config.url });
       return response.data;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -42,7 +41,6 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
         name: 'MoviesSearch',
         movieIds: movieIds
       });
-      logger.debug('🔎 Triggered search for movies', { movieIds, count: movieIds.length });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('❌ Failed to search movies in Radarr', { error: errorMessage, movieIds });
@@ -89,11 +87,6 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
             return m.status === 'announced';
           }
           return true;
-        });
-        logger.debug('🔽 Filtered by movie status', { 
-          before, 
-          after: filtered.length, 
-          status: config.movieStatus 
         });
       }
 

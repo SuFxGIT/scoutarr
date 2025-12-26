@@ -940,15 +940,15 @@ function Settings() {
                               <Separator />
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Name (required)</Text>
-                                  <Tooltip content={`A unique name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}'). Must be unique across all instances.`}>
+                                  <Text size="2" weight="medium">Name</Text>
+                                  <Tooltip content={`A name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}').`}>
                                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                                   </Tooltip>
                                 </Flex>
                                 <TextField.Root
                                   value={instance.name || ''}
                                   onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
-                                  placeholder={`Enter unique instance name`}
+                                  placeholder={`Enter instance name`}
                                 />
                               </Flex>
 
