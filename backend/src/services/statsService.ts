@@ -183,7 +183,7 @@ class StatsService {
       }
       logger.debug('✅ Upgrades by instance calculated', { instances: Object.keys(upgradesByInstance).length });
 
-      logger.debug('📊 Querying recent upgrades', { limit });
+      logger.debug('📊 Querying recent triggers', { limit });
       // Get recent upgrades (limited for API response)
       const recentStmt = this.db.prepare(`
         SELECT timestamp, application, instance, count, items
@@ -206,7 +206,7 @@ class StatsService {
         count: row.count,
         items: JSON.parse(row.items) as Array<{ id: number; title: string }>
       }));
-      logger.debug('✅ Recent upgrades retrieved', { count: recentUpgrades.length });
+      logger.debug('✅ Recent triggers retrieved', { count: recentUpgrades.length });
 
       // Get last upgrade timestamp
       const lastStmt = this.db.prepare(`
@@ -252,7 +252,7 @@ class StatsService {
     total: number;
     totalPages: number;
   }> {
-    logger.debug('📊 Getting recent upgrades (paginated)', { page, pageSize });
+    logger.debug('📊 Getting recent triggers (paginated)', { page, pageSize });
     if (!this.db) {
       logger.warn('⚠️  Database not initialized, returning empty results');
       return { upgrades: [], total: 0, totalPages: 0 };
@@ -292,7 +292,7 @@ class StatsService {
         items: JSON.parse(row.items) as Array<{ id: number; title: string }>
       }));
 
-      logger.debug('✅ Recent upgrades retrieved', { 
+      logger.debug('✅ Recent triggers retrieved', { 
         count: upgrades.length, 
         total, 
         totalPages,
@@ -302,7 +302,7 @@ class StatsService {
       return { upgrades, total, totalPages };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('❌ Error getting recent upgrades', { 
+      logger.error('❌ Error getting recent triggers', { 
         error: errorMessage
       });
       return { upgrades: [], total: 0, totalPages: 0 };
@@ -344,7 +344,7 @@ class StatsService {
 
   async clearRecentUpgrades(): Promise<void> {
     // Note: Since we're using a single database table for all upgrades,
-    // "clearing recent upgrades" effectively clears all stats.
+    // "clearing recent triggers" effectively clears all stats.
     // This method exists for API compatibility with the frontend.
     await this.resetStats();
   }

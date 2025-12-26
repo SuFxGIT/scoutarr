@@ -5,7 +5,7 @@ import logger from '../utils/logger.js';
 
 export const statsRouter = express.Router();
 
-// Get stats (backward compatible - returns first 100 recent upgrades)
+// Get stats (backward compatible - returns first 100 recent triggers)
 statsRouter.get('/', async (req, res) => {
   logger.debug('📊 Stats requested', { limit: req.query.limit });
   try {
@@ -22,7 +22,7 @@ statsRouter.get('/', async (req, res) => {
   }
 });
 
-// Get paginated recent upgrades (for unlimited records)
+// Get paginated recent triggers (for unlimited records)
 statsRouter.get('/recent', async (req, res) => {
   try {
     const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
@@ -38,7 +38,7 @@ statsRouter.get('/recent', async (req, res) => {
     const result = await statsService.getRecentUpgrades(page, pageSize);
     res.json(result);
   } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to get recent upgrades');
+    handleRouteError(res, error, 'Failed to get recent triggers');
   }
 });
 
@@ -54,13 +54,13 @@ statsRouter.post('/reset', async (req, res) => {
   }
 });
 
-// Clear recent upgrades only
+// Clear recent triggers only
 statsRouter.post('/clear-recent', async (req, res) => {
   try {
     await statsService.clearRecentUpgrades();
-    res.json({ success: true, message: 'Recent upgrades cleared successfully' });
+    res.json({ success: true, message: 'Recent triggers cleared successfully' });
   } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to clear recent upgrades');
+    handleRouteError(res, error, 'Failed to clear recent triggers');
   }
 });
 

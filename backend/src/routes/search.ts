@@ -393,8 +393,8 @@ searchRouter.post('/run', async (req, res) => {
       failureCount: summary.filter(r => !r.success).length
     });
 
-    // Record this manual run in the scheduler history so it appears in the dashboard logs
-    logger.debug('📝 Recording manual run in scheduler history');
+    // Record this run in the scheduler history so it appears in the dashboard logs
+    logger.debug('📝 Recording run in scheduler history');
     try {
       schedulerService.addToHistory({
         timestamp: new Date().toISOString(),
@@ -402,13 +402,13 @@ searchRouter.post('/run', async (req, res) => {
         success: true
       });
     } catch (historyError: unknown) {
-      logger.warn('⚠️  Failed to record manual run in scheduler history', {
+      logger.warn('⚠️  Failed to record run in scheduler history', {
         error: getErrorMessage(historyError)
       });
     }
 
     // Send notifications
-    logger.debug('📤 Sending notifications for manual run');
+    logger.debug('📤 Sending notifications for run');
     try {
       await notificationService.sendNotifications(results, true);
     } catch (notificationError: unknown) {
@@ -425,7 +425,7 @@ searchRouter.post('/run', async (req, res) => {
       stack: error instanceof Error ? error.stack : undefined
     });
 
-    // Record failed manual run in scheduler history
+    // Record failed run in scheduler history
     try {
       schedulerService.addToHistory({
         timestamp: new Date().toISOString(),
@@ -434,7 +434,7 @@ searchRouter.post('/run', async (req, res) => {
         error: errorMessage
       });
     } catch (historyError: unknown) {
-      logger.warn('⚠️  Failed to record failed manual run in scheduler history', {
+      logger.warn('⚠️  Failed to record failed run in scheduler history', {
         error: getErrorMessage(historyError)
       });
     }
@@ -455,7 +455,7 @@ searchRouter.post('/run', async (req, res) => {
   }
 });
 
-// Helper function for manual run preview
+// Helper function for run preview
 async function processManualRun<TMedia extends FilterableMedia>(
   name: string,
   config: StarrInstanceConfig,
@@ -466,7 +466,7 @@ async function processManualRun<TMedia extends FilterableMedia>(
   getTagId?: (config: StarrInstanceConfig, tagName: string) => Promise<number | null>
 ): Promise<{ success: boolean; count: number; total: number; items: Array<{ id: number; title: string }>; error?: string }> {
   try {
-    logger.debug(`Manual run preview: Processing ${name}`, {
+    logger.debug(`Run preview: Processing ${name}`, {
       count: config.count,
       unattended: config.unattended
     });
@@ -505,7 +505,7 @@ async function processManualRun<TMedia extends FilterableMedia>(
     };
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
-    logger.error(`Manual run preview: ${name} failed`, { error: errorMessage });
+    logger.error(`Run preview: ${name} failed`, { error: errorMessage });
     return {
       success: false,
       count: 0,
@@ -516,7 +516,7 @@ async function processManualRun<TMedia extends FilterableMedia>(
   }
 }
 
-// Helper to process instances for manual run preview
+// Helper to process instances for run preview
 async function processManualRunInstances(
   instances: StarrInstanceConfig[],
   appType: AppType,
@@ -544,9 +544,9 @@ async function processManualRunInstances(
   }
 }
 
-// Get items that would be searched (manual run preview)
+// Get items that would be searched (run preview)
 searchRouter.post('/manual-run', async (req, res) => {
-  logger.info('👀 Starting manual run preview');
+  logger.info('👀 Starting run preview');
   try {
     const config = configService.getConfig();
     const results: SearchResults = {};
@@ -561,12 +561,12 @@ searchRouter.post('/manual-run', async (req, res) => {
     res.json(results);
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
-    logger.error('❌ Manual run preview failed', {
+    logger.error('❌ Run preview failed', {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
     });
     res.status(500).json({
-      error: 'Manual run preview failed',
+      error: 'Run preview failed',
       message: errorMessage
     });
   }

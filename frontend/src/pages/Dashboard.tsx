@@ -30,13 +30,15 @@ function Dashboard() {
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
-  // Fetch status
+  // Fetch status - only fetch on initial mount, not on window focus/reconnect
   const { data: statusData, refetch: refetchStatus } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
       return response.data;
     },
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    refetchOnReconnect: false, // Don't refetch when network reconnects
   });
 
   const connectionStatus = statusData || {};
@@ -51,7 +53,7 @@ function Dashboard() {
     },
   });
 
-  // Fetch manual run preview
+  // Fetch run preview
   const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
     queryKey: ['manualRunPreview'],
     queryFn: async () => {
@@ -60,13 +62,22 @@ function Dashboard() {
     },
   });
 
-  // Fetch stats
+  // Fetch stats - only fetch after runs, not on initial mount
+  // Stats start at 0 and only update when a run happens
   const { data: stats, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: async () => {
       const response = await axios.get('/api/stats');
       return response.data;
     },
+    enabled: false, // Don't fetch on mount - only fetch when explicitly called after runs
+    initialData: {
+      totalUpgrades: 0,
+      upgradesByApplication: {},
+      upgradesByInstance: {},
+      recentUpgrades: [],
+    },
+    staleTime: Infinity, // Stats never go stale - they only change when a run happens
   });
 
   // Auto-scroll to bottom when scheduler history changes
