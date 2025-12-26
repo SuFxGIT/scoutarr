@@ -11,31 +11,12 @@ import logger from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
 import { serviceRegistry, getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
+import { StarrInstanceConfig } from '../types/starr.js';
+import { SearchResults, SearchResult } from '../types/api.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
 export const searchRouter = express.Router();
-
-// Type for instance configs
-type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
-
-// Type for search results
-interface SearchResult {
-  success: boolean;
-  searched: number;
-  items: Array<{ id: number; title: string }>;
-  error?: string;
-}
-
-interface SearchResults {
-  [key: string]: SearchResult & {
-    movies?: Array<{ id: number; title: string }>;
-    series?: Array<{ id: number; title: string }>;
-    artists?: Array<{ id: number; title: string }>;
-    authors?: Array<{ id: number; title: string }>;
-    instanceName?: string;
-  };
-}
 
 // Helper function to randomly select items (matching script behavior)
 function randomSelect<T>(items: T[], count: number | 'max'): T[] {
@@ -105,7 +86,8 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
   instanceName: string,
   config: TConfig,
   appType: AppType,
-  instanceId: string
+  instanceId: string,
+  unattended?: boolean
 ): ApplicationProcessor<TMedia> {
   const service = getServiceForApp(appType);
   
@@ -117,6 +99,7 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
     config,
     appType,
     instanceId,
+    unattended,
     getMedia: (cfg: TConfig) => service.getMedia(cfg),
     filterMedia: (cfg: TConfig, media: TMedia[]) => service.filterMedia(cfg, media),
     searchMedia: async (cfg: TConfig, mediaIds: number[]) => {
@@ -176,9 +159,7 @@ async function processAppInstances<T extends StarrInstanceConfig>(
     const instanceConfig = instances[i];
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
     
-      // Merge unattended mode into config if provided
-      const config = unattended !== undefined ? { ...instanceConfig, unattended } : instanceConfig;
-      const processor = createProcessor(instanceName, config, appType, instanceId);
+      const processor = createProcessor(instanceName, instanceConfig, appType, instanceId, unattended);
       const result = await processApplication(processor);
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
@@ -283,14 +264,14 @@ export async function processApplication<TMedia extends FilterableMedia>(
     logger.info(`Processing ${processor.name} search`, {
       count: processor.config.count,
       tagName: processor.config.tagName,
-      unattended: processor.config.unattended
+      unattended: processor.unattended
     });
 
     let allMedia = await processor.getMedia(processor.config);
     let filtered = await processor.filterMedia(processor.config, allMedia);
 
     // Unattended mode: if no media found, remove tag from all and re-filter
-    if (processor.config.unattended && filtered.length === 0) {
+    if (processor.unattended && filtered.length === 0) {
       logger.info(`🔄 Unattended mode: No media found, removing tag from all ${processor.name} and re-filtering`);
       const tagId = await processor.getTagId(processor.config, processor.config.tagName);
       if (tagId !== null) {
@@ -555,7 +536,7 @@ searchRouter.get('/run-preview', async (req, res) => {
       res.json(preview);
     } else {
       logger.debug('ℹ️  No cached run preview found');
-      res.status(404).json({ error: 'No preview found' });
+      res.json({}); // Return 200 with empty object instead of 404
     }
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);

@@ -1,7 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from './logger.js';
 
-// Supported application types
+/**
+ * Supported application types
+ * This is the source of truth for application types in the backend.
+ * Frontend maintains its own copy for type checking purposes.
+ */
 export const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
 export type AppType = typeof APP_TYPES[number];
 

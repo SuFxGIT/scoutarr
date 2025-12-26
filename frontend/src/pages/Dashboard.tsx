@@ -10,7 +10,7 @@ import {
   Dialog,
   Tooltip,
 } from '@radix-ui/themes';
-import { PlayIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import humanizeDuration from 'humanize-duration';
@@ -18,10 +18,10 @@ import ReactPaginate from 'react-paginate';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
-import { ITEMS_PER_PAGE, APP_TYPES, LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
+import { ITEMS_PER_PAGE, LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { ConnectionStatusBadges } from '../components/ConnectionStatusBadges';
-import type { SearchResults, Stats, StatusResponse, SchedulerHistoryEntry } from '../types/api';
+import type { SearchResults, Stats, StatusResponse, SchedulerHistoryEntry, InstanceStatus } from '../types/api';
 
 function Dashboard() {
   const queryClient = useQueryClient();
@@ -31,7 +31,7 @@ function Dashboard() {
   const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
   // Fetch status - only fetch on initial mount, not on every refresh
-  const { data: statusData, refetch: refetchStatus } = useQuery<StatusResponse>({
+  const { data: statusData } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
@@ -44,21 +44,20 @@ function Dashboard() {
   const connectionStatus = statusData || {};
   const schedulerStatus = statusData?.scheduler || null;
 
-  // Fetch scheduler history - only fetch after runs, not on initial mount
-  // History only changes when runs happen, so no need to fetch on every refresh
+  // Fetch scheduler history - load from database on mount
+  // History is persisted in the backend, so we should load it on mount
   const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
     queryKey: ['schedulerHistory'],
     queryFn: async () => {
       const response = await axios.get('/api/status/scheduler/history');
       return response.data;
     },
-    enabled: false, // Don't fetch on mount - only fetch when explicitly called after runs
-    initialData: [], // Start with empty history
+    enabled: true, // Fetch on mount to load cached history from database
     staleTime: Infinity, // History never goes stale - it only changes when runs happen
   });
 
   // Fetch run preview - load from database on mount
-  const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
+  const { data: manualRunResults } = useQuery<SearchResults>({
     queryKey: ['runPreview'],
     queryFn: async () => {
       // Try to get cached preview from database
@@ -84,21 +83,15 @@ function Dashboard() {
     return response.data;
   };
 
-  // Fetch stats - only fetch after runs, not on initial mount
-  // Stats start at 0 and only update when a run happens
+  // Fetch stats - load from database on mount
+  // Stats are persisted in the backend database, so we should load them on mount
   const { data: stats, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: async () => {
       const response = await axios.get('/api/stats');
       return response.data;
     },
-    enabled: false, // Don't fetch on mount - only fetch when explicitly called after runs
-    initialData: {
-      totalUpgrades: 0,
-      upgradesByApplication: {},
-      upgradesByInstance: {},
-      recentUpgrades: [],
-    },
+    enabled: true, // Fetch on mount to load cached stats from database
     staleTime: Infinity, // Stats never go stale - they only change when a run happens
   });
 
@@ -311,7 +304,7 @@ function Dashboard() {
       const timestamp = format(new Date(entry.timestamp), 'HH:mm:ss');
       
       if (entry.success) {
-        Object.entries(entry.results).forEach(([app, result]) => {
+        Object.entries(entry.results as SearchResults).forEach(([app, result]) => {
           if (result.success) {
             const appName = result.instanceName || formatAppName(app);
             const searched = result.searched || 0;
@@ -364,12 +357,13 @@ function Dashboard() {
   };
 
   const renderAutomaticRunPreview = () => {
+    const scheduler = schedulerStatus && 'nextRun' in schedulerStatus ? schedulerStatus : null;
     const logs = convertHistoryToLogs(
       schedulerHistory, 
-      schedulerStatus?.nextRun || null, 
-      schedulerStatus?.globalEnabled || false, 
+      scheduler?.nextRun || null, 
+      scheduler?.globalEnabled || false, 
       manualRunResults || null,
-      schedulerStatus?.instances,
+      scheduler?.instances,
       connectionStatus
     );
 
@@ -378,7 +372,7 @@ function Dashboard() {
         <Flex align="center" justify="between" mb="3">
           <Flex align="center" gap="2">
             <Heading size="5">Logs</Heading>
-            {schedulerStatus && (
+            {schedulerStatus && 'enabled' in schedulerStatus && (
               <Badge 
                 color={
                   schedulerStatus.enabled && schedulerStatus.running

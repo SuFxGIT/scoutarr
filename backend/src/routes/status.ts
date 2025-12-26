@@ -3,34 +3,11 @@ import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
-import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
+import { StarrInstanceConfig } from '../types/starr.js';
+import { StatusResponse, InstanceStatus } from '../types/api.js';
 import { handleRouteError } from '../utils/errorUtils.js';
 
 export const statusRouter = express.Router();
-
-// Type for instance configs
-type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
-
-// Type for status response
-interface InstanceStatus {
-  connected: boolean;
-  configured: boolean;
-  version?: string;
-  appName?: string;
-  error?: string;
-  instanceName?: string;
-}
-
-interface StatusResponse {
-  [key: string]: InstanceStatus | {
-    enabled: boolean;
-    globalEnabled?: boolean;
-    running: boolean;
-    schedule: string | null;
-    nextRun: string | null;
-    instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
-  };
-}
 
 // Get status of all applications
 statusRouter.get('/', async (req, res) => {

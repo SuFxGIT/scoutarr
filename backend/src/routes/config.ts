@@ -9,15 +9,13 @@ import logger from '../utils/logger.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
+import { Config } from '../types/config.js';
+import { StarrInstanceConfig } from '../types/starr.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const configRouter = express.Router();
-
-// Type for instance configs
-type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
 
 // Helper function to clear log files
 async function clearLogs(): Promise<void> {

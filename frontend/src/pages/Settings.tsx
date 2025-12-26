@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import axios from 'axios';
-import type { Config } from '../types/config';
+import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
 import type { StatusResponse } from '../types/api';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
@@ -109,16 +109,6 @@ function Settings() {
       setActiveTab(newTab);
     }
   }, [hasUnsavedChanges, activeTab]);
-
-  // Handle navigation with unsaved changes check
-  const handleNavigation = useCallback((path: string) => {
-    if (hasUnsavedChanges()) {
-      setPendingNavigation(path);
-      setShowUnsavedDialog(true);
-    } else {
-      baseHandleNavigation(path);
-    }
-  }, [hasUnsavedChanges, baseHandleNavigation]);
 
   // Confirm navigation/tab change (discard changes)
   const confirmDiscardChanges = useCallback(() => {
@@ -1067,7 +1057,7 @@ function Settings() {
                                     </Tooltip>
                                   </Flex>
                                   <Select.Root
-                                    value={instance.movieStatus || 'any'}
+                                    value={(instance as RadarrInstance).movieStatus || 'any'}
                                     onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
                                   >
                                     <Select.Trigger />
@@ -1090,7 +1080,7 @@ function Settings() {
                                     </Tooltip>
                                   </Flex>
                                   <Select.Root
-                                    value={instance.seriesStatus || 'any'}
+                                    value={(instance as SonarrInstance).seriesStatus || 'any'}
                                     onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
                                   >
                                     <Select.Trigger />
@@ -1113,7 +1103,7 @@ function Settings() {
                                     </Tooltip>
                                   </Flex>
                                   <Select.Root
-                                    value={selectedAppType === 'lidarr' ? (instance.artistStatus || 'any') : (instance.authorStatus || 'any')}
+                                    value={selectedAppType === 'lidarr' ? ((instance as LidarrInstance).artistStatus || 'any') : ((instance as ReadarrInstance).authorStatus || 'any')}
                                     onValueChange={(value) => {
                                       const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
                                       updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);

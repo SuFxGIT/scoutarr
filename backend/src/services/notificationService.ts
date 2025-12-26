@@ -2,21 +2,7 @@ import axios from 'axios';
 import { configService } from './configService.js';
 import logger from '../utils/logger.js';
 import { extractItemsFromResult } from '../utils/starrUtils.js';
-
-interface SearchResults {
-  [key: string]: {
-    success: boolean;
-    searched?: number;
-    count?: number;
-    total?: number;
-    movies?: Array<{ id: number; title: string }>;
-    series?: Array<{ id: number; title: string }>;
-    artists?: Array<{ id: number; title: string }>;
-    authors?: Array<{ id: number; title: string }>;
-    error?: string;
-    instanceName?: string;
-  };
-}
+import { SearchResults } from '../types/api.js';
 
 class NotificationService {
   async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {

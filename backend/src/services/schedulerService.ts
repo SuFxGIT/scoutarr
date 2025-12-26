@@ -5,29 +5,12 @@ import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
 import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
 import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
-import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
+import { StarrInstanceConfig } from '../types/starr.js';
+import { SearchResults } from '../types/api.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
 const require = createRequire(import.meta.url);
 const { parseExpression } = require('cron-parser');
-
-// Type for instance configs
-type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
-
-// Type for search results (from search.ts)
-interface SearchResults {
-  [key: string]: {
-    success: boolean;
-    searched?: number;
-    items?: Array<{ id: number; title: string }>;
-    error?: string;
-    instanceName?: string;
-    movies?: Array<{ id: number; title: string }>;
-    series?: Array<{ id: number; title: string }>;
-    artists?: Array<{ id: number; title: string }>;
-    authors?: Array<{ id: number; title: string }>;
-  };
-}
 
 interface SchedulerRunHistory {
   timestamp: string;

@@ -15,6 +15,8 @@ export const LOG_BG_COLOR = '#1a1a1a';
 
 /**
  * Supported application types
+ * Note: This should match backend/src/utils/starrUtils.ts APP_TYPES
+ * Frontend maintains its own copy for type checking purposes.
  */
 export const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
 export type AppType = typeof APP_TYPES[number];

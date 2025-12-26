@@ -1,13 +1,10 @@
 import Database from 'better-sqlite3';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
+import { getConfigDir } from '../utils/paths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const CONFIG_DIR = process.env.CONFIG_DIR || path.join(__dirname, '../../../config');
+const CONFIG_DIR = getConfigDir();
 const DB_FILE = path.join(CONFIG_DIR, 'stats.db');
 
 export interface UpgradeEntry {

@@ -1,13 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { Config } from '../types/config.js';
 import logger from '../utils/logger.js';
+import { getConfigDir } from '../utils/paths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const CONFIG_DIR = process.env.CONFIG_DIR || path.join(__dirname, '../../../config');
+const CONFIG_DIR = getConfigDir();
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const CONFIG_EXAMPLE = path.join(CONFIG_DIR, 'config.example.json');
 
@@ -99,7 +96,18 @@ class ConfigService {
       // Normalize config: ensure lidarr and readarr arrays exist for backward compatibility
       if (!parsed.applications) {
         logger.debug('⚠️  No applications in config, initializing empty object');
-        parsed.applications = {};
+        parsed.applications = {
+          radarr: [],
+          sonarr: [],
+          lidarr: [],
+          readarr: []
+        };
+      }
+      if (!Array.isArray(parsed.applications.radarr)) {
+        parsed.applications.radarr = [];
+      }
+      if (!Array.isArray(parsed.applications.sonarr)) {
+        parsed.applications.sonarr = [];
       }
       if (!Array.isArray(parsed.applications.lidarr)) {
         logger.debug('⚠️  Lidarr not an array, initializing empty array');
@@ -112,8 +120,8 @@ class ConfigService {
       
       // Count configured instances
       const instanceCounts = {
-        radarr: Array.isArray(parsed.applications.radarr) ? parsed.applications.radarr.length : 0,
-        sonarr: Array.isArray(parsed.applications.sonarr) ? parsed.applications.sonarr.length : 0,
+        radarr: parsed.applications.radarr.length,
+        sonarr: parsed.applications.sonarr.length,
         lidarr: parsed.applications.lidarr.length,
         readarr: parsed.applications.readarr.length
       };

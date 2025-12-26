@@ -12,7 +12,9 @@ export const formatAppName = (app: string): string => {
 };
 
 /**
- * Extract error message from axios error
+ * Extract error message from error object
+ * Handles axios errors (which have a response.data.error structure) and standard errors
+ * Note: This is frontend-specific and differs from the backend version which doesn't need axios handling
  */
 export const getErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object' && 'response' in error) {

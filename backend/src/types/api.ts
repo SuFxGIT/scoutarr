@@ -3,6 +3,13 @@
  * Centralized type definitions for API responses
  */
 
+export interface SearchResult {
+  success: boolean;
+  searched: number;
+  items: Array<{ id: number; title: string }>;
+  error?: string;
+}
+
 export interface SearchResults {
   [key: string]: {
     success: boolean;
@@ -17,20 +24,6 @@ export interface SearchResults {
     error?: string;
     instanceName?: string;
   };
-}
-
-export interface Stats {
-  totalUpgrades: number;
-  upgradesByApplication: Record<string, number>;
-  upgradesByInstance: Record<string, number>;
-  recentUpgrades: Array<{
-    timestamp: string;
-    application: string;
-    instance?: string;
-    count: number;
-    items: Array<{ id: number; title: string }>;
-  }>;
-  lastUpgrade?: string;
 }
 
 export interface InstanceStatus {
@@ -59,3 +52,4 @@ export interface SchedulerHistoryEntry {
   success: boolean;
   error?: string;
 }
+
