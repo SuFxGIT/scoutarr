@@ -30,15 +30,15 @@ function Dashboard() {
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedUpgrade, setSelectedUpgrade] = useState<Stats['recentUpgrades'][number] | null>(null);
 
-  // Fetch status - only fetch on initial mount, not on window focus/reconnect
+  // Fetch status - only fetch on initial mount, not on every refresh
   const { data: statusData, refetch: refetchStatus } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
       return response.data;
     },
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    refetchOnReconnect: false, // Don't refetch when network reconnects
+    enabled: false, // Don't fetch on mount - only fetch when explicitly called
+    staleTime: Infinity, // Status never goes stale - only changes when config changes
   });
 
   const connectionStatus = statusData || {};
@@ -57,13 +57,15 @@ function Dashboard() {
     staleTime: Infinity, // History never goes stale - it only changes when runs happen
   });
 
-  // Fetch run preview
+  // Fetch run preview - only fetch after runs, not on initial mount
   const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
     queryKey: ['runPreview'],
     queryFn: async () => {
       const response = await axios.post('/api/search/run-preview');
       return response.data;
     },
+    enabled: false, // Don't fetch on mount - only fetch when explicitly called
+    staleTime: Infinity, // Preview never goes stale - it only changes when config/runs happen
   });
 
   // Fetch stats - only fetch after runs, not on initial mount
@@ -396,22 +398,6 @@ function Dashboard() {
                   disabled={clearHistoryMutation.isPending}
                 >
                   <TrashIcon />
-                </Button>
-              </span>
-            </Tooltip>
-            <Tooltip content="Refresh logs.">
-              <span>
-                <Button 
-                  variant="outline" 
-                  size="2" 
-                  onClick={() => {
-                    refetchHistory();
-                    refetchPreview();
-                    refetchStatus();
-                    toast.success('Logs refreshed');
-                  }}
-                >
-                  <ReloadIcon />
                 </Button>
               </span>
             </Tooltip>

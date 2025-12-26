@@ -70,13 +70,15 @@ function Settings() {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch status
+  // Fetch status - don't fetch automatically, only when explicitly refreshed
   const { data: statusData } = useQuery<StatusResponse>({
     queryKey: ['status'],
     queryFn: async () => {
       const response = await axios.get('/api/status');
       return response.data;
     },
+    enabled: false, // Don't fetch on mount - only fetch when explicitly called
+    staleTime: Infinity, // Status never goes stale - only changes when config changes
   });
 
   const connectionStatus = statusData || {};

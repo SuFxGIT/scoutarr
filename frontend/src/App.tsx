@@ -1,13 +1,16 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
+import { Flex, Heading, Button, Separator, Tooltip } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
-import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
+import { GearIcon, HomeIcon, ReloadIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 function NavigationLinks() {
   const location = useLocation();
   const { handleNavigation } = useNavigation();
+  const queryClient = useQueryClient();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Only intercept if we're navigating away from settings
@@ -17,6 +20,17 @@ function NavigationLinks() {
       return;
     }
     // Otherwise, let default Link behavior handle it
+  };
+
+  const handleRefresh = async () => {
+    // Refetch all queries that should be refreshed
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['status'] }),
+      queryClient.refetchQueries({ queryKey: ['schedulerHistory'] }),
+      queryClient.refetchQueries({ queryKey: ['runPreview'] }),
+      queryClient.refetchQueries({ queryKey: ['stats'] }),
+    ]);
+    toast.success('Refreshed');
   };
 
   return (
@@ -40,6 +54,11 @@ function NavigationLinks() {
             <GearIcon /> Settings
           </Link>
         </Button>
+        <Tooltip content="Refresh app">
+          <Button variant="ghost" onClick={handleRefresh}>
+            <ReloadIcon /> Refresh
+          </Button>
+        </Tooltip>
       </Flex>
     </>
   );
