@@ -136,7 +136,7 @@ The application uses Winston for structured logging with organized, color-coded 
 - `GET /api/status/scheduler/history` – Get scheduler run history
 - `POST /api/status/scheduler/history/clear` – Clear scheduler run history
 - `POST /api/search/run` – Run the search for all configured instances
-- `POST /api/search/manual-run` – Preview what would be searched for each instance
+- `POST /api/search/run-preview` – Preview what would be searched for each instance
 - `GET /api/stats` – Get aggregated trigger statistics
 - `POST /api/stats/reset` – Reset all statistics
 - `POST /api/stats/clear-recent` – Clear the list of recent triggers

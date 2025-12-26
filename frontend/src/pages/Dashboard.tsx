@@ -59,9 +59,9 @@ function Dashboard() {
 
   // Fetch run preview
   const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
-    queryKey: ['manualRunPreview'],
+    queryKey: ['runPreview'],
     queryFn: async () => {
-      const response = await axios.post('/api/search/manual-run');
+      const response = await axios.post('/api/search/run-preview');
       return response.data;
     },
   });

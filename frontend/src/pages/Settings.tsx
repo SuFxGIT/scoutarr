@@ -190,7 +190,7 @@ function Settings() {
         loadedConfigRef.current = configToSave;
       }
       queryClient.invalidateQueries({ queryKey: ['config'] });
-      queryClient.invalidateQueries({ queryKey: ['manualRunPreview'] });
+      queryClient.invalidateQueries({ queryKey: ['runPreview'] });
       refetchConfig();
     },
     onError: (error: unknown) => {

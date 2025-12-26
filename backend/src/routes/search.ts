@@ -545,7 +545,7 @@ async function processManualRunInstances(
 }
 
 // Get items that would be searched (run preview)
-searchRouter.post('/manual-run', async (req, res) => {
+searchRouter.post('/run-preview', async (req, res) => {
   logger.info('👀 Starting run preview');
   try {
     const config = configService.getConfig();
