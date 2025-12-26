@@ -34,7 +34,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 
 function Settings() {
   const queryClient = useQueryClient();
-  const { handleNavigation: baseHandleNavigation } = useNavigation();
+  const { handleNavigation: baseHandleNavigation, registerNavigationGuard, unregisterNavigationGuard } = useNavigation();
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
   const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
@@ -125,21 +125,23 @@ function Settings() {
     }
   }, [activeTab]);
 
-  // Handle browser beforeunload event for unsaved changes
+  // Register navigation guard to check for unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const navigationGuard = (path: string) => {
       if (hasUnsavedChanges()) {
-        e.preventDefault();
-        e.returnValue = ''; // Chrome requires returnValue to be set
-        return '';
+        setPendingNavigation(path);
+        setShowUnsavedDialog(true);
+        return false; // Block navigation
       }
+      return true; // Allow navigation
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    registerNavigationGuard(navigationGuard);
+
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      unregisterNavigationGuard();
     };
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, registerNavigationGuard, unregisterNavigationGuard]);
 
   // Save config mutation with validation
   const saveConfigMutation = useMutation({

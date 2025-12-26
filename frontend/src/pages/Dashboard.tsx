@@ -73,7 +73,7 @@ function Dashboard() {
   });
 
   // Fetch run preview - load from database on mount
-  const { data: manualRunResults, refetch: refetchPreview } = useQuery<SearchResults>({
+  const { data: manualRunResults } = useQuery<SearchResults>({
     queryKey: ['runPreview'],
     queryFn: async () => {
       // Try to get cached preview from database

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
@@ -6,17 +6,12 @@ import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 
 function NavigationLinks() {
-  const location = useLocation();
   const { handleNavigation } = useNavigation();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    // Only intercept if we're navigating away from settings
-    if (location.pathname === '/settings' && path !== '/settings') {
-      e.preventDefault();
-      handleNavigation(path);
-      return;
-    }
-    // Otherwise, let default Link behavior handle it
+    // Always intercept navigation to allow guards to check
+    e.preventDefault();
+    handleNavigation(path);
   };
 
   return (
