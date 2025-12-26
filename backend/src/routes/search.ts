@@ -460,11 +460,9 @@ searchRouter.post('/run', async (req, res) => {
         results,
         success: true
       });
-      logger.debug('✅ Manual run recorded in history');
     } catch (historyError: unknown) {
-      const errorMessage = historyError instanceof Error ? historyError.message : 'Unknown error';
       logger.warn('⚠️  Failed to record manual run in scheduler history', {
-        error: errorMessage
+        error: historyError instanceof Error ? historyError.message : 'Unknown error'
       });
     }
 
@@ -472,11 +470,9 @@ searchRouter.post('/run', async (req, res) => {
     logger.debug('📤 Sending notifications for manual run');
     try {
       await notificationService.sendNotifications(results, true);
-      logger.debug('✅ Notifications sent for manual run');
     } catch (notificationError: unknown) {
-      const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-      logger.warn('⚠️  Failed to send notifications for manual run', {
-        error: errorMessage
+      logger.warn('⚠️  Failed to send notifications', {
+        error: notificationError instanceof Error ? notificationError.message : 'Unknown error'
       });
     }
 
@@ -497,9 +493,8 @@ searchRouter.post('/run', async (req, res) => {
         error: errorMessage
       });
     } catch (historyError: unknown) {
-      const errorMessage = historyError instanceof Error ? historyError.message : 'Unknown error';
-      logger.debug('Failed to record failed manual run in scheduler history', {
-        error: errorMessage
+      logger.warn('⚠️  Failed to record failed manual run in scheduler history', {
+        error: historyError instanceof Error ? historyError.message : 'Unknown error'
       });
     }
 
@@ -507,13 +502,15 @@ searchRouter.post('/run', async (req, res) => {
     try {
       await notificationService.sendNotifications({}, false, errorMessage);
     } catch (notificationError: unknown) {
-      const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-      logger.debug('Failed to send failure notifications', {
-        error: errorMessage
+      logger.warn('⚠️  Failed to send failure notifications', {
+        error: notificationError instanceof Error ? notificationError.message : 'Unknown error'
       });
     }
 
-    res.status(500).json({ error: errorMessage });
+    res.status(500).json({
+      error: 'Search operation failed',
+      message: errorMessage
+    });
   }
 });
 
@@ -638,6 +635,9 @@ searchRouter.post('/manual-run', async (req, res) => {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
     });
-    res.status(500).json({ error: errorMessage });
+    res.status(500).json({
+      error: 'Manual run preview failed',
+      message: errorMessage
+    });
   }
 });

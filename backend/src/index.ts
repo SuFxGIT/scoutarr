@@ -47,8 +47,8 @@ app.get('*', (req, res) => {
 // Initialize services and start server
 let server: Server | null = null;
 
-logger.info('🚀 Starting application initialization', { 
-  port: PORT, 
+logger.info('🚀 Starting application initialization', {
+  port: PORT,
   environment: process.env.NODE_ENV || 'development',
   nodeVersion: process.version
 });

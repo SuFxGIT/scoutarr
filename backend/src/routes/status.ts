@@ -4,6 +4,7 @@ import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config.js';
+import { handleRouteError } from '../utils/errorUtils.js';
 
 export const statusRouter = express.Router();
 
@@ -37,8 +38,8 @@ statusRouter.get('/', async (req, res) => {
   logger.debug('📊 Status check requested');
   try {
     const config = configService.getConfig();
-    logger.debug('📋 Checking status for all applications', { 
-      appTypes: APP_TYPES.length 
+    logger.debug('📋 Checking status for all applications', {
+      appTypes: APP_TYPES.length
     });
     const status: StatusResponse = {};
 
@@ -50,10 +51,8 @@ statusRouter.get('/', async (req, res) => {
     ): Promise<InstanceStatus> => {
       // Check if configured (has URL and API key)
       const isConfigured = !!(appConfig.url && appConfig.apiKey);
-      
+
       if (!isConfigured) {
-        const displayName = instanceName || appType;
-        logger.debug(`⚠️  ${displayName} not configured (missing URL or API key)`);
         return { connected: false, configured: false };
       }
       
@@ -139,9 +138,7 @@ statusRouter.get('/', async (req, res) => {
     });
     res.json(status);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Status check failed', { error: errorMessage });
-    res.status(500).json({ error: errorMessage });
+    handleRouteError(res, error, 'Status check failed');
   }
 });
 
@@ -151,9 +148,7 @@ statusRouter.get('/scheduler/history', async (req, res) => {
     const history = schedulerService.getHistory();
     res.json(history);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to get scheduler history', { error: errorMessage });
-    res.status(500).json({ error: errorMessage });
+    handleRouteError(res, error, 'Failed to get scheduler history');
   }
 });
 
@@ -163,8 +158,6 @@ statusRouter.post('/scheduler/history/clear', async (req, res) => {
     schedulerService.clearHistory();
     res.json({ success: true });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to clear scheduler history', { error: errorMessage });
-    res.status(500).json({ error: errorMessage });
+    handleRouteError(res, error, 'Failed to clear scheduler history');
   }
 });

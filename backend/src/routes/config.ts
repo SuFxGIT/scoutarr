@@ -5,6 +5,7 @@ import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
+import { handleRouteError, getErrorMessage } from '../utils/errorUtils.js';
 import logger from '../utils/logger.js';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -32,9 +33,9 @@ async function clearLogs(): Promise<void> {
       logger.debug(`Deleted log file: ${logFile}`);
     } catch (error: unknown) {
       // If file doesn't exist, that's okay - just log and continue
-      const fileError = error as { code?: string; message?: string };
-      if (fileError.code !== 'ENOENT') {
-        logger.warn(`Failed to delete log file ${logFile}: ${fileError.message || 'Unknown error'}`);
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code !== 'ENOENT') {
+        logger.warn(`Failed to delete log file ${logFile}: ${getErrorMessage(error)}`);
       }
     }
   }
@@ -47,9 +48,7 @@ configRouter.get('/', async (req, res) => {
     const config = configService.getConfig();
     res.json(config);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to load config', { error: errorMessage });
-    res.status(500).json({ error: 'Failed to load config' });
+    handleRouteError(res, error, 'Failed to load config');
   }
 });
 
@@ -75,9 +74,7 @@ configRouter.post('/reset-app', async (_req, res) => {
     logger.info('✅ App reset completed - all data cleared');
     res.json({ success: true, config });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to reset app', { error: errorMessage });
-    res.status(500).json({ error: 'Failed to reset app' });
+    handleRouteError(res, error, 'Failed to reset app');
   }
 });
 
@@ -127,9 +124,7 @@ configRouter.put('/', async (req, res) => {
     logger.info('✅ Config update completed', { cacheInvalidations });
     res.json({ success: true });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to save config', { error: errorMessage });
-    res.status(500).json({ error: 'Failed to save config' });
+    handleRouteError(res, error, 'Failed to save config');
   }
 });
 
@@ -196,14 +191,7 @@ configRouter.post('/test/:app', async (req, res) => {
       });
     }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`❌ Connection test failed for ${app}`, {
-      error: errorMessage
-    });
-    res.status(500).json({
-      error: 'Connection test failed',
-      message: errorMessage
-    });
+    handleRouteError(res, error, 'Connection test failed');
   }
 });
 
@@ -238,8 +226,7 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
       const service = getServiceForApp(app as AppType);
       profiles = await service.getQualityProfiles(instanceConfig);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return res.status(400).json({ error: errorMessage });
+      return res.status(400).json({ error: getErrorMessage(error) });
     }
 
     // Cache only id and name from profiles
@@ -255,14 +242,7 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
     res.json(profiles);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`❌ Failed to fetch quality profiles for ${app} instance ${instanceId}`, {
-      error: errorMessage
-    });
-    res.status(500).json({ 
-      error: 'Failed to fetch quality profiles',
-      message: errorMessage 
-    });
+    handleRouteError(res, error, 'Failed to fetch quality profiles');
   }
 });
 
@@ -311,8 +291,7 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
       const service = getServiceForApp(app as AppType);
       profiles = await service.getQualityProfiles(tempConfig);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return res.status(400).json({ error: errorMessage });
+      return res.status(400).json({ error: getErrorMessage(error) });
     }
 
     // Cache only id and name from profiles if instanceId is provided
@@ -330,14 +309,7 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`);
     res.json(profiles);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`❌ Failed to fetch quality profiles for ${app}`, {
-      error: errorMessage
-    });
-    res.status(500).json({ 
-      error: 'Failed to fetch quality profiles',
-      message: errorMessage 
-    });
+    handleRouteError(res, error, 'Failed to fetch quality profiles');
   }
 });
 
@@ -348,14 +320,7 @@ configRouter.get('/quality-profiles', async (_req, res) => {
     const cachedProfiles = qualityProfilesCacheService.getAllCachedProfiles();
     res.json(cachedProfiles);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('❌ Failed to fetch cached quality profiles', {
-      error: errorMessage
-    });
-    res.status(500).json({ 
-      error: 'Failed to fetch cached quality profiles',
-      message: errorMessage 
-    });
+    handleRouteError(res, error, 'Failed to fetch cached quality profiles');
   }
 });
 
@@ -403,9 +368,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     try {
       tagId = await service.getTagId(instanceConfig, instanceConfig.tagName);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to get tag ID`, { error: errorMessage, tagName: instanceConfig.tagName });
-      return res.status(400).json({ error: errorMessage });
+      return res.status(400).json({ error: getErrorMessage(error) });
     }
 
     if (tagId === null) {
@@ -422,9 +385,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       allMedia = await service.getAllMedia(instanceConfig);
       logger.debug(`✅ Fetched ${allMedia.length} media items`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to fetch media`, { error: errorMessage });
-      return res.status(400).json({ error: errorMessage });
+      return res.status(400).json({ error: getErrorMessage(error) });
     }
 
     // Filter media that has the tag
@@ -449,9 +410,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       await service.removeTagFromMedia(instanceConfig, mediaIds, tagId);
       logger.debug(`✅ Tag removal request completed`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`❌ Failed to remove tag from media`, { error: errorMessage });
-      return res.status(400).json({ error: errorMessage });
+      return res.status(400).json({ error: getErrorMessage(error) });
     }
 
     // Get media type name for logging
@@ -464,20 +423,12 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       tagId,
       count: mediaIds.length
     });
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `Cleared tag from ${mediaIds.length} ${mediaTypeName}`,
       count: mediaIds.length
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`❌ Failed to clear tags for ${app} instance ${instanceId}`, {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    res.status(500).json({ 
-      error: 'Failed to clear tags',
-      message: errorMessage 
-    });
+    handleRouteError(res, error, 'Failed to clear tags');
   }
 });

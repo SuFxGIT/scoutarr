@@ -25,7 +25,6 @@ import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import axios from 'axios';
 import type { Config } from '../types/config';
-import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
 import type { StatusResponse } from '../types/api';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
