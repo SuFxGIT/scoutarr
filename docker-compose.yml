@@ -12,7 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - TZ=Asia/Kuwait
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
     networks:
       - scoutarr-network
 
