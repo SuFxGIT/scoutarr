@@ -11,6 +11,7 @@ import {
   Tooltip,
   Spinner,
   Box,
+  Select,
 } from '@radix-ui/themes';
 import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +32,7 @@ function Dashboard() {
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<Stats['recentTriggers'][number] | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   // Fetch config to get instance names
   const { data: config } = useQuery<Config>({
@@ -591,67 +593,115 @@ function Dashboard() {
         })()}
 
         {stats && (() => {
-          const recentTriggers = stats.recentTriggers || [];
-          const totalItems = recentTriggers.length;
+          const allTriggers = stats.recentTriggers || [];
+
+          // Filter by date
+          const now = new Date();
+          const filteredTriggers = allTriggers.filter(trigger => {
+            const triggerDate = new Date(trigger.timestamp);
+            switch (dateFilter) {
+              case 'today':
+                return triggerDate.toDateString() === now.toDateString();
+              case 'week':
+                const weekAgo = new Date(now);
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                return triggerDate >= weekAgo;
+              case 'month':
+                const monthAgo = new Date(now);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                return triggerDate >= monthAgo;
+              default:
+                return true;
+            }
+          });
+
+          const totalItems = filteredTriggers.length;
           const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
           const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
           const endIndex = startIndex + ITEMS_PER_PAGE;
-          const currentItems = recentTriggers.slice(startIndex, endIndex);
-          
+          const currentItems = filteredTriggers.slice(startIndex, endIndex);
+
           return (
             <Card>
-              <Flex direction="column" gap="2">
-                <Flex align="center" justify="between">
+              <Flex direction="column" gap="3">
+                <Flex align="center" justify="between" wrap="wrap" gap="3">
                   <Heading size="5">Recent Triggers</Heading>
-                  {totalItems > 0 && totalPages > 1 && (
-                    <Text size="2" color="gray">
-                      Page {currentPage} of {totalPages} ({totalItems} total)
-                    </Text>
-                  )}
+                  <Flex align="center" gap="3">
+                    <Flex align="center" gap="2">
+                      <Text size="2" weight="medium">Filter:</Text>
+                      <Select.Root value={dateFilter} onValueChange={(value) => {
+                        setDateFilter(value as typeof dateFilter);
+                        setCurrentPage(1);
+                      }}>
+                        <Select.Trigger style={{ minWidth: '120px' }} />
+                        <Select.Content position="popper" sideOffset={5}>
+                          <Select.Item value="all">All Time</Select.Item>
+                          <Select.Item value="today">Today</Select.Item>
+                          <Select.Item value="week">Last 7 Days</Select.Item>
+                          <Select.Item value="month">Last 30 Days</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </Flex>
+                    {totalItems > 0 && (
+                      <Text size="2" color="gray">
+                        {totalItems} {totalItems === 1 ? 'trigger' : 'triggers'}
+                      </Text>
+                    )}
+                  </Flex>
                 </Flex>
                 <Separator />
                 {totalItems === 0 ? (
-                  <Text size="2" color="gray" style={{ textAlign: 'center', padding: '1rem' }}>
-                    No recent triggers yet
-                  </Text>
+                  <Box p="4">
+                    <Text size="2" color="gray" align="center">
+                      {dateFilter === 'all' ? 'No recent triggers yet' : `No triggers found for ${dateFilter === 'today' ? 'today' : dateFilter === 'week' ? 'the last 7 days' : 'the last 30 days'}`}
+                    </Text>
+                  </Box>
                 ) : (
                   <>
-                    <Flex direction="column" gap="1" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <Flex direction="column" gap="0">
                       {currentItems.map((trigger, idx) => {
                         const timestamp = new Date(trigger.timestamp);
-                        const appName = trigger.instance 
+                        const appName = trigger.instance
                           ? `${trigger.application} (${trigger.instance})`
                           : trigger.application;
                         const itemsPreview = trigger.items.length > 0
-                          ? trigger.items.slice(0, 2).map(i => i.title).join(', ') + (trigger.items.length > 2 ? ` +${trigger.items.length - 2}` : '')
+                          ? trigger.items.slice(0, 3).map(i => i.title).join(', ') + (trigger.items.length > 3 ? ` +${trigger.items.length - 3} more` : '')
                           : 'No items';
-                        
+
                         return (
-                          <Flex 
-                            key={idx} 
-                            align="center" 
-                            gap="2" 
-                            style={{ 
-                              padding: '0.5rem',
+                          <Box
+                            key={idx}
+                            py="2"
+                            px="3"
+                            style={{
                               borderBottom: idx < currentItems.length - 1 ? '1px solid var(--gray-6)' : 'none',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s'
                             }}
                             onClick={() => setSelectedTrigger(trigger)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-2)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
-                            <AppIcon app={trigger.application} size={16} variant="light" />
-                            <Badge size="1" style={{ textTransform: 'capitalize', minWidth: '60px', textAlign: 'center' }}>
-                              {appName}
-                            </Badge>
-                            <Text size="2" weight="medium" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {itemsPreview}
-                            </Text>
-                            <Text size="1" color="gray" style={{ minWidth: '120px', textAlign: 'right' }}>
-                              {format(timestamp, 'PPp')}
-                            </Text>
-                            <Text size="1" color="gray" style={{ minWidth: '50px', textAlign: 'right' }}>
-                              {trigger.count} {trigger.count === 1 ? 'item' : 'items'}
-                            </Text>
-                          </Flex>
+                            <Flex align="center" gap="3" justify="between">
+                              <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0 }}>
+                                <AppIcon app={trigger.application} size={16} variant="light" />
+                                <Badge size="1" style={{ textTransform: 'capitalize', flexShrink: 0 }}>
+                                  {appName}
+                                </Badge>
+                                <Text size="2" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {itemsPreview}
+                                </Text>
+                              </Flex>
+                              <Flex align="center" gap="3" style={{ flexShrink: 0 }}>
+                                <Text size="2" color="gray">
+                                  {trigger.count} {trigger.count === 1 ? 'item' : 'items'}
+                                </Text>
+                                <Text size="2" color="gray" style={{ minWidth: '140px', textAlign: 'right' }}>
+                                  {format(timestamp, 'PPp')}
+                                </Text>
+                              </Flex>
+                            </Flex>
+                          </Box>
                         );
                       })}
                     </Flex>
