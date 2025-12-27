@@ -4,6 +4,7 @@ import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { ThemeToggle } from './components/ThemeToggle';
 
 function NavigationLinks() {
   const { handleNavigation } = useNavigation();
@@ -26,7 +27,7 @@ function NavigationLinks() {
           <Heading size="8" m="0">scoutarr</Heading>
         </Flex>
       </Link>
-      <Flex gap="3">
+      <Flex gap="3" align="center">
         <Button variant="ghost" asChild>
           <Link to="/" onClick={(e) => handleLinkClick(e, '/')}>
             <HomeIcon /> Home
@@ -37,6 +38,7 @@ function NavigationLinks() {
             <GearIcon /> Settings
           </Link>
         </Button>
+        <ThemeToggle />
       </Flex>
     </>
   );
