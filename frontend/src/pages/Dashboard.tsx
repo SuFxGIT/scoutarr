@@ -10,12 +10,12 @@ import {
   Dialog,
   Tooltip,
   Spinner,
+  Box,
 } from '@radix-ui/themes';
 import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import humanizeDuration from 'humanize-duration';
-import ReactPaginate from 'react-paginate';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
@@ -484,7 +484,7 @@ function Dashboard() {
   };
 
   return (
-    <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
+    <Box width="100%" pt="0" mt="0">
       <Flex direction="column" gap="3">
         {renderAutomaticRunPreview()}
 
@@ -541,42 +541,42 @@ function Dashboard() {
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Flex align="center" gap="2">
                         <AppIcon app="lidarr" size={20} variant="light" />
-                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Lidarr</Text>
+                        <Text size="2" color="gray" align="center">Lidarr</Text>
                       </Flex>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{lidarrTotal}</Heading>
+                      <Heading size="7" align="center">{lidarrTotal}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Flex align="center" gap="2">
                         <AppIcon app="radarr" size={20} variant="light" />
-                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Radarr</Text>
+                        <Text size="2" color="gray" align="center">Radarr</Text>
                       </Flex>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{radarrTotal}</Heading>
+                      <Heading size="7" align="center">{radarrTotal}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" style={{ textAlign: 'center' }}>Total Triggered</Text>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{stats.totalTriggers}</Heading>
+                      <Text size="2" color="gray" align="center">Total Triggered</Text>
+                      <Heading size="7" align="center">{stats.totalTriggers}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Flex align="center" gap="2">
                         <AppIcon app="sonarr" size={20} variant="light" />
-                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Sonarr</Text>
+                        <Text size="2" color="gray" align="center">Sonarr</Text>
                       </Flex>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{sonarrTotal}</Heading>
+                      <Heading size="7" align="center">{sonarrTotal}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
                       <Flex align="center" gap="2">
                         <AppIcon app="readarr" size={20} variant="light" />
-                        <Text size="2" color="gray" style={{ textAlign: 'center' }}>Readarr</Text>
+                        <Text size="2" color="gray" align="center">Readarr</Text>
                       </Flex>
-                      <Heading size="7" style={{ textAlign: 'center' }}>{readarrTotal}</Heading>
+                      <Heading size="7" align="center">{readarrTotal}</Heading>
                     </Flex>
                   </Card>
                 </Flex>
@@ -665,23 +665,63 @@ function Dashboard() {
                         >
                           <ChevronLeftIcon /> Previous
                         </Button>
-                        <ReactPaginate
-                          pageCount={totalPages}
-                          pageRangeDisplayed={5}
-                          marginPagesDisplayed={2}
-                          onPageChange={({ selected }) => setCurrentPage(selected + 1)}
-                          forcePage={currentPage - 1}
-                          containerClassName="pagination"
-                          activeClassName="active"
-                          previousLabel={null}
-                          nextLabel={null}
-                          breakLabel={<Text size="2" style={{ padding: '0.5rem' }}>...</Text>}
-                          pageClassName="page-item"
-                          pageLinkClassName="page-link"
-                          breakClassName="page-item break-item"
-                          disabledClassName="disabled"
-                          renderOnZeroPageCount={null}
-                        />
+                        <Flex gap="1" align="center">
+                          {(() => {
+                            const pages = [];
+                            const pageRangeDisplayed = 5;
+                            const marginPagesDisplayed = 2;
+
+                            // Helper to add page button
+                            const addPageButton = (page: number) => (
+                              <Button
+                                key={page}
+                                variant={currentPage === page ? 'solid' : 'soft'}
+                                size="2"
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </Button>
+                            );
+
+                            // Helper to add ellipsis
+                            const addEllipsis = (key: string) => (
+                              <Text key={key} size="2" style={{ padding: '0 0.5rem' }}>...</Text>
+                            );
+
+                            // Always show first pages
+                            for (let i = 1; i <= Math.min(marginPagesDisplayed, totalPages); i++) {
+                              pages.push(addPageButton(i));
+                            }
+
+                            // Calculate range around current page
+                            const rangeStart = Math.max(marginPagesDisplayed + 1, currentPage - Math.floor(pageRangeDisplayed / 2));
+                            const rangeEnd = Math.min(totalPages - marginPagesDisplayed, currentPage + Math.floor(pageRangeDisplayed / 2));
+
+                            // Add ellipsis before range if needed
+                            if (rangeStart > marginPagesDisplayed + 1) {
+                              pages.push(addEllipsis('ellipsis-start'));
+                            }
+
+                            // Add pages in range
+                            for (let i = rangeStart; i <= rangeEnd; i++) {
+                              if (i > marginPagesDisplayed && i <= totalPages - marginPagesDisplayed) {
+                                pages.push(addPageButton(i));
+                              }
+                            }
+
+                            // Add ellipsis after range if needed
+                            if (rangeEnd < totalPages - marginPagesDisplayed) {
+                              pages.push(addEllipsis('ellipsis-end'));
+                            }
+
+                            // Always show last pages
+                            for (let i = Math.max(totalPages - marginPagesDisplayed + 1, marginPagesDisplayed + 1); i <= totalPages; i++) {
+                              pages.push(addPageButton(i));
+                            }
+
+                            return pages;
+                          })()}
+                        </Flex>
                         <Button
                           variant="outline"
                           size="2"
@@ -785,7 +825,7 @@ function Dashboard() {
           </Dialog.Content>
         </Dialog.Root>
       </Flex>
-    </div>
+    </Box>
   );
 }
 

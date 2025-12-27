@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Flex, Heading, Button, Separator } from '@radix-ui/themes';
+import { Flex, Heading, Button, Separator, Box } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
@@ -16,13 +16,15 @@ function NavigationLinks() {
 
   return (
     <>
-      <Link 
-        to="/" 
-        style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem' }}
+      <Link
+        to="/"
+        style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
         onClick={(e) => handleLinkClick(e, '/')}
       >
-        <img src="/headerlogo.png" alt="scoutarr" style={{ height: '2.5rem' }} />
-        <Heading size="8" style={{ margin: 0 }}>scoutarr</Heading>
+        <Flex align="center" gap="3">
+          <img src="/headerlogo.png" alt="scoutarr" style={{ height: '2.5rem' }} />
+          <Heading size="8" m="0">scoutarr</Heading>
+        </Flex>
       </Link>
       <Flex gap="3">
         <Button variant="ghost" asChild>
@@ -42,20 +44,20 @@ function NavigationLinks() {
 
 function AppContent() {
   return (
-    <Flex direction="column" style={{ minHeight: '100vh' }} align="center">
-      <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem 1rem 0 1rem' }}>
+    <Flex direction="column" minHeight="100vh" align="center">
+      <Box maxWidth="1200px" width="100%" pt="4" px="4">
         <Flex align="center" justify="between" mb="2">
           <NavigationLinks />
         </Flex>
         <Separator size="4" mb="0" />
-      </div>
+      </Box>
 
-      <div style={{ maxWidth: '1200px', width: '100%', padding: '1rem', margin: '0 auto' }}>
+      <Box maxWidth="1200px" width="100%" p="4" mx="auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
-      </div>
+      </Box>
     </Flex>
   );
 }

@@ -15,7 +15,9 @@ import {
   Spinner,
   Grid,
   Tooltip,
-  AlertDialog
+  AlertDialog,
+  Link,
+  Box
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
@@ -717,9 +719,10 @@ function Settings() {
                     placeholder="0 */6 * * *"
                   />
                   <Text size="1" color="gray">
-                    <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
-                      Need help? Visit crontab.guru →
-                    </a>
+                    Need help?{' '}
+                    <Link href="https://crontab.guru/" target="_blank">
+                      Visit crontab.guru →
+                    </Link>
                   </Text>
                 </Flex>
               )}
@@ -731,7 +734,7 @@ function Settings() {
   };
 
   return (
-    <div style={{ width: '100%', paddingTop: 0, marginTop: 0 }}>
+    <Box width="100%" pt="0" mt="0">
       <Flex direction="column" gap="3">
         <Tabs.Root value={activeTab} onValueChange={handleTabChange}>
           <Flex align="center" justify="between" gap="3">
@@ -821,21 +824,14 @@ function Settings() {
                           setExpandedInstances(newExpanded);
                         }}>
                           <Collapsible.Trigger asChild>
-                            <div 
-                              style={{ 
-                                width: '100%', 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center', 
-                                padding: '0.75rem', 
-                                marginBottom: '0', 
-                                cursor: 'pointer',
-                                userSelect: 'none',
-                                WebkitUserSelect: 'none'
-                              }}
+                            <Box
+                              width="100%"
+                              p="3"
+                              mb="0"
+                              style={{ cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Flex align="center" gap="2" style={{ width: '100%', justifyContent: 'space-between' }}>
+                              <Flex align="center" gap="2" width="100%" justify="between">
                                 <Flex align="center" gap="2">
                                   <AppIcon app={selectedAppType} size={18} variant="light" />
                                   <Text size="3" weight="bold">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
@@ -884,7 +880,7 @@ function Settings() {
                                   {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
                                 </Flex>
                               </Flex>
-                            </div>
+                            </Box>
                           </Collapsible.Trigger>
                           
                           <Collapsible.Content style={{ overflow: 'hidden' }}>
@@ -1405,9 +1401,10 @@ function Settings() {
                         placeholder="0 */6 * * *"
                       />
                       <Text size="1" color="gray">
-                        <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
-                          Need help? Visit crontab.guru →
-                        </a>
+                        Need help?{' '}
+                        <Link href="https://crontab.guru/" target="_blank">
+                          Visit crontab.guru →
+                        </Link>
                       </Text>
                     </Flex>
                   )}
@@ -1526,7 +1523,7 @@ function Settings() {
           </Flex>
         </AlertDialog.Content>
       </AlertDialog.Root>
-    </div>
+    </Box>
   );
 }
 
