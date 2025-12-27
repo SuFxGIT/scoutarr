@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Flex, 
-  Heading, 
-  Button, 
-  Card, 
-  Text, 
+import {
+  Flex,
+  Heading,
+  Button,
+  Card,
+  Text,
   Badge,
   Separator,
   Dialog,
   Tooltip,
+  Spinner,
 } from '@radix-ui/themes';
 import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -182,29 +183,51 @@ function Dashboard() {
     },
   });
 
+  // Mutation for generating run preview
+  const runPreviewMutation = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post('/api/search/run-preview');
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['runPreview'], data);
+      setShowPreviewDialog(true);
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to generate preview: ' + getErrorMessage(error));
+    },
+  });
+
   // Render confirmation buttons for clear actions
   const renderConfirmButtons = (type: 'stats' | 'recent', onConfirm: () => void) => {
     if (confirmingClear !== type) return null;
-    
+
+    const isPending = (type === 'stats' && clearStatsMutation.isPending) ||
+                      (type === 'recent' && clearRecentMutation.isPending);
+
     return (
       <Flex gap="2" align="center">
         <Text size="2" color="gray">Are you sure?</Text>
-        <Button 
-          variant="solid" 
+        <Button
+          variant="solid"
           color="red"
-          size="2" 
+          size="2"
           onClick={onConfirm}
-          disabled={
-            (type === 'stats' && clearStatsMutation.isPending) ||
-            (type === 'recent' && clearRecentMutation.isPending)
-          }
+          disabled={isPending}
         >
-          Confirm
+          {isPending ? (
+            <>
+              <Spinner size="1" /> Clearing...
+            </>
+          ) : (
+            'Confirm'
+          )}
         </Button>
-        <Button 
-          variant="outline" 
-          size="2" 
+        <Button
+          variant="outline"
+          size="2"
           onClick={() => setConfirmingClear(null)}
+          disabled={isPending}
         >
           Cancel
         </Button>
@@ -349,70 +372,70 @@ function Dashboard() {
     );
 
     return (
-      <Card mb="4">
-        <Flex align="center" justify="between" mb="3">
-          <Flex align="center" gap="2">
-            <Heading size="5">Logs</Heading>
-            {schedulerStatus && 'enabled' in schedulerStatus && (
-              <Badge 
-                color={
-                  schedulerStatus.enabled && schedulerStatus.running
-                    ? 'green'
-                    : schedulerStatus.enabled
-                    ? 'yellow'
-                    : 'gray'
-                }
-                size="2"
-              >
-                Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
-              </Badge>
-            )}
-          </Flex>
-          <Flex gap="3">
-            <Tooltip content="Trigger a search run immediately using the current configuration.">
-              <span>
-                <Button 
-                  size="2" 
-                  onClick={() => runSearchMutation.mutate()} 
-                  disabled={runSearchMutation.isPending}
-                >
-                  <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
-                </Button>
-              </span>
-            </Tooltip>
-            <Tooltip content="Generate and preview what will be searched in the next run.">
-              <Button
-                size="2"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    // Generate new preview and store in database
-                    const response = await axios.post('/api/search/run-preview');
-                    queryClient.setQueryData(['runPreview'], response.data);
-                    setShowPreviewDialog(true);
-                  } catch (error: unknown) {
-                    toast.error('Failed to generate preview: ' + getErrorMessage(error));
+      <Card>
+        <Flex direction="column" gap="3">
+          <Flex align="center" justify="between">
+            <Flex align="center" gap="2">
+              <Heading size="5">Logs</Heading>
+              {schedulerStatus && 'enabled' in schedulerStatus && (
+                <Badge
+                  color={
+                    schedulerStatus.enabled && schedulerStatus.running
+                      ? 'green'
+                      : schedulerStatus.enabled
+                      ? 'yellow'
+                      : 'gray'
                   }
-                }}
-              >
-                Next Run Preview
-              </Button>
-            </Tooltip>
-            <Tooltip content="Clear log history.">
-              <span>
-                <Button 
-                  variant="outline" 
-                  size="2" 
-                  onClick={() => clearHistoryMutation.mutate()}
-                  disabled={clearHistoryMutation.isPending}
+                  size="2"
                 >
-                  <TrashIcon />
+                  Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              )}
+            </Flex>
+            <Flex gap="3">
+              <Tooltip content="Trigger a search run immediately using the current configuration.">
+                <span>
+                  <Button
+                    size="2"
+                    onClick={() => runSearchMutation.mutate()}
+                    disabled={runSearchMutation.isPending}
+                  >
+                    <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip content="Generate and preview what will be searched in the next run.">
+                <Button
+                  size="2"
+                  variant="outline"
+                  onClick={() => runPreviewMutation.mutate()}
+                  disabled={runPreviewMutation.isPending}
+                >
+                  {runPreviewMutation.isPending ? (
+                    <>
+                      <Spinner size="1" /> Generating...
+                    </>
+                  ) : (
+                    'Next Run Preview'
+                  )}
                 </Button>
-              </span>
-            </Tooltip>
+              </Tooltip>
+              <Tooltip content="Clear log history.">
+                <span>
+                  <Button
+                    variant="outline"
+                    size="2"
+                    onClick={() => clearHistoryMutation.mutate()}
+                    disabled={clearHistoryMutation.isPending}
+                  >
+                    <TrashIcon />
+                  </Button>
+                </span>
+              </Tooltip>
+            </Flex>
           </Flex>
-        </Flex>
-        <Card variant="surface" style={{ backgroundColor: LOG_BG_COLOR, fontFamily: 'monospace' }}>
+          <Separator />
+          <Card variant="surface" style={{ backgroundColor: LOG_BG_COLOR, fontFamily: 'monospace' }}>
           <div
             ref={logContainerRef}
             style={{
@@ -455,6 +478,7 @@ function Dashboard() {
             )}
           </div>
         </Card>
+        </Flex>
       </Card>
     );
   };
