@@ -98,6 +98,11 @@ function Settings() {
 
   // Confirm navigation/tab change (discard changes)
   const confirmDiscardChanges = useCallback(() => {
+    // Reset config to the loaded state to discard changes
+    if (loadedConfigRef.current) {
+      setConfig(loadedConfigRef.current);
+    }
+
     if (pendingNavigation) {
       baseHandleNavigation(pendingNavigation);
       setPendingNavigation(null);
@@ -1497,7 +1502,11 @@ function Settings() {
       </Flex>
 
       {/* Unsaved Changes Dialog */}
-      <AlertDialog.Root open={showUnsavedDialog}>
+      <AlertDialog.Root open={showUnsavedDialog} onOpenChange={(open) => {
+        if (!open) {
+          cancelDiscardChanges();
+        }
+      }}>
         <AlertDialog.Content maxWidth="450px">
           <AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
           <AlertDialog.Description size="3" mb="4">
