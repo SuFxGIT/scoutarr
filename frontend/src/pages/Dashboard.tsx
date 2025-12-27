@@ -13,7 +13,7 @@ import {
   Box,
   Select,
 } from '@radix-ui/themes';
-import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
+import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import humanizeDuration from 'humanize-duration';
@@ -393,8 +393,20 @@ function Dashboard() {
                   Scheduler: {schedulerStatus.enabled && schedulerStatus.running ? 'Running' : schedulerStatus.enabled ? 'Enabled' : 'Disabled'}
                 </Badge>
               )}
+              <Tooltip content="Refresh the page to update scheduler status and logs.">
+                <QuestionMarkCircledIcon style={{ color: 'var(--gray-9)', cursor: 'help' }} />
+              </Tooltip>
             </Flex>
             <Flex gap="3">
+              <Tooltip content="Refresh the page to update scheduler status and logs.">
+                <Button
+                  size="2"
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
+                  <ReloadIcon /> Refresh
+                </Button>
+              </Tooltip>
               <Tooltip content="Trigger a search run immediately using the current configuration.">
                 <span>
                   <Button
