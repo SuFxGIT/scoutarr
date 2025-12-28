@@ -72,7 +72,6 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
       // Filter by movie status (skip when set to "any")
       // Radarr has special status mapping
       if (config.movieStatus && config.movieStatus !== 'any') {
-        const before = filtered.length;
         filtered = filtered.filter(m => {
           if (config.movieStatus === 'released') {
             return m.status === 'released';

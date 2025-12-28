@@ -45,7 +45,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         name: 'ArtistSearch',
         artistId
       });
-      logger.debug('🔎 Triggered search for artist', { artistId });
+      logger.debug('🔎 Searched for artist', { artistId });
     } catch (error: unknown) {
       this.logError('Failed to search artist', error, { artistId });
       throw error;
@@ -83,11 +83,9 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
 
       // Filter by artist status
       if (config.artistStatus) {
-        const before = filtered.length;
         filtered = filtered.filter(a => a.status === config.artistStatus);
         logger.debug('🔽 Filtered by artist status', {
-          before,
-          after: filtered.length,
+          count: filtered.length,
           status: config.artistStatus
         });
       }

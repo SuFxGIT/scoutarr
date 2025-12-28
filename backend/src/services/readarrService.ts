@@ -45,7 +45,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
         name: 'AuthorSearch',
         authorId
       });
-      logger.debug('🔎 Triggered search for author', { authorId });
+      logger.debug('🔎 Searched for author', { authorId });
     } catch (error: unknown) {
       this.logError('Failed to search author', error, { authorId });
       throw error;
@@ -83,11 +83,9 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
 
       // Filter by author status
       if (config.authorStatus) {
-        const before = filtered.length;
         filtered = filtered.filter(a => a.status === config.authorStatus);
         logger.debug('🔽 Filtered by author status', {
-          before,
-          after: filtered.length,
+          count: filtered.length,
           status: config.authorStatus
         });
       }

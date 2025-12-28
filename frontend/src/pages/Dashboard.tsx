@@ -407,7 +407,7 @@ function Dashboard() {
                   <ReloadIcon /> Refresh
                 </Button>
               </Tooltip>
-              <Tooltip content="Trigger a search run immediately using the current configuration.">
+              <Tooltip content="Start a search run immediately using the current configuration.">
                 <span>
                   <Button
                     size="2"
@@ -462,7 +462,7 @@ function Dashboard() {
           >
             {logs.length === 0 ? (
               <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                No scheduler runs yet. The scheduler will automatically trigger searches based on the schedule.
+                No scheduler runs yet. The scheduler will automatically run searches based on the schedule.
               </Text>
             ) : (
               logs.map((log, idx) => (

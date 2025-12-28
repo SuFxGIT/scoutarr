@@ -16,10 +16,8 @@ export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
   getMediaTitle: (media: TMedia) => string;
   getTagId: (config: TConfig, tagName: string) => Promise<number | null>;
   getQualityProfiles: (config: TConfig) => Promise<Array<{ id: number; name: string }>>;
-  getAllMedia: (config: TConfig) => Promise<TMedia[]>;
   addTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
   removeTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
-  removeTagFromMedia: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
 }
 
 /**
@@ -33,12 +31,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaTitle: (m: RadarrMovie) => radarrService.getMediaTitle(m),
     getTagId: (config: RadarrInstance, tagName: string) => radarrService.getTagId(config, tagName),
     getQualityProfiles: (config: RadarrInstance) => radarrService.getQualityProfiles(config),
-    getAllMedia: (config: RadarrInstance) => radarrService.getMovies(config),
     addTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
       radarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
-      radarrService.removeTag(config, mediaIds, tagId),
-    removeTagFromMedia: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
       radarrService.removeTag(config, mediaIds, tagId)
   },
   sonarr: {
@@ -48,12 +43,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaTitle: (s: SonarrSeries) => sonarrService.getMediaTitle(s),
     getTagId: (config: SonarrInstance, tagName: string) => sonarrService.getTagId(config, tagName),
     getQualityProfiles: (config: SonarrInstance) => sonarrService.getQualityProfiles(config),
-    getAllMedia: (config: SonarrInstance) => sonarrService.getSeries(config),
     addTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
       sonarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
-      sonarrService.removeTag(config, mediaIds, tagId),
-    removeTagFromMedia: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
       sonarrService.removeTag(config, mediaIds, tagId)
   },
   lidarr: {
@@ -63,12 +55,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaTitle: (a: LidarrArtist) => lidarrService.getMediaTitle(a),
     getTagId: (config: LidarrInstance, tagName: string) => lidarrService.getTagId(config, tagName),
     getQualityProfiles: (config: LidarrInstance) => lidarrService.getQualityProfiles(config),
-    getAllMedia: (config: LidarrInstance) => lidarrService.getArtists(config),
     addTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
       lidarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
-      lidarrService.removeTag(config, mediaIds, tagId),
-    removeTagFromMedia: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
       lidarrService.removeTag(config, mediaIds, tagId)
   },
   readarr: {
@@ -78,12 +67,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaTitle: (a: ReadarrAuthor) => readarrService.getMediaTitle(a),
     getTagId: (config: ReadarrInstance, tagName: string) => readarrService.getTagId(config, tagName),
     getQualityProfiles: (config: ReadarrInstance) => readarrService.getQualityProfiles(config),
-    getAllMedia: (config: ReadarrInstance) => readarrService.getAuthors(config),
     addTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
       readarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
-      readarrService.removeTag(config, mediaIds, tagId),
-    removeTagFromMedia: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
       readarrService.removeTag(config, mediaIds, tagId)
   }
 };

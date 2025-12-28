@@ -309,7 +309,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     logger.debug(`📋 Fetching all media from ${app} to find tagged items`);
     let allMedia: any[];
     try {
-      allMedia = await service.getAllMedia(instanceConfig);
+      allMedia = await service.getMedia(instanceConfig);
       logger.debug(`📋 Fetched ${allMedia.length} total media items from ${app}`);
     } catch (error: unknown) {
       logger.error(`❌ Failed to fetch media from ${app}`, { error: getErrorMessage(error) });
@@ -339,7 +339,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     // Remove tag from media based on app type
     logger.debug(`🏷️  Removing tag from media items`, { count: taggedMediaIds.length });
     try {
-      await service.removeTagFromMedia(instanceConfig, taggedMediaIds, tagId);
+      await service.removeTag(instanceConfig, taggedMediaIds, tagId);
       logger.debug(`✅ Tag removal request completed`);
 
       // Clear tracked media records from database after successful removal

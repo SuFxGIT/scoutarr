@@ -47,10 +47,9 @@ class ConfigService {
       await this.loadConfig();
       logger.info('✅ Configuration initialized successfully', { configFile: CONFIG_FILE });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.warn('⚠️  Error initializing config, creating default config', { 
-        error: errorMessage,
-        configFile: CONFIG_FILE 
+      logger.warn('⚠️  Error initializing config, creating default config', {
+        error: getErrorMessage(error),
+        configFile: CONFIG_FILE
       });
       await this.createDefaultConfig();
       await this.loadConfig();

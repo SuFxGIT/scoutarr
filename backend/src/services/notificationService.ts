@@ -33,8 +33,7 @@ class NotificationService {
         logger.debug('✅ Discord notification sent');
       } catch (err: unknown) {
         notificationsFailed++;
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('❌ Failed to send Discord notification', { error: errorMessage });
+        logger.error('❌ Failed to send Discord notification', { error: getErrorMessage(err) });
       }
     } else {
       logger.debug('⏸️  Discord webhook not configured, skipping');
@@ -55,8 +54,7 @@ class NotificationService {
         logger.debug('✅ Notifiarr notification sent');
       } catch (err: unknown) {
         notificationsFailed++;
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('❌ Failed to send Notifiarr notification', { error: errorMessage });
+        logger.error('❌ Failed to send Notifiarr notification', { error: getErrorMessage(err) });
       }
     } else {
       logger.debug('⏸️  Notifiarr webhook not configured, skipping');
@@ -77,8 +75,7 @@ class NotificationService {
         logger.debug('✅ Pushover notification sent');
       } catch (err: unknown) {
         notificationsFailed++;
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('❌ Failed to send Pushover notification', { error: errorMessage });
+        logger.error('❌ Failed to send Pushover notification', { error: getErrorMessage(err) });
       }
     } else {
       logger.debug('⏸️  Pushover not configured, skipping');

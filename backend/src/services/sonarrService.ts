@@ -39,7 +39,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
         name: 'SeriesSearch',
         seriesId
       });
-      logger.debug('🔎 Triggered search for series', { seriesId });
+      logger.debug('🔎 Searched for series', { seriesId });
     } catch (error: unknown) {
       this.logError('Failed to search series', error, { seriesId });
       throw error;
@@ -77,11 +77,9 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
 
       // Filter by series status
       if (config.seriesStatus) {
-        const before = filtered.length;
         filtered = filtered.filter(s => s.status === config.seriesStatus);
         logger.debug('🔽 Filtered by series status', {
-          before,
-          after: filtered.length,
+          count: filtered.length,
           status: config.seriesStatus
         });
       }

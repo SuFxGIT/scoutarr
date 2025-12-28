@@ -9,7 +9,7 @@ import { schedulerService } from '../services/schedulerService.js';
 import { notificationService } from '../services/notificationService.js';
 import logger from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
-import { serviceRegistry, getServiceForApp } from '../utils/serviceRegistry.js';
+import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
 import { FilterableMedia } from '../utils/filterUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
