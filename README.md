@@ -1,6 +1,6 @@
 # scoutarr
 
-Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by triggering manual searches for media items that meet your criteria and tagging what was triggered, so you can continuously chase better quality releases without babysitting your apps.
+Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by performing manual searches for media items that meet your criteria and tagging what was searched, so you can continuously chase better quality releases without babysitting your apps.
 
 > **Note:** This project uses [Upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/tree/main/Upgradinatorr) as its foundation. We've created a modern UI and enhanced the functionality while maintaining the core concept.
 
@@ -19,14 +19,14 @@ Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Li
 
 ## Features
 
-- 🎬 **Radarr Integration** – Automatically trigger focused manual searches for movies
-- 📺 **Sonarr Integration** – Automatically trigger focused manual searches for series
-- 🎵 **Lidarr Integration** – Automatically trigger focused manual searches for music
-- 📚 **Readarr Integration** – Automatically trigger focused manual searches for books
+- 🎬 **Radarr Integration** – Automatically perform focused manual searches for movies
+- 📺 **Sonarr Integration** – Automatically perform focused manual searches for series
+- 🎵 **Lidarr Integration** – Automatically perform focused manual searches for music
+- 📚 **Readarr Integration** – Automatically perform focused manual searches for books
 - 🧠 **Smart Filtering** – Filter by monitored state, movie/series status (including an **Any** option), quality profile, and tags
-- 🏷️ **Tag-Aware Workflow** – Only search untagged items, then tag everything that was triggered to avoid duplicates
+- 🏷️ **Tag-Aware Workflow** – Only search untagged items, then tag everything that was searched to avoid duplicates
 - ⏱️ **Scheduler with Unattended Mode** – Run searches on a schedule; when unattended is enabled, tags are automatically cleared and re-applied when nothing matches, keeping things moving without manual intervention
-- 📊 **Dashboard & Stats** – See recent triggers, per-app/instance totals, and a detailed log of what ran and when
+- 📊 **Dashboard & Stats** – See recent searches, per-app/instance totals, and a detailed log of what ran and when
 - 🔔 **Notification Hooks** – Optional Discord and Notifiarr webhooks for external notifications
 - 🎨 **Modern UI** – Built with Radix UI Themes
 - 🐳 **Docker Support** – Easy deployment with Docker Compose
@@ -95,8 +95,8 @@ Configuration is stored in `config/config.json`. On first run, the application w
 ## How It Works
 
 1. **Configure** – Set up your Radarr, Sonarr, Lidarr, and Readarr instances, filters, and scheduler in the Settings page.
-2. **Preview** – The Dashboard shows a live preview of what the next scheduled run will trigger for each instance.
-3. **Run** – Trigger a search manually from the Dashboard or let the scheduler run automatically.
+2. **Preview** – The Dashboard shows a live preview of what the next scheduled run will search for each instance.
+3. **Run** – Start a search manually from the Dashboard or let the scheduler run automatically.
 4. **Tag** – Items that are searched are automatically tagged, and future runs only consider untagged items (unless unattended mode clears tags to keep searching).
 
 The application filters items based on:
@@ -137,9 +137,9 @@ The application uses Winston for structured logging with organized, color-coded 
 - `POST /api/status/scheduler/history/clear` – Clear scheduler run history
 - `POST /api/search/run` – Run the search for all configured instances
 - `POST /api/search/run-preview` – Preview what would be searched for each instance
-- `GET /api/stats` – Get aggregated trigger statistics
+- `GET /api/stats` – Get aggregated search statistics
 - `POST /api/stats/reset` – Reset all statistics
-- `POST /api/stats/clear-recent` – Clear the list of recent triggers
+- `POST /api/stats/clear-recent` – Clear the list of recent searches
 
 ## License
 

@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from '../components/icons/AppIcon';
-import { fetchMediaLibrary, triggerManualSearch } from '../services/mediaLibraryService';
+import { fetchMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
@@ -46,7 +46,7 @@ function MediaLibrary() {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [sortField, setSortField] = useState<'title' | 'lastTriggered' | 'dateAdded'>('title');
+  const [sortField, setSortField] = useState<'title' | 'lastSearched' | 'dateImported'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -95,7 +95,7 @@ function MediaLibrary() {
   const searchMutation = useMutation({
     mutationFn: async () => {
       if (!instanceInfo) throw new Error('No instance selected');
-      return triggerManualSearch(
+      return searchMedia(
         instanceInfo.appType,
         instanceInfo.instanceId,
         Array.from(selectedMediaIds)
@@ -104,7 +104,7 @@ function MediaLibrary() {
     onSuccess: (data) => {
       toast.success(data.message);
       setSelectedMediaIds(new Set()); // Clear selection
-      refetch(); // Refresh media list to update last triggered dates
+      refetch(); // Refresh media list to update last searched dates
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));
@@ -140,7 +140,7 @@ function MediaLibrary() {
     });
   }, []);
 
-  const handleSort = useCallback((field: 'title' | 'lastTriggered' | 'dateAdded') => {
+  const handleSort = useCallback((field: 'title' | 'lastSearched' | 'dateImported') => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -172,15 +172,15 @@ function MediaLibrary() {
         // Search in quality profile
         if (item.qualityProfileName?.toLowerCase().includes(query)) return true;
 
-        // Search in formatted last triggered date
-        if (item.lastTriggered) {
-          const formattedDate = format(new Date(item.lastTriggered), 'PPp').toLowerCase();
+        // Search in formatted last searched date
+        if (item.lastSearched) {
+          const formattedDate = format(new Date(item.lastSearched), 'PPp').toLowerCase();
           if (formattedDate.includes(query)) return true;
         }
 
-        // Search in formatted date added
-        if (item.dateAdded) {
-          const formattedDate = format(new Date(item.dateAdded), 'PPp').toLowerCase();
+        // Search in formatted date imported
+        if (item.dateImported) {
+          const formattedDate = format(new Date(item.dateImported), 'PPp').toLowerCase();
           if (formattedDate.includes(query)) return true;
         }
 
@@ -194,13 +194,13 @@ function MediaLibrary() {
       let comparison = 0;
       if (sortField === 'title') {
         comparison = a.title.localeCompare(b.title);
-      } else if (sortField === 'lastTriggered') {
-        const aDate = a.lastTriggered ? new Date(a.lastTriggered).getTime() : 0;
-        const bDate = b.lastTriggered ? new Date(b.lastTriggered).getTime() : 0;
+      } else if (sortField === 'lastSearched') {
+        const aDate = a.lastSearched ? new Date(a.lastSearched).getTime() : 0;
+        const bDate = b.lastSearched ? new Date(b.lastSearched).getTime() : 0;
         comparison = aDate - bDate;
-      } else if (sortField === 'dateAdded') {
-        const aDate = a.dateAdded ? new Date(a.dateAdded).getTime() : 0;
-        const bDate = b.dateAdded ? new Date(b.dateAdded).getTime() : 0;
+      } else if (sortField === 'dateImported') {
+        const aDate = a.dateImported ? new Date(a.dateImported).getTime() : 0;
+        const bDate = b.dateImported ? new Date(b.dateImported).getTime() : 0;
         comparison = aDate - bDate;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -209,8 +209,8 @@ function MediaLibrary() {
     // Pre-compute formatted dates to avoid formatting on every render
     return sorted.map(item => ({
       ...item,
-      formattedLastTriggered: item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never',
-      formattedDateAdded: item.dateAdded ? format(new Date(item.dateAdded), 'PPp') : 'N/A'
+      formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
+      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : 'N/A'
     }));
   }, [mediaData?.media, sortField, sortDirection, searchQuery]);
 
@@ -293,7 +293,7 @@ function MediaLibrary() {
           {/* Search Bar */}
           {mediaData && mediaData.media.length > 0 && (
             <TextField.Root
-              placeholder="Search by title, status, quality profile, last triggered, or date added..."
+              placeholder="Search by title, status, quality profile, last searched, or date imported..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               size="2"
@@ -372,21 +372,21 @@ function MediaLibrary() {
                   <Box style={{ flex: '0.7', fontWeight: 500 }}>Monitored</Box>
                   <Box
                     style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('lastTriggered')}
+                    onClick={() => handleSort('lastSearched')}
                   >
                     <Flex align="center" gap="1">
-                      Last Triggered
-                      {sortField === 'lastTriggered' &&
+                      Last Searched
+                      {sortField === 'lastSearched' &&
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
                   <Box
                     style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('dateAdded')}
+                    onClick={() => handleSort('dateImported')}
                   >
                     <Flex align="center" gap="1">
-                      Date Added
-                      {sortField === 'dateAdded' &&
+                      Date Imported
+                      {sortField === 'dateImported' &&
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
@@ -442,12 +442,12 @@ function MediaLibrary() {
                         </Box>
                         <Box style={{ flex: '1.3' }}>
                           <Text size="2" color="gray">
-                            {item.formattedLastTriggered}
+                            {item.formattedLastSearched}
                           </Text>
                         </Box>
                         <Box style={{ flex: '1.3' }}>
                           <Text size="2" color="gray">
-                            {item.formattedDateAdded}
+                            {item.formattedDateImported}
                           </Text>
                         </Box>
                       </Flex>

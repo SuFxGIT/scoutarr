@@ -8,7 +8,7 @@ import { getErrorMessage } from '../utils/errorUtils.js';
 const CONFIG_DIR = getConfigDir();
 const DB_FILE = path.join(CONFIG_DIR, 'stats.db');
 
-export interface TriggerEntry {
+export interface SearchEntry {
   timestamp: string;
   application: string;
   instance?: string; // Instance name/ID
@@ -17,11 +17,11 @@ export interface TriggerEntry {
 }
 
 export interface Stats {
-  totalTriggers: number;
-  triggersByApplication: Record<string, number>;
-  triggersByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
-  recentTriggers: TriggerEntry[];
-  lastTrigger?: string;
+  totalSearches: number;
+  searchesByApplication: Record<string, number>;
+  searchesByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
+  recentSearches: SearchEntry[];
+  lastSearch?: string;
 }
 
 class StatsService {
@@ -56,7 +56,7 @@ class StatsService {
   private createTables(): void {
     if (!this.db) throw new Error('Database not initialized');
 
-    // Create triggers table (keeping table name as 'upgrades' for database compatibility)
+    // Create searches table (keeping table name as 'upgrades' for database compatibility)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS upgrades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,7 +118,7 @@ class StatsService {
     `);
   }
 
-  async addTrigger(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
+  async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
@@ -138,7 +138,7 @@ class StatsService {
         JSON.stringify(items)
       );
 
-      logger.debug('📊 Stats updated', { 
+      logger.debug('📊 Stats updated', {
         application: appKey,
         instance,
         instanceValue: instance,
@@ -147,7 +147,7 @@ class StatsService {
       });
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error saving stats', { 
+      logger.error('❌ Error saving stats', {
         error: errorMessage
       });
       throw error;
@@ -157,35 +157,35 @@ class StatsService {
   private calculateStats(limit: number = 100): Stats {
     if (!this.db) {
       return {
-        totalTriggers: 0,
-        triggersByApplication: {},
-        triggersByInstance: {},
-        recentTriggers: [],
-        lastTrigger: undefined
+        totalSearches: 0,
+        searchesByApplication: {},
+        searchesByInstance: {},
+        recentSearches: [],
+        lastSearch: undefined
       };
     }
 
-    // Get total triggers
+    // Get total searches
     const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
     const totalResult = totalStmt.get() as { total: number | null };
-    const totalTriggers = totalResult.total || 0;
+    const totalSearches = totalResult.total || 0;
 
-    // Get triggers by application
+    // Get searches by application
     const byAppStmt = this.db.prepare(`
       SELECT application, SUM(count) as total
       FROM upgrades
       GROUP BY application
     `);
     const byAppResults = byAppStmt.all() as Array<{ application: string; total: number }>;
-    const triggersByApplication: Record<string, number> = {};
+    const searchesByApplication: Record<string, number> = {};
     for (const row of byAppResults) {
-      triggersByApplication[row.application] = row.total;
+      searchesByApplication[row.application] = row.total;
     }
 
-    // Get triggers by instance
+    // Get searches by instance
     const byInstanceStmt = this.db.prepare(`
-      SELECT 
-        CASE 
+      SELECT
+        CASE
           WHEN instance IS NOT NULL THEN application || '-' || instance
           ELSE application
         END as instance_key,
@@ -194,12 +194,12 @@ class StatsService {
       GROUP BY instance_key
     `);
     const byInstanceResults = byInstanceStmt.all() as Array<{ instance_key: string; total: number }>;
-    const triggersByInstance: Record<string, number> = {};
+    const searchesByInstance: Record<string, number> = {};
     for (const row of byInstanceResults) {
-      triggersByInstance[row.instance_key] = row.total;
+      searchesByInstance[row.instance_key] = row.total;
     }
 
-    // Get recent triggers (limited for API response)
+    // Get recent searches (limited for API response)
     const recentStmt = this.db.prepare(`
       SELECT timestamp, application, instance, count, items
       FROM upgrades
@@ -214,7 +214,7 @@ class StatsService {
       items: string;
     }>;
 
-    const recentTriggers: TriggerEntry[] = recentResults.map(row => ({
+    const recentSearches: SearchEntry[] = recentResults.map(row => ({
       timestamp: row.timestamp,
       application: row.application,
       instance: row.instance || undefined,
@@ -222,7 +222,7 @@ class StatsService {
       items: JSON.parse(row.items) as Array<{ id: number; title: string }>
     }));
 
-    // Get last trigger timestamp
+    // Get last search timestamp
     const lastStmt = this.db.prepare(`
       SELECT timestamp
       FROM upgrades
@@ -230,14 +230,14 @@ class StatsService {
       LIMIT 1
     `);
     const lastResult = lastStmt.get() as { timestamp: string } | undefined;
-    const lastTrigger = lastResult?.timestamp;
+    const lastSearch = lastResult?.timestamp;
 
     return {
-      totalTriggers,
-      triggersByApplication,
-      triggersByInstance,
-      recentTriggers,
-      lastTrigger
+      totalSearches,
+      searchesByApplication,
+      searchesByInstance,
+      recentSearches,
+      lastSearch
     };
   }
 
@@ -246,10 +246,10 @@ class StatsService {
     if (!this.db) {
       logger.warn('⚠️  Database not initialized, returning empty stats');
       return {
-        totalTriggers: 0,
-        triggersByApplication: {},
-        triggersByInstance: {},
-        recentTriggers: []
+        totalSearches: 0,
+        searchesByApplication: {},
+        searchesByInstance: {},
+        recentSearches: []
       };
     }
 
@@ -257,39 +257,39 @@ class StatsService {
       logger.debug('📊 Calculating stats');
       const stats = this.calculateStats(limit);
       logger.debug('✅ Stats retrieved successfully', {
-        totalTriggers: stats.totalTriggers,
-        applicationsCount: Object.keys(stats.triggersByApplication).length,
-        instancesCount: Object.keys(stats.triggersByInstance).length,
-        recentTriggersCount: stats.recentTriggers.length
+        totalSearches: stats.totalSearches,
+        applicationsCount: Object.keys(stats.searchesByApplication).length,
+        instancesCount: Object.keys(stats.searchesByInstance).length,
+        recentSearchesCount: stats.recentSearches.length
       });
       return stats;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting stats', { 
+      logger.error('❌ Error getting stats', {
         error: errorMessage
       });
       return {
-        totalTriggers: 0,
-        triggersByApplication: {},
-        triggersByInstance: {},
-        recentTriggers: []
+        totalSearches: 0,
+        searchesByApplication: {},
+        searchesByInstance: {},
+        recentSearches: []
       };
     }
   }
 
-  async getRecentTriggers(page: number = 1, pageSize: number = 15): Promise<{
-    triggers: TriggerEntry[];
+  async getRecentSearches(page: number = 1, pageSize: number = 15): Promise<{
+    searches: SearchEntry[];
     total: number;
     totalPages: number;
   }> {
-    logger.debug('📊 Getting recent triggers (paginated)', { page, pageSize });
+    logger.debug('📊 Getting recent searches (paginated)', { page, pageSize });
     if (!this.db) {
       logger.warn('⚠️  Database not initialized, returning empty results');
-      return { triggers: [], total: 0, totalPages: 0 };
+      return { searches: [], total: 0, totalPages: 0 };
     }
 
     try {
-      logger.debug('📊 Counting total triggers');
+      logger.debug('📊 Counting total searches');
       // Get total count
       const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM upgrades');
       const countResult = countStmt.get() as { count: number };
@@ -314,7 +314,7 @@ class StatsService {
         items: string;
       }>;
 
-      const triggers: TriggerEntry[] = results.map(row => ({
+      const searches: SearchEntry[] = results.map(row => ({
         timestamp: row.timestamp,
         application: row.application,
         instance: row.instance || undefined,
@@ -322,20 +322,20 @@ class StatsService {
         items: JSON.parse(row.items) as Array<{ id: number; title: string }>
       }));
 
-      logger.debug('✅ Recent triggers retrieved', { 
-        count: triggers.length, 
-        total, 
+      logger.debug('✅ Recent searches retrieved', {
+        count: searches.length,
+        total,
         totalPages,
-        page 
+        page
       });
 
-      return { triggers, total, totalPages };
+      return { searches, total, totalPages };
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting recent triggers', { 
+      logger.error('❌ Error getting recent searches', {
         error: errorMessage
       });
-      return { triggers: [], total: 0, totalPages: 0 };
+      return { searches: [], total: 0, totalPages: 0 };
     }
   }
 
@@ -372,9 +372,9 @@ class StatsService {
     }
   }
 
-  async clearRecentTriggers(): Promise<void> {
-    // Note: Since we're using a single database table for all triggers,
-    // "clearing recent triggers" effectively clears all stats.
+  async clearRecentSearches(): Promise<void> {
+    // Note: Since we're using a single database table for all searches,
+    // "clearing recent searches" effectively clears all stats.
     // This method exists for API compatibility with the frontend.
     await this.resetStats();
   }
@@ -385,22 +385,22 @@ class StatsService {
     }
 
     try {
-      // Delete all entries from the triggers table
-      // This clears recent triggers and stats but keeps the database structure
-      const deleteTriggersStmt = this.db.prepare('DELETE FROM upgrades');
-      const triggersResult = deleteTriggersStmt.run();
-      
+      // Delete all entries from the searches table
+      // This clears recent searches and stats but keeps the database structure
+      const deleteSearchesStmt = this.db.prepare('DELETE FROM upgrades');
+      const searchesResult = deleteSearchesStmt.run();
+
       // Also clear all tagged media records
       const deleteTaggedMediaStmt = this.db.prepare('DELETE FROM tagged_media');
       const taggedMediaResult = deleteTaggedMediaStmt.run();
-      
-      logger.info('🗑️  Cleared all trigger data and tagged media records from stats database', { 
-        triggersDeleted: triggersResult.changes,
+
+      logger.info('🗑️  Cleared all search data and tagged media records from stats database', {
+        searchesDeleted: searchesResult.changes,
         taggedMediaDeleted: taggedMediaResult.changes
       });
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error clearing data', { 
+      logger.error('❌ Error clearing data', {
         error: errorMessage
       });
       throw error;
@@ -468,7 +468,7 @@ class StatsService {
     }
   }
 
-  async getMediaLastTriggered(
+  async getMediaLastSearched(
     application: string,
     instanceId: string,
     mediaIds: number[]
@@ -486,22 +486,22 @@ class StatsService {
       const appKey = application.toLowerCase();
       const placeholders = mediaIds.map(() => '?').join(',');
       const stmt = this.db.prepare(`
-        SELECT media_id, MAX(timestamp) as last_triggered
+        SELECT media_id, MAX(timestamp) as last_searched
         FROM tagged_media
         WHERE application = ? AND instance_id = ? AND media_id IN (${placeholders})
         GROUP BY media_id
       `);
       const results = stmt.all(appKey, instanceId, ...mediaIds) as Array<{
         media_id: number;
-        last_triggered: string;
+        last_searched: string;
       }>;
 
       const map = new Map<number, string>();
       for (const row of results) {
-        map.set(row.media_id, row.last_triggered);
+        map.set(row.media_id, row.last_searched);
       }
 
-      logger.debug('✅ Retrieved last triggered dates', {
+      logger.debug('✅ Retrieved last searched dates', {
         application: appKey,
         instanceId,
         count: map.size
@@ -509,7 +509,7 @@ class StatsService {
       return map;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting media last triggered dates', {
+      logger.error('❌ Error getting media last searched dates', {
         error: errorMessage
       });
       return new Map();

@@ -12,10 +12,10 @@ export interface FilterableMedia {
   status: string;
   lastSearchTime?: string;
   added?: string;
-  movieFile?: { dateAdded?: string };
-  episodeFile?: { dateAdded?: string };
-  trackFiles?: Array<{ dateAdded?: string }>;
-  bookFiles?: Array<{ dateAdded?: string }>;
+  movieFile?: { dateAdded?: string }; // Date imported from *arr API
+  episodeFile?: { dateAdded?: string }; // Date imported from *arr API
+  trackFiles?: Array<{ dateAdded?: string }>; // Date imported from *arr API
+  bookFiles?: Array<{ dateAdded?: string }>; // Date imported from *arr API
 }
 
 /**

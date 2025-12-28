@@ -5,16 +5,16 @@ import logger from '../utils/logger.js';
 
 export const statsRouter = express.Router();
 
-// Get stats (backward compatible - returns first 100 recent triggers)
+// Get stats (backward compatible - returns first 100 recent searches)
 statsRouter.get('/', async (req, res) => {
   logger.debug('📊 Stats requested', { limit: req.query.limit });
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
     logger.debug('📊 Fetching stats', { limit });
     const stats = await statsService.getStats(limit);
-    logger.debug('✅ Stats retrieved successfully', { 
-      totalTriggers: stats.totalTriggers,
-      recentCount: stats.recentTriggers.length
+    logger.debug('✅ Stats retrieved successfully', {
+      totalSearches: stats.totalSearches,
+      recentCount: stats.recentSearches.length
     });
     res.json(stats);
   } catch (error: unknown) {
@@ -22,7 +22,7 @@ statsRouter.get('/', async (req, res) => {
   }
 });
 
-// Get paginated recent triggers (for unlimited records)
+// Get paginated recent searches (for unlimited records)
 statsRouter.get('/recent', async (req, res) => {
   try {
     const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
@@ -35,10 +35,10 @@ statsRouter.get('/recent', async (req, res) => {
       return res.status(400).json({ error: 'Page size must be between 1 and 1000' });
     }
 
-    const result = await statsService.getRecentTriggers(page, pageSize);
+    const result = await statsService.getRecentSearches(page, pageSize);
     res.json(result);
   } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to get recent triggers');
+    handleRouteError(res, error, 'Failed to get recent searches');
   }
 });
 
@@ -54,23 +54,23 @@ statsRouter.post('/reset', async (req, res) => {
   }
 });
 
-// Clear recent triggers only
+// Clear recent searches only
 statsRouter.post('/clear-recent', async (req, res) => {
   try {
-    await statsService.clearRecentTriggers();
-    res.json({ success: true, message: 'Recent triggers cleared successfully' });
+    await statsService.clearRecentSearches();
+    res.json({ success: true, message: 'Recent searches cleared successfully' });
   } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to clear recent triggers');
+    handleRouteError(res, error, 'Failed to clear recent searches');
   }
 });
 
-// Clear data (recent triggers and stats) - keeps database structure
+// Clear data (recent searches and stats) - keeps database structure
 statsRouter.post('/clear-data', async (req, res) => {
   logger.info('🗑️  Clear data requested');
   try {
     await statsService.clearData();
     logger.info('✅ Data cleared successfully');
-    res.json({ success: true, message: 'Recent triggers and stats cleared successfully' });
+    res.json({ success: true, message: 'Recent searches and stats cleared successfully' });
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to clear data');
   }

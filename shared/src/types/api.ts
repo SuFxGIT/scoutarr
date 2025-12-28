@@ -54,17 +54,17 @@ export interface SchedulerHistoryEntry {
 }
 
 export interface Stats {
-  totalTriggers: number;
-  triggersByApplication: Record<string, number>;
-  triggersByInstance: Record<string, number>;
-  recentTriggers: Array<{
+  totalSearches: number;
+  searchesByApplication: Record<string, number>;
+  searchesByInstance: Record<string, number>;
+  recentSearches: Array<{
     timestamp: string;
     application: string;
     instance?: string;
     count: number;
     items: Array<{ id: number; title: string }>;
   }>;
-  lastTrigger?: string;
+  lastSearch?: string;
 }
 
 export interface MediaLibraryItem {
@@ -75,8 +75,8 @@ export interface MediaLibraryItem {
   qualityProfileId: number;
   qualityProfileName?: string;
   tags: number[];
-  lastTriggered?: string;
-  dateAdded?: string;
+  lastSearched?: string;
+  dateImported?: string;
 }
 
 export interface MediaLibraryResponse {

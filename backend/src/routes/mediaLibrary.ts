@@ -14,7 +14,7 @@ import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrI
 export const mediaLibraryRouter = express.Router();
 
 // GET /api/media-library/:appType/:instanceId
-// Fetch all media for an instance with last triggered dates
+// Fetch all media for an instance with last searched dates
 mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
   try {
     const { appType, instanceId } = req.params;
@@ -60,24 +60,24 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
     const mediaWithDates = allMedia.map(m => {
-      // Extract dateAdded from file (Radarr uses movieFile, Sonarr uses episodeFile,
+      // Extract dateImported from file (Radarr uses movieFile, Sonarr uses episodeFile,
       // Lidarr uses trackFiles array, Readarr uses bookFiles array)
-      let dateAdded: string | undefined;
+      let dateImported: string | undefined;
       if (m.movieFile?.dateAdded) {
-        dateAdded = m.movieFile.dateAdded;
+        dateImported = m.movieFile.dateAdded;
       } else if (m.episodeFile?.dateAdded) {
-        dateAdded = m.episodeFile.dateAdded;
+        dateImported = m.episodeFile.dateAdded;
       } else if (m.trackFiles && m.trackFiles.length > 0) {
         // For Lidarr, use the most recent track file
         const dates = m.trackFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
         if (dates.length > 0) {
-          dateAdded = dates.sort().reverse()[0]; // Most recent
+          dateImported = dates.sort().reverse()[0]; // Most recent
         }
       } else if (m.bookFiles && m.bookFiles.length > 0) {
         // For Readarr, use the most recent book file
         const dates = m.bookFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
         if (dates.length > 0) {
-          dateAdded = dates.sort().reverse()[0]; // Most recent
+          dateImported = dates.sort().reverse()[0]; // Most recent
         }
       }
 
@@ -89,12 +89,12 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         qualityProfileId: m.qualityProfileId,
         qualityProfileName: profileMap.get(m.qualityProfileId),
         tags: m.tags,
-        lastTriggered: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
-        dateAdded: dateAdded || m.added // File import date, fallback to when added to library
+        lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
+        dateImported: dateImported || m.added // File import date, fallback to when added to library
       };
     });
 
-    const withLastSearchCount = mediaWithDates.filter(m => m.lastTriggered).length;
+    const withLastSearchCount = mediaWithDates.filter(m => m.lastSearched).length;
     logger.debug('✅ Media library prepared', {
       total: mediaWithDates.length,
       withLastSearchTime: withLastSearchCount
@@ -123,7 +123,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 });
 
 // POST /api/media-library/search
-// Trigger manual search for selected media
+// Search selected media manually
 mediaLibraryRouter.post('/search', async (req, res) => {
   try {
     const { appType, instanceId, mediaIds } = req.body;
@@ -151,7 +151,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       return res.status(404).json({ error: 'Instance not found' });
     }
 
-    logger.info('🔎 Manual search triggered', {
+    logger.info('🔎 Manual search started', {
       appType,
       instanceId,
       instanceName: instance.name,
@@ -161,29 +161,29 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     // Get service for this app type
     const service = getServiceForApp(appType as AppType);
 
-    // Trigger search based on app type
+    // Search based on app type
     if (appType === 'radarr') {
       // Radarr supports bulk search
       await radarrService.searchMovies(instance as RadarrInstance, mediaIds);
-      logger.debug('✅ Bulk search triggered for Radarr', { count: mediaIds.length });
+      logger.debug('✅ Bulk search started for Radarr', { count: mediaIds.length });
     } else if (appType === 'sonarr') {
       // Sonarr requires one-by-one
       for (const mediaId of mediaIds) {
         await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search triggered for Sonarr', { count: mediaIds.length });
+      logger.debug('✅ Sequential search started for Sonarr', { count: mediaIds.length });
     } else if (appType === 'lidarr') {
       // Lidarr requires one-by-one
       for (const mediaId of mediaIds) {
         await lidarrService.searchArtists(instance as LidarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search triggered for Lidarr', { count: mediaIds.length });
+      logger.debug('✅ Sequential search started for Lidarr', { count: mediaIds.length });
     } else if (appType === 'readarr') {
       // Readarr requires one-by-one
       for (const mediaId of mediaIds) {
         await readarrService.searchAuthors(instance as ReadarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search triggered for Readarr', { count: mediaIds.length });
+      logger.debug('✅ Sequential search started for Readarr', { count: mediaIds.length });
     }
 
     // Add tag to searched items
@@ -194,7 +194,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       await service.addTag(instance, mediaIds, tagId);
       logger.debug('✅ Tag added to media', { tagId, count: mediaIds.length });
 
-      // Record in tagged_media table (updates last triggered date)
+      // Record in tagged_media table (updates last searched date)
       await statsService.addTaggedMedia(appType, instanceId, tagId, mediaIds);
       logger.debug('✅ Tagged media recorded in database');
     } else {
@@ -205,7 +205,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     res.json({
       success: true,
       searched: mediaIds.length,
-      message: `Successfully triggered search for ${mediaIds.length} item${mediaIds.length === 1 ? '' : 's'}`
+      message: `Successfully searched ${mediaIds.length} item${mediaIds.length === 1 ? '' : 's'}`
     });
 
   } catch (error: unknown) {

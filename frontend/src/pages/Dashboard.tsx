@@ -30,7 +30,7 @@ function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
-  const [selectedTrigger, setSelectedTrigger] = useState<Stats['recentTriggers'][number] | null>(null);
+  const [selectedSearch, setSelectedSearch] = useState<Stats['recentSearches'][number] | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
@@ -134,19 +134,19 @@ function Dashboard() {
     },
   });
 
-  // Mutation for clearing recent triggers
+  // Mutation for clearing recent searches
   const clearRecentMutation = useMutation({
     mutationFn: async () => {
       await axios.post('/api/stats/clear-recent');
     },
     onSuccess: () => {
-      toast.success('Recent triggers cleared');
+      toast.success('Recent searches cleared');
       setCurrentPage(1);
       setConfirmingClear(null);
       refetchStats();
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear recent triggers: ' + getErrorMessage(error));
+      toast.error('Failed to clear recent searches: ' + getErrorMessage(error));
       setConfirmingClear(null);
     },
   });
@@ -157,7 +157,7 @@ function Dashboard() {
       await axios.post('/api/stats/clear-data');
     },
     onSuccess: () => {
-      toast.success('Recent triggers and stats cleared');
+      toast.success('Recent searches and stats cleared');
       setCurrentPage(1);
       setConfirmingClear(null);
       refetchStats();
@@ -319,11 +319,11 @@ function Dashboard() {
             // Determine media type
             const mediaType = result.movies ? 'movies' : result.artists ? 'artists' : result.authors ? 'authors' : 'series';
             
-            // Show triggered action
+            // Show searched action
             logs.push({
               timestamp,
               app,
-              message: `${appName}: Triggered search for ${searched} ${mediaType}`,
+              message: `${appName}: Searched ${searched} ${mediaType}`,
               type: 'success'
             });
             
@@ -509,7 +509,7 @@ function Dashboard() {
           let sonarrTotal = 0;
           let readarrTotal = 0;
           
-          Object.entries(stats.triggersByInstance || {}).forEach(([instanceKey, count]) => {
+          Object.entries(stats.searchesByInstance || {}).forEach(([instanceKey, count]) => {
             if (instanceKey.startsWith('lidarr')) {
               lidarrTotal += count as number;
             } else if (instanceKey.startsWith('radarr')) {
@@ -521,12 +521,12 @@ function Dashboard() {
             }
           });
           
-          // Fallback to triggersByApplication if triggersByInstance is empty
+          // Fallback to searchesByApplication if searchesByInstance is empty
           if (lidarrTotal === 0 && radarrTotal === 0 && sonarrTotal === 0 && readarrTotal === 0) {
-            lidarrTotal = stats.triggersByApplication?.lidarr || 0;
-            radarrTotal = stats.triggersByApplication?.radarr || 0;
-            sonarrTotal = stats.triggersByApplication?.sonarr || 0;
-            readarrTotal = stats.triggersByApplication?.readarr || 0;
+            lidarrTotal = stats.searchesByApplication?.lidarr || 0;
+            radarrTotal = stats.searchesByApplication?.radarr || 0;
+            sonarrTotal = stats.searchesByApplication?.sonarr || 0;
+            readarrTotal = stats.searchesByApplication?.readarr || 0;
           }
           
           return (
@@ -534,7 +534,7 @@ function Dashboard() {
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between">
                   <Heading size="5">Statistics</Heading>
-                  <Tooltip content="Delete all trigger history and tagged media records from the database. This will reset all statistics to zero.">
+                  <Tooltip content="Delete all search history and tagged media records from the database. This will reset all statistics to zero.">
                     <span>
                       {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
                         <Button 
@@ -571,8 +571,8 @@ function Dashboard() {
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
-                      <Text size="2" color="gray" align="center">Total Triggered</Text>
-                      <Heading size="7" align="center">{stats.totalTriggers}</Heading>
+                      <Text size="2" color="gray" align="center">Total Searched</Text>
+                      <Heading size="7" align="center">{stats.totalSearches}</Heading>
                     </Flex>
                   </Card>
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
@@ -594,9 +594,9 @@ function Dashboard() {
                     </Flex>
                   </Card>
                 </Flex>
-                {stats.lastTrigger && (
+                {stats.lastSearch && (
                   <Text size="2" color="gray">
-                    Last trigger: {format(new Date(stats.lastTrigger), 'PPpp')}
+                    Last search: {format(new Date(stats.lastSearch), 'PPpp')}
                   </Text>
                 )}
               </Flex>
@@ -605,39 +605,39 @@ function Dashboard() {
         })()}
 
         {stats && (() => {
-          const allTriggers = stats.recentTriggers || [];
+          const allSearches = stats.recentSearches || [];
 
           // Filter by date
           const now = new Date();
-          const filteredTriggers = allTriggers.filter(trigger => {
-            const triggerDate = new Date(trigger.timestamp);
+          const filteredSearches = allSearches.filter(search => {
+            const searchDate = new Date(search.timestamp);
             switch (dateFilter) {
               case 'today':
-                return triggerDate.toDateString() === now.toDateString();
+                return searchDate.toDateString() === now.toDateString();
               case 'week':
                 const weekAgo = new Date(now);
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                return triggerDate >= weekAgo;
+                return searchDate >= weekAgo;
               case 'month':
                 const monthAgo = new Date(now);
                 monthAgo.setMonth(monthAgo.getMonth() - 1);
-                return triggerDate >= monthAgo;
+                return searchDate >= monthAgo;
               default:
                 return true;
             }
           });
 
-          const totalItems = filteredTriggers.length;
+          const totalItems = filteredSearches.length;
           const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
           const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
           const endIndex = startIndex + ITEMS_PER_PAGE;
-          const currentItems = filteredTriggers.slice(startIndex, endIndex);
+          const currentItems = filteredSearches.slice(startIndex, endIndex);
 
           return (
             <Card>
               <Flex direction="column" gap="3">
                 <Flex align="center" justify="between" wrap="wrap" gap="3">
-                  <Heading size="5">Recent Triggers</Heading>
+                  <Heading size="5">Recent Searches</Heading>
                   <Flex align="center" gap="3">
                     <Flex align="center" gap="2">
                       <Text size="2" weight="medium">Filter:</Text>
@@ -656,7 +656,7 @@ function Dashboard() {
                     </Flex>
                     {totalItems > 0 && (
                       <Text size="2" color="gray">
-                        {totalItems} {totalItems === 1 ? 'trigger' : 'triggers'}
+                        {totalItems} {totalItems === 1 ? 'search' : 'searches'}
                       </Text>
                     )}
                   </Flex>
@@ -665,19 +665,19 @@ function Dashboard() {
                 {totalItems === 0 ? (
                   <Box p="4">
                     <Text size="2" color="gray" align="center">
-                      {dateFilter === 'all' ? 'No recent triggers yet' : `No triggers found for ${dateFilter === 'today' ? 'today' : dateFilter === 'week' ? 'the last 7 days' : 'the last 30 days'}`}
+                      {dateFilter === 'all' ? 'No recent searches yet' : `No searches found for ${dateFilter === 'today' ? 'today' : dateFilter === 'week' ? 'the last 7 days' : 'the last 30 days'}`}
                     </Text>
                   </Box>
                 ) : (
                   <>
                     <Flex direction="column" gap="0">
-                      {currentItems.map((trigger, idx) => {
-                        const timestamp = new Date(trigger.timestamp);
-                        const appName = trigger.instance
-                          ? `${trigger.application} (${trigger.instance})`
-                          : trigger.application;
-                        const itemsPreview = trigger.items.length > 0
-                          ? trigger.items.slice(0, 3).map(i => i.title).join(', ') + (trigger.items.length > 3 ? ` +${trigger.items.length - 3} more` : '')
+                      {currentItems.map((search, idx) => {
+                        const timestamp = new Date(search.timestamp);
+                        const appName = search.instance
+                          ? `${search.application} (${search.instance})`
+                          : search.application;
+                        const itemsPreview = search.items.length > 0
+                          ? search.items.slice(0, 3).map((i: { id: number; title: string }) => i.title).join(', ') + (search.items.length > 3 ? ` +${search.items.length - 3} more` : '')
                           : 'No items';
 
                         return (
@@ -690,13 +690,13 @@ function Dashboard() {
                               cursor: 'pointer',
                               transition: 'background-color 0.15s'
                             }}
-                            onClick={() => setSelectedTrigger(trigger)}
+                            onClick={() => setSelectedSearch(search)}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-2)'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
                             <Flex align="center" gap="3" justify="between">
                               <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0 }}>
-                                <AppIcon app={trigger.application} size={16} variant="light" />
+                                <AppIcon app={search.application} size={16} variant="light" />
                                 <Badge size="1" style={{ textTransform: 'capitalize', flexShrink: 0 }}>
                                   {appName}
                                 </Badge>
@@ -706,7 +706,7 @@ function Dashboard() {
                               </Flex>
                               <Flex align="center" gap="3" style={{ flexShrink: 0 }}>
                                 <Text size="2" color="gray">
-                                  {trigger.count} {trigger.count === 1 ? 'item' : 'items'}
+                                  {search.count} {search.count === 1 ? 'item' : 'items'}
                                 </Text>
                                 <Text size="2" color="gray" style={{ minWidth: '140px', textAlign: 'right' }}>
                                   {format(timestamp, 'PPp')}
@@ -839,31 +839,31 @@ function Dashboard() {
           </Dialog.Content>
         </Dialog.Root>
 
-        {/* Dialog for viewing all items in a recent trigger entry */}
+        {/* Dialog for viewing all items in a recent search entry */}
         <Dialog.Root
-          open={!!selectedTrigger}
+          open={!!selectedSearch}
           onOpenChange={(open) => {
             if (!open) {
-              setSelectedTrigger(null);
+              setSelectedSearch(null);
             }
           }}
         >
           <Dialog.Content maxWidth="480px">
-            {selectedTrigger && (
+            {selectedSearch && (
               <Flex direction="column" gap="3">
                 <Dialog.Title>
-                  {selectedTrigger.instance
-                    ? `${formatAppName(selectedTrigger.application)} (${selectedTrigger.instance})`
-                    : formatAppName(selectedTrigger.application)}
+                  {selectedSearch.instance
+                    ? `${formatAppName(selectedSearch.application)} (${selectedSearch.instance})`
+                    : formatAppName(selectedSearch.application)}
                 </Dialog.Title>
                 <Dialog.Description>
-                  {selectedTrigger.count} {selectedTrigger.count === 1 ? 'item' : 'items'} triggered on{' '}
-                  {format(new Date(selectedTrigger.timestamp), 'PPpp')}
+                  {selectedSearch.count} {selectedSearch.count === 1 ? 'item' : 'items'} searched on{' '}
+                  {format(new Date(selectedSearch.timestamp), 'PPpp')}
                 </Dialog.Description>
                 <Separator />
-                {selectedTrigger.items.length === 0 ? (
+                {selectedSearch.items.length === 0 ? (
                   <Text size="2" color="gray">
-                    No items recorded for this trigger.
+                    No items recorded for this search.
                   </Text>
                 ) : (
                   <Flex
@@ -871,7 +871,7 @@ function Dashboard() {
                     gap="2"
                     style={{ maxHeight: '320px', overflowY: 'auto' }}
                     >
-                    {selectedTrigger.items.map((item) => (
+                    {selectedSearch.items.map((item) => (
                       <Text
                         key={item.id}
                         size="2"

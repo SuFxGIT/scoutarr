@@ -209,7 +209,7 @@ class SchedulerService {
     }
 
     this.globalIsRunning = true;
-    logger.info('⏰ Global scheduled search triggered', { schedule });
+    logger.info('⏰ Global scheduled search started', { schedule });
 
     try {
       const results = await executeSearchRun();
@@ -266,7 +266,7 @@ class SchedulerService {
     }
 
     this.instanceIsRunning.set(instanceKey, true);
-    logger.info('⏰ Instance scheduled search triggered', { instanceKey, schedule });
+    logger.info('⏰ Instance scheduled search started', { instanceKey, schedule });
 
     try {
       const results = await executeSearchRunForInstance(appType, instanceId);

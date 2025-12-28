@@ -11,7 +11,7 @@ export async function fetchMediaLibrary(
   return response.data;
 }
 
-export async function triggerManualSearch(
+export async function searchMedia(
   appType: string,
   instanceId: string,
   mediaIds: number[]
