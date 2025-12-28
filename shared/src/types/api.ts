@@ -66,3 +66,33 @@ export interface Stats {
   }>;
   lastTrigger?: string;
 }
+
+export interface MediaLibraryItem {
+  id: number;
+  title: string;
+  monitored: boolean;
+  status: string;
+  qualityProfileId: number;
+  qualityProfileName?: string;
+  tags: number[];
+  lastTriggered?: string;
+}
+
+export interface MediaLibraryResponse {
+  media: MediaLibraryItem[];
+  total: number;
+  instanceName: string;
+  appType: string;
+}
+
+export interface MediaSearchRequest {
+  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr';
+  instanceId: string;
+  mediaIds: number[];
+}
+
+export interface MediaSearchResponse {
+  success: boolean;
+  searched: number;
+  message: string;
+}

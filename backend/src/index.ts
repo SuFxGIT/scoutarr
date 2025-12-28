@@ -5,6 +5,7 @@ import { configRouter } from './routes/config.js';
 import { searchRouter } from './routes/search.js';
 import { statusRouter } from './routes/status.js';
 import { statsRouter } from './routes/stats.js';
+import { mediaLibraryRouter } from './routes/mediaLibrary.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
@@ -33,6 +34,7 @@ app.use('/api/config', configRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/status', statusRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/media-library', mediaLibraryRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

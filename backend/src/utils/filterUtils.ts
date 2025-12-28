@@ -10,6 +10,7 @@ export interface FilterableMedia {
   tags: number[];
   qualityProfileId: number;
   status: string;
+  lastSearchTime?: string;
 }
 
 /**

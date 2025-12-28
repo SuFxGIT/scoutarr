@@ -468,6 +468,54 @@ class StatsService {
     }
   }
 
+  async getMediaLastTriggered(
+    application: string,
+    instanceId: string,
+    mediaIds: number[]
+  ): Promise<Map<number, string>> {
+    if (!this.db) {
+      logger.warn('⚠️  Database not initialized, returning empty map');
+      return new Map();
+    }
+
+    if (mediaIds.length === 0) {
+      return new Map();
+    }
+
+    try {
+      const appKey = application.toLowerCase();
+      const placeholders = mediaIds.map(() => '?').join(',');
+      const stmt = this.db.prepare(`
+        SELECT media_id, MAX(timestamp) as last_triggered
+        FROM tagged_media
+        WHERE application = ? AND instance_id = ? AND media_id IN (${placeholders})
+        GROUP BY media_id
+      `);
+      const results = stmt.all(appKey, instanceId, ...mediaIds) as Array<{
+        media_id: number;
+        last_triggered: string;
+      }>;
+
+      const map = new Map<number, string>();
+      for (const row of results) {
+        map.set(row.media_id, row.last_triggered);
+      }
+
+      logger.debug('✅ Retrieved last triggered dates', {
+        application: appKey,
+        instanceId,
+        count: map.size
+      });
+      return map;
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error getting media last triggered dates', {
+        error: errorMessage
+      });
+      return new Map();
+    }
+  }
+
   async clearTaggedMedia(application: string, instanceId: string, tagId: number): Promise<void> {
     if (!this.db) {
       throw new Error('Database not initialized');

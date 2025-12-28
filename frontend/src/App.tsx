@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { Flex, Heading, Button, Separator, Box } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
-import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
+import MediaLibrary from './pages/MediaLibrary';
+import { GearIcon, HomeIcon, ArchiveIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -34,6 +35,11 @@ function NavigationLinks() {
           </Link>
         </Button>
         <Button variant="ghost" asChild>
+          <Link to="/library" onClick={(e) => handleLinkClick(e, '/library')}>
+            <ArchiveIcon /> Library
+          </Link>
+        </Button>
+        <Button variant="ghost" asChild>
           <Link to="/settings" onClick={(e) => handleLinkClick(e, '/settings')}>
             <GearIcon /> Settings
           </Link>
@@ -57,6 +63,7 @@ function AppContent() {
       <Box maxWidth="1200px" width="100%" p="4" mx="auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/library" element={<MediaLibrary />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Box>
