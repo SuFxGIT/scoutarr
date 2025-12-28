@@ -11,6 +11,11 @@ export interface FilterableMedia {
   qualityProfileId: number;
   status: string;
   lastSearchTime?: string;
+  added?: string;
+  movieFile?: { dateAdded?: string };
+  episodeFile?: { dateAdded?: string };
+  trackFiles?: Array<{ dateAdded?: string }>;
+  bookFiles?: Array<{ dateAdded?: string }>;
 }
 
 /**

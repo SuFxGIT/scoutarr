@@ -76,6 +76,7 @@ export interface MediaLibraryItem {
   qualityProfileName?: string;
   tags: number[];
   lastTriggered?: string;
+  dateAdded?: string;
 }
 
 export interface MediaLibraryResponse {

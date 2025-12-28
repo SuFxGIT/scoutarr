@@ -46,7 +46,7 @@ function MediaLibrary() {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [sortField, setSortField] = useState<'title' | 'lastTriggered'>('title');
+  const [sortField, setSortField] = useState<'title' | 'lastTriggered' | 'dateAdded'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -140,7 +140,7 @@ function MediaLibrary() {
     });
   }, []);
 
-  const handleSort = useCallback((field: 'title' | 'lastTriggered') => {
+  const handleSort = useCallback((field: 'title' | 'lastTriggered' | 'dateAdded') => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -172,9 +172,15 @@ function MediaLibrary() {
         // Search in quality profile
         if (item.qualityProfileName?.toLowerCase().includes(query)) return true;
 
-        // Search in formatted date
+        // Search in formatted last triggered date
         if (item.lastTriggered) {
           const formattedDate = format(new Date(item.lastTriggered), 'PPp').toLowerCase();
+          if (formattedDate.includes(query)) return true;
+        }
+
+        // Search in formatted date added
+        if (item.dateAdded) {
+          const formattedDate = format(new Date(item.dateAdded), 'PPp').toLowerCase();
           if (formattedDate.includes(query)) return true;
         }
 
@@ -192,6 +198,10 @@ function MediaLibrary() {
         const aDate = a.lastTriggered ? new Date(a.lastTriggered).getTime() : 0;
         const bDate = b.lastTriggered ? new Date(b.lastTriggered).getTime() : 0;
         comparison = aDate - bDate;
+      } else if (sortField === 'dateAdded') {
+        const aDate = a.dateAdded ? new Date(a.dateAdded).getTime() : 0;
+        const bDate = b.dateAdded ? new Date(b.dateAdded).getTime() : 0;
+        comparison = aDate - bDate;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -199,7 +209,8 @@ function MediaLibrary() {
     // Pre-compute formatted dates to avoid formatting on every render
     return sorted.map(item => ({
       ...item,
-      formattedDate: item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never'
+      formattedLastTriggered: item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never',
+      formattedDateAdded: item.dateAdded ? format(new Date(item.dateAdded), 'PPp') : 'N/A'
     }));
   }, [mediaData?.media, sortField, sortDirection, searchQuery]);
 
@@ -282,7 +293,7 @@ function MediaLibrary() {
           {/* Search Bar */}
           {mediaData && mediaData.media.length > 0 && (
             <TextField.Root
-              placeholder="Search by title, status, quality profile, or date..."
+              placeholder="Search by title, status, quality profile, last triggered, or date added..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               size="2"
@@ -357,15 +368,25 @@ function MediaLibrary() {
                     </Flex>
                   </Box>
                   <Box style={{ flex: '1', fontWeight: 500 }}>Status</Box>
-                  <Box style={{ flex: '1.5', fontWeight: 500 }}>Quality Profile</Box>
-                  <Box style={{ flex: '0.8', fontWeight: 500 }}>Monitored</Box>
+                  <Box style={{ flex: '1.3', fontWeight: 500 }}>Quality Profile</Box>
+                  <Box style={{ flex: '0.7', fontWeight: 500 }}>Monitored</Box>
                   <Box
-                    style={{ flex: '1.5', cursor: 'pointer', fontWeight: 500 }}
+                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
                     onClick={() => handleSort('lastTriggered')}
                   >
                     <Flex align="center" gap="1">
                       Last Triggered
                       {sortField === 'lastTriggered' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                  <Box
+                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('dateAdded')}
+                  >
+                    <Flex align="center" gap="1">
+                      Date Added
+                      {sortField === 'dateAdded' &&
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
@@ -411,17 +432,22 @@ function MediaLibrary() {
                             {item.status}
                           </Badge>
                         </Box>
-                        <Box style={{ flex: '1.5' }}>
+                        <Box style={{ flex: '1.3' }}>
                           <Text size="2">{item.qualityProfileName || 'N/A'}</Text>
                         </Box>
-                        <Box style={{ flex: '0.8' }}>
+                        <Box style={{ flex: '0.7' }}>
                           <Badge size="1" color={item.monitored ? 'green' : 'gray'}>
                             {item.monitored ? 'Yes' : 'No'}
                           </Badge>
                         </Box>
-                        <Box style={{ flex: '1.5' }}>
+                        <Box style={{ flex: '1.3' }}>
                           <Text size="2" color="gray">
-                            {item.formattedDate}
+                            {item.formattedLastTriggered}
+                          </Text>
+                        </Box>
+                        <Box style={{ flex: '1.3' }}>
+                          <Text size="2" color="gray">
+                            {item.formattedDateAdded}
                           </Text>
                         </Box>
                       </Flex>

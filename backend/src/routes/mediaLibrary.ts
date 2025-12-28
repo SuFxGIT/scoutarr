@@ -59,16 +59,40 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
-    const mediaWithDates = allMedia.map(m => ({
-      id: service.getMediaId(m),
-      title: service.getMediaTitle(m),
-      monitored: m.monitored,
-      status: m.status,
-      qualityProfileId: m.qualityProfileId,
-      qualityProfileName: profileMap.get(m.qualityProfileId),
-      tags: m.tags,
-      lastTriggered: m.lastSearchTime // Native field from Radarr/Sonarr/Lidarr/Readarr API
-    }));
+    const mediaWithDates = allMedia.map(m => {
+      // Extract dateAdded from file (Radarr uses movieFile, Sonarr uses episodeFile,
+      // Lidarr uses trackFiles array, Readarr uses bookFiles array)
+      let dateAdded: string | undefined;
+      if (m.movieFile?.dateAdded) {
+        dateAdded = m.movieFile.dateAdded;
+      } else if (m.episodeFile?.dateAdded) {
+        dateAdded = m.episodeFile.dateAdded;
+      } else if (m.trackFiles && m.trackFiles.length > 0) {
+        // For Lidarr, use the most recent track file
+        const dates = m.trackFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
+        if (dates.length > 0) {
+          dateAdded = dates.sort().reverse()[0]; // Most recent
+        }
+      } else if (m.bookFiles && m.bookFiles.length > 0) {
+        // For Readarr, use the most recent book file
+        const dates = m.bookFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
+        if (dates.length > 0) {
+          dateAdded = dates.sort().reverse()[0]; // Most recent
+        }
+      }
+
+      return {
+        id: service.getMediaId(m),
+        title: service.getMediaTitle(m),
+        monitored: m.monitored,
+        status: m.status,
+        qualityProfileId: m.qualityProfileId,
+        qualityProfileName: profileMap.get(m.qualityProfileId),
+        tags: m.tags,
+        lastTriggered: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
+        dateAdded: dateAdded || m.added // File import date, fallback to when added to library
+      };
+    });
 
     const withLastSearchCount = mediaWithDates.filter(m => m.lastTriggered).length;
     logger.debug('✅ Media library prepared', {
