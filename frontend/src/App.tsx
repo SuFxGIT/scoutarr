@@ -8,7 +8,7 @@ import { NavigationProvider, useNavigation } from './contexts/NavigationContext'
 import { ThemeToggle } from './components/ThemeToggle';
 
 function NavigationLinks() {
-  const { handleNavigation } = useNavigation();
+  const { handleNavigation, lastLibraryUrl } = useNavigation();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Always intercept navigation to allow guards to check
@@ -35,7 +35,7 @@ function NavigationLinks() {
           </Link>
         </Button>
         <Button variant="ghost" asChild>
-          <Link to="/library" onClick={(e) => handleLinkClick(e, '/library')}>
+          <Link to={lastLibraryUrl} onClick={(e) => handleLinkClick(e, lastLibraryUrl)}>
             <ArchiveIcon /> Library
           </Link>
         </Button>

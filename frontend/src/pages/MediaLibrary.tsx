@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Flex,
@@ -14,6 +14,7 @@ import {
   Select,
   Checkbox,
   Callout,
+  TextField,
 } from '@radix-ui/themes';
 import {
   ChevronUpIcon,
@@ -29,6 +30,7 @@ import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from '../components/icons/AppIcon';
 import { fetchMediaLibrary, triggerManualSearch } from '../services/mediaLibraryService';
+import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
 
@@ -37,6 +39,8 @@ type AppType = typeof APP_TYPES[number];
 
 function MediaLibrary() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const { setLastLibraryUrl } = useNavigation();
 
   // Get initial instance from URL or use null
   const initialInstance = searchParams.get('instance');
@@ -44,6 +48,12 @@ function MediaLibrary() {
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
   const [sortField, setSortField] = useState<'title' | 'lastTriggered'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Update lastLibraryUrl whenever the location changes
+  useEffect(() => {
+    setLastLibraryUrl(location.pathname + location.search);
+  }, [location.pathname, location.search, setLastLibraryUrl]);
 
   // Fetch config to get instances
   const { data: config } = useQuery<Config>({
@@ -144,10 +154,36 @@ function MediaLibrary() {
     searchMutation.mutate();
   }, [selectedMediaIds.size, searchMutation]);
 
-  // Sort media and pre-compute formatted dates
-  const sortedMediaWithFormattedDates = useMemo(() => {
+  // Filter and sort media, pre-compute formatted dates
+  const filteredAndSortedMedia = useMemo(() => {
     if (!mediaData?.media) return [];
-    const sorted = [...mediaData.media];
+
+    // Filter media based on search query
+    let filtered = mediaData.media;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = mediaData.media.filter(item => {
+        // Search in title
+        if (item.title.toLowerCase().includes(query)) return true;
+
+        // Search in status
+        if (item.status.toLowerCase().includes(query)) return true;
+
+        // Search in quality profile
+        if (item.qualityProfileName?.toLowerCase().includes(query)) return true;
+
+        // Search in formatted date
+        if (item.lastTriggered) {
+          const formattedDate = format(new Date(item.lastTriggered), 'PPp').toLowerCase();
+          if (formattedDate.includes(query)) return true;
+        }
+
+        return false;
+      });
+    }
+
+    // Sort filtered results
+    const sorted = [...filtered];
     sorted.sort((a, b) => {
       let comparison = 0;
       if (sortField === 'title') {
@@ -165,7 +201,7 @@ function MediaLibrary() {
       ...item,
       formattedDate: item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never'
     }));
-  }, [mediaData?.media, sortField, sortDirection]);
+  }, [mediaData?.media, sortField, sortDirection, searchQuery]);
 
   // Check if any instances are configured
   const hasAnyInstances = useMemo(() => {
@@ -179,7 +215,7 @@ function MediaLibrary() {
   // Virtual scrolling setup
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
-    count: sortedMediaWithFormattedDates.length,
+    count: filteredAndSortedMedia.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 50, // Estimated row height
     overscan: 5, // Render 5 extra items above and below viewport
@@ -237,11 +273,25 @@ function MediaLibrary() {
             <Heading size="5">Media Library</Heading>
             {mediaData && (
               <Text size="2" color="gray">
-                {mediaData.media.length} items ({selectedMediaIds.size} selected)
+                {filteredAndSortedMedia.length} of {mediaData.media.length} items ({selectedMediaIds.size} selected)
               </Text>
             )}
           </Flex>
           <Separator />
+
+          {/* Search Bar */}
+          {mediaData && mediaData.media.length > 0 && (
+            <TextField.Root
+              placeholder="Search by title, status, quality profile, or date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              size="2"
+            >
+              <TextField.Slot>
+                <MagnifyingGlassIcon height="16" width="16" />
+              </TextField.Slot>
+            </TextField.Root>
+          )}
 
           {isLoading && (
             <Flex justify="center" p="6">
@@ -330,7 +380,7 @@ function MediaLibrary() {
                   }}
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const item = sortedMediaWithFormattedDates[virtualRow.index];
+                    const item = filteredAndSortedMedia[virtualRow.index];
                     return (
                       <Flex
                         key={item.id}

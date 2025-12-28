@@ -1,10 +1,12 @@
-import { createContext, useContext, useCallback, ReactNode, useRef } from 'react';
+import { createContext, useContext, useCallback, ReactNode, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface NavigationContextType {
   handleNavigation: (path: string) => void;
   registerNavigationGuard: (guard: (path: string) => boolean | Promise<boolean>) => void;
   unregisterNavigationGuard: () => void;
+  lastLibraryUrl: string;
+  setLastLibraryUrl: (url: string) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -12,6 +14,7 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const navigationGuardRef = useRef<((path: string) => boolean | Promise<boolean>) | null>(null);
+  const [lastLibraryUrl, setLastLibraryUrl] = useState<string>('/library');
 
   const handleNavigation = useCallback(async (path: string) => {
     // If there's a navigation guard, check if navigation is allowed
@@ -33,7 +36,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <NavigationContext.Provider value={{ handleNavigation, registerNavigationGuard, unregisterNavigationGuard }}>
+    <NavigationContext.Provider value={{ handleNavigation, registerNavigationGuard, unregisterNavigationGuard, lastLibraryUrl, setLastLibraryUrl }}>
       {children}
     </NavigationContext.Provider>
   );
