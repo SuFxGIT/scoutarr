@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Flex,
   Heading,
@@ -10,7 +12,6 @@ import {
   Spinner,
   Box,
   Select,
-  Table,
   Checkbox,
   Callout,
 } from '@radix-ui/themes';
@@ -35,7 +36,11 @@ const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
 type AppType = typeof APP_TYPES[number];
 
 function MediaLibrary() {
-  const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial instance from URL or use null
+  const initialInstance = searchParams.get('instance');
+  const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
   const [sortField, setSortField] = useState<'title' | 'lastTriggered'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -100,18 +105,20 @@ function MediaLibrary() {
   const handleInstanceChange = (value: string) => {
     setSelectedInstance(value);
     setSelectedMediaIds(new Set()); // Clear selection when changing instance
+    // Update URL to persist instance selection
+    setSearchParams({ instance: value });
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (!mediaData) return;
     if (selectedMediaIds.size === mediaData.media.length) {
       setSelectedMediaIds(new Set());
     } else {
       setSelectedMediaIds(new Set(mediaData.media.map((m: MediaLibraryItem) => m.id)));
     }
-  };
+  }, [mediaData, selectedMediaIds.size]);
 
-  const handleSelectItem = (mediaId: number) => {
+  const handleSelectItem = useCallback((mediaId: number) => {
     setSelectedMediaIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(mediaId)) {
@@ -121,24 +128,24 @@ function MediaLibrary() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleSort = (field: 'title' | 'lastTriggered') => {
+  const handleSort = useCallback((field: 'title' | 'lastTriggered') => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
       setSortDirection('asc');
     }
-  };
+  }, [sortField]);
 
-  const handleManualSearch = async () => {
+  const handleManualSearch = useCallback(async () => {
     if (selectedMediaIds.size === 0) return;
     searchMutation.mutate();
-  };
+  }, [selectedMediaIds.size, searchMutation]);
 
-  // Sort media
-  const sortedMedia = useMemo(() => {
+  // Sort media and pre-compute formatted dates
+  const sortedMediaWithFormattedDates = useMemo(() => {
     if (!mediaData?.media) return [];
     const sorted = [...mediaData.media];
     sorted.sort((a, b) => {
@@ -152,7 +159,12 @@ function MediaLibrary() {
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-    return sorted;
+
+    // Pre-compute formatted dates to avoid formatting on every render
+    return sorted.map(item => ({
+      ...item,
+      formattedDate: item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never'
+    }));
   }, [mediaData?.media, sortField, sortDirection]);
 
   // Check if any instances are configured
@@ -163,6 +175,15 @@ function MediaLibrary() {
       return instances && instances.length > 0;
     });
   }, [config]);
+
+  // Virtual scrolling setup
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: sortedMediaWithFormattedDates.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // Estimated row height
+    overscan: 5, // Render 5 extra items above and below viewport
+  });
 
   return (
     <Flex direction="column" gap="4">
@@ -255,73 +276,109 @@ function MediaLibrary() {
 
           {mediaData && mediaData.media.length > 0 && (
             <>
-              <Table.Root variant="surface">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell style={{ width: '50px' }}>
-                      <Checkbox
-                        checked={selectedMediaIds.size === mediaData.media.length}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell
-                      onClick={() => handleSort('title')}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <Flex align="center" gap="1">
-                        Title
-                        {sortField === 'title' &&
-                          (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                      </Flex>
-                    </Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Quality Profile</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Monitored</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell
-                      onClick={() => handleSort('lastTriggered')}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <Flex align="center" gap="1">
-                        Last Triggered
-                        {sortField === 'lastTriggered' &&
-                          (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                      </Flex>
-                    </Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
+              {/* Virtual Table Container */}
+              <Box style={{ overflow: 'auto', maxHeight: '600px' }} ref={parentRef}>
+                {/* Table Header - Fixed */}
+                <Flex
+                  style={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                    backgroundColor: 'var(--color-panel)',
+                    borderBottom: '1px solid var(--gray-6)',
+                  }}
+                  p="2"
+                  gap="2"
+                >
+                  <Box style={{ width: '50px', flexShrink: 0 }}>
+                    <Checkbox
+                      checked={selectedMediaIds.size === mediaData.media.length}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </Box>
+                  <Box
+                    style={{ flex: '2', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('title')}
+                  >
+                    <Flex align="center" gap="1">
+                      Title
+                      {sortField === 'title' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                  <Box style={{ flex: '1', fontWeight: 500 }}>Status</Box>
+                  <Box style={{ flex: '1.5', fontWeight: 500 }}>Quality Profile</Box>
+                  <Box style={{ flex: '0.8', fontWeight: 500 }}>Monitored</Box>
+                  <Box
+                    style={{ flex: '1.5', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('lastTriggered')}
+                  >
+                    <Flex align="center" gap="1">
+                      Last Triggered
+                      {sortField === 'lastTriggered' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                </Flex>
 
-                <Table.Body>
-                  {sortedMedia.map((item: MediaLibraryItem) => (
-                    <Table.Row key={item.id}>
-                      <Table.Cell>
-                        <Checkbox
-                          checked={selectedMediaIds.has(item.id)}
-                          onCheckedChange={() => handleSelectItem(item.id)}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>{item.title}</Table.Cell>
-                      <Table.Cell>
-                        <Badge size="1" variant="soft">
-                          {item.status}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2">{item.qualityProfileName || 'N/A'}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge size="1" color={item.monitored ? 'green' : 'gray'}>
-                          {item.monitored ? 'Yes' : 'No'}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">
-                          {item.lastTriggered ? format(new Date(item.lastTriggered), 'PPp') : 'Never'}
-                        </Text>
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
+                {/* Virtualized Table Body */}
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const item = sortedMediaWithFormattedDates[virtualRow.index];
+                    return (
+                      <Flex
+                        key={item.id}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                          borderBottom: '1px solid var(--gray-4)',
+                        }}
+                        p="2"
+                        gap="2"
+                        align="center"
+                      >
+                        <Box style={{ width: '50px', flexShrink: 0 }}>
+                          <Checkbox
+                            checked={selectedMediaIds.has(item.id)}
+                            onCheckedChange={() => handleSelectItem(item.id)}
+                          />
+                        </Box>
+                        <Box style={{ flex: '2' }}>
+                          <Text size="2">{item.title}</Text>
+                        </Box>
+                        <Box style={{ flex: '1' }}>
+                          <Badge size="1" variant="soft">
+                            {item.status}
+                          </Badge>
+                        </Box>
+                        <Box style={{ flex: '1.5' }}>
+                          <Text size="2">{item.qualityProfileName || 'N/A'}</Text>
+                        </Box>
+                        <Box style={{ flex: '0.8' }}>
+                          <Badge size="1" color={item.monitored ? 'green' : 'gray'}>
+                            {item.monitored ? 'Yes' : 'No'}
+                          </Badge>
+                        </Box>
+                        <Box style={{ flex: '1.5' }}>
+                          <Text size="2" color="gray">
+                            {item.formattedDate}
+                          </Text>
+                        </Box>
+                      </Flex>
+                    );
+                  })}
+                </div>
+              </Box>
 
               {/* Manual Search Button */}
               <Flex justify="end" gap="2" pt="3">
