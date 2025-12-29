@@ -68,8 +68,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       // Fetch and sync quality profiles
       logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
       const profiles = await service.getQualityProfiles(instance);
-      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
-      await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
       // Convert tag IDs to names before syncing
       logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
@@ -81,9 +79,18 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       );
       logger.debug('✅ [Scoutarr] Tag IDs converted to names');
 
+      // Add quality profile names to media items
+      logger.debug('🔧 [Scoutarr] Adding quality profile names');
+      const profileMap = new Map(profiles.map(p => [p.id, p.name]));
+      const mediaWithProfileNames = mediaWithTagNames.map(item => ({
+        ...item,
+        qualityProfileName: profileMap.get(item.qualityProfileId) || 'Unknown'
+      }));
+      logger.debug('✅ [Scoutarr] Quality profile names added');
+
       // Sync to database first (before filtering)
-      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
-      await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
+      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithProfileNames.length });
+      await statsService.syncMediaToDatabase(instanceId, mediaWithProfileNames);
       logger.debug('✅ [Scoutarr DB] Synced media to database');
 
       // Apply instance filter settings
@@ -109,6 +116,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
           monitored: m.monitored,
           tags: m.tags,
           qualityProfileId: m.quality_profile_id,
+          qualityProfileName: m.quality_profile_name || undefined,
           status: m.status,
           lastSearchTime: m.last_search_time || undefined,
           added: m.added || undefined,
@@ -138,8 +146,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         // Fetch and sync quality profiles
         logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
         const profiles = await service.getQualityProfiles(instance);
-        logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
-        await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
         // Convert tag IDs to names before syncing
         logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
@@ -151,9 +157,18 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         );
         logger.debug('✅ [Scoutarr] Tag IDs converted to names');
 
+        // Add quality profile names to media items
+        logger.debug('🔧 [Scoutarr] Adding quality profile names');
+        const profileMap2 = new Map(profiles.map(p => [p.id, p.name]));
+        const mediaWithProfileNames2 = mediaWithTagNames.map(item => ({
+          ...item,
+          qualityProfileName: profileMap2.get(item.qualityProfileId) || 'Unknown'
+        }));
+        logger.debug('✅ [Scoutarr] Quality profile names added');
+
         // Sync to database
-        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
-        await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
+        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithProfileNames2.length });
+        await statsService.syncMediaToDatabase(instanceId, mediaWithProfileNames2);
         logger.debug('✅ [Scoutarr DB] Synced media to database');
 
         // Apply instance filter settings
@@ -165,11 +180,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         });
       }
     }
-
-    // Get quality profiles for name mapping (from cache)
-    logger.debug('💾 [Scoutarr DB] Loading quality profiles from cache');
-    const profiles = await statsService.getQualityProfilesFromDatabase(instanceId);
-    const profileMap = new Map(profiles.map(p => [p.id, p.name]));
 
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
@@ -213,7 +223,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         monitored: m.monitored,
         status: m.status,
         qualityProfileId: m.qualityProfileId,
-        qualityProfileName: profileMap.get(m.qualityProfileId),
+        qualityProfileName: m.qualityProfileName,
         tags: m.tags,
         lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
         dateImported: dateImported || m.added, // File import date, fallback to when added to library

@@ -79,7 +79,6 @@ class SyncSchedulerService {
             // Fetch quality profiles from API
             logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
             const profiles = await service.getQualityProfiles(instance);
-            await statsService.syncQualityProfilesToDatabase(instance.id, profiles);
 
             // Fetch all media from API
             const allMedia = await service.getMedia(instance);
@@ -95,8 +94,17 @@ class SyncSchedulerService {
             );
             logger.debug('✅ Tag IDs converted to names');
 
+            // Add quality profile names to media items
+            logger.debug('🔧 Adding quality profile names');
+            const profileMap = new Map(profiles.map(p => [p.id, p.name]));
+            const mediaWithProfileNames = mediaWithTagNames.map(item => ({
+              ...item,
+              qualityProfileName: profileMap.get(item.qualityProfileId) || 'Unknown'
+            }));
+            logger.debug('✅ Quality profile names added');
+
             // Sync to database
-            await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
+            await statsService.syncMediaToDatabase(instance.id, mediaWithProfileNames);
             logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
             totalSynced += allMedia.length;
@@ -140,7 +148,6 @@ class SyncSchedulerService {
       // Fetch quality profiles from API
       logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
       const profiles = await service.getQualityProfiles(instance);
-      await statsService.syncQualityProfilesToDatabase(instance.id, profiles);
 
       // Fetch all media from API
       const allMedia = await service.getMedia(instance);
@@ -156,8 +163,17 @@ class SyncSchedulerService {
       );
       logger.debug('✅ Tag IDs converted to names');
 
+      // Add quality profile names to media items
+      logger.debug('🔧 Adding quality profile names');
+      const profileMap = new Map(profiles.map(p => [p.id, p.name]));
+      const mediaWithProfileNames = mediaWithTagNames.map(item => ({
+        ...item,
+        qualityProfileName: profileMap.get(item.qualityProfileId) || 'Unknown'
+      }));
+      logger.debug('✅ Quality profile names added');
+
       // Sync to database
-      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
+      await statsService.syncMediaToDatabase(instance.id, mediaWithProfileNames);
       logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
     } catch (error: unknown) {
       logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {

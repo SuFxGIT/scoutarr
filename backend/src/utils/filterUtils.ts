@@ -9,6 +9,7 @@ export interface FilterableMedia {
   monitored: boolean;
   tags: string[]; // Tag names, not IDs
   qualityProfileId: number;
+  qualityProfileName?: string; // Profile name for filtering
   status: string;
   lastSearchTime?: string;
   added?: string;
@@ -61,18 +62,9 @@ export async function applyCommonFilters<T extends FilterableMedia>(
     filtered = filtered.filter(m => !m.tags.includes(tagName));
   }
 
-  // Filter by quality profile
+  // Filter by quality profile name
   if (config.qualityProfileName) {
-    const profiles = await config.getQualityProfiles();
-    const profile = profiles.find(p => p.name === config.qualityProfileName);
-    if (profile) {
-      filtered = filtered.filter(m => m.qualityProfileId === profile.id);
-    } else {
-      logger.warn('⚠️  Quality profile not found, skipping profile filter', {
-        profileName: config.qualityProfileName,
-        availableProfiles: profiles.map(p => p.name)
-      });
-    }
+    filtered = filtered.filter(m => m.qualityProfileName === config.qualityProfileName);
   }
 
   // Filter out media with ignore tag (by name)

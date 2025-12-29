@@ -106,17 +106,6 @@ class StatsService {
       )
     `);
 
-    // Create quality_profiles table to cache quality profiles
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS quality_profiles (
-        instance_id TEXT NOT NULL,
-        profile_id INTEGER NOT NULL,
-        profile_name TEXT NOT NULL,
-        synced_at TEXT NOT NULL,
-        PRIMARY KEY (instance_id, profile_id),
-        FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
-      )
-    `);
 
     // Create indexes for better query performance
     this.db.exec(`
@@ -192,6 +181,38 @@ class StatsService {
       }
     } catch (error: unknown) {
       logger.warn('⚠️  Error dropping tagged_media table', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Add quality_profile_name column to media_library table
+    try {
+      const mediaColumns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
+      const hasQualityProfileName = mediaColumns.some(col => col.name === 'quality_profile_name');
+
+      if (!hasQualityProfileName) {
+        logger.info('📦 Adding quality_profile_name column to media_library table');
+        this.db.exec('ALTER TABLE media_library ADD COLUMN quality_profile_name TEXT');
+        logger.info('✅ quality_profile_name column added successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error adding quality_profile_name column', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Drop quality_profiles table (no longer needed)
+    try {
+      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
+      const hasQualityProfiles = tables.some(t => t.name === 'quality_profiles');
+
+      if (hasQualityProfiles) {
+        logger.info('🗑️  Dropping quality_profiles table (migrating to inline storage)');
+        this.db.exec('DROP TABLE IF EXISTS quality_profiles');
+        logger.info('✅ quality_profiles table removed successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error dropping quality_profiles table', {
         error: getErrorMessage(error)
       });
     }
@@ -677,6 +698,7 @@ class StatsService {
       monitored: boolean;
       tags: string[]; // Tag names, not IDs
       qualityProfileId: number;
+      qualityProfileName?: string; // Profile name from API
       status: string;
       lastSearchTime?: string;
       added?: string;
@@ -695,15 +717,16 @@ class StatsService {
       // Use a transaction for better performance
       const insertStmt = this.db.prepare(`
         INSERT INTO media_library (
-          instance_id, media_id, title, monitored, tags, quality_profile_id,
+          instance_id, media_id, title, monitored, tags, quality_profile_id, quality_profile_name,
           status, last_search_time, added, date_imported, has_file, custom_score,
           custom_format_score, raw_data, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id, media_id) DO UPDATE SET
           title = excluded.title,
           monitored = excluded.monitored,
           tags = excluded.tags,
           quality_profile_id = excluded.quality_profile_id,
+          quality_profile_name = excluded.quality_profile_name,
           status = excluded.status,
           last_search_time = excluded.last_search_time,
           added = excluded.added,
@@ -760,6 +783,7 @@ class StatsService {
             item.monitored ? 1 : 0,
             JSON.stringify(item.tags),
             item.qualityProfileId,
+            item.qualityProfileName || null,
             item.status,
             item.lastSearchTime || null,
             item.added || null,
@@ -808,6 +832,7 @@ class StatsService {
     monitored: boolean;
     tags: string[]; // Tag names, not IDs
     quality_profile_id: number;
+    quality_profile_name: string | null; // Profile name
     status: string;
     last_search_time: string | null;
     added: string | null;
@@ -849,6 +874,7 @@ class StatsService {
         monitored: number;
         tags: string;
         quality_profile_id: number;
+        quality_profile_name: string | null;
         status: string;
         last_search_time: string | null;
         added: string | null;
@@ -867,6 +893,7 @@ class StatsService {
         monitored: row.monitored === 1,
         tags: JSON.parse(row.tags) as string[], // Tag names, not IDs
         quality_profile_id: row.quality_profile_id,
+        quality_profile_name: row.quality_profile_name,
         status: row.status,
         last_search_time: row.last_search_time,
         added: row.added,
@@ -922,69 +949,6 @@ class StatsService {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Error deleting media for instance', { error: errorMessage });
       throw error;
-    }
-  }
-
-  // ========== Quality Profiles Management ==========
-
-  async syncQualityProfilesToDatabase(
-    instanceId: string,
-    profiles: Array<{ id: number; name: string }>
-  ): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
-    try {
-      const syncTime = new Date().toISOString();
-
-      // Delete existing profiles for this instance
-      const deleteStmt = this.db.prepare('DELETE FROM quality_profiles WHERE instance_id = ?');
-      deleteStmt.run(instanceId);
-
-      // Insert new profiles
-      const insertStmt = this.db.prepare(`
-        INSERT INTO quality_profiles (instance_id, profile_id, profile_name, synced_at)
-        VALUES (?, ?, ?, ?)
-      `);
-
-      const transaction = this.db.transaction((profs: typeof profiles) => {
-        for (const profile of profs) {
-          insertStmt.run(instanceId, profile.id, profile.name, syncTime);
-        }
-      });
-
-      transaction(profiles);
-
-      logger.debug('💾 [Scoutarr DB] Synced quality profiles to database', {
-        instanceId,
-        count: profiles.length
-      });
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error syncing quality profiles to database', { error: errorMessage });
-      throw error;
-    }
-  }
-
-  async getQualityProfilesFromDatabase(
-    instanceId: string
-  ): Promise<Array<{ id: number; name: string }>> {
-    if (!this.db) return [];
-
-    try {
-      const stmt = this.db.prepare('SELECT profile_id, profile_name FROM quality_profiles WHERE instance_id = ?');
-      const results = stmt.all(instanceId) as Array<{
-        profile_id: number;
-        profile_name: string;
-      }>;
-
-      return results.map(row => ({
-        id: row.profile_id,
-        name: row.profile_name
-      }));
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting quality profiles from database', { error: errorMessage });
-      return [];
     }
   }
 
