@@ -136,9 +136,32 @@ async function processAppInstances<T extends StarrInstanceConfig>(
   for (let i = 0; i < instances.length; i++) {
     const instanceConfig = instances[i];
     const { instanceName, instanceId } = getInstanceInfo(instanceConfig, appType);
-    
-      const processor = createProcessor(instanceName, instanceConfig, appType, instanceId, unattended);
-      const result = await processApplication(processor);
+
+    const processor = createProcessor(instanceName, instanceConfig, appType, instanceId, unattended);
+
+    // Load media from database cache instead of fetching from API
+    logger.debug('💾 [Scoutarr DB] Loading media from cache for search', { instanceId, appType });
+    const dbMedia = await statsService.getMediaFromDatabase(instanceId);
+
+    let preloadedMedia;
+    if (dbMedia.length > 0) {
+      logger.debug('✅ [Scoutarr DB] Using cached media for search', { count: dbMedia.length });
+      // Convert database format to API format
+      preloadedMedia = dbMedia.map(m => ({
+        id: m.media_id,
+        title: m.title,
+        monitored: m.monitored,
+        tags: m.tags,
+        qualityProfileId: m.quality_profile_id,
+        status: m.status,
+        lastSearchTime: m.last_search_time || undefined,
+        added: m.added || undefined,
+      }));
+    } else {
+      logger.warn('⚠️  No cached media found, will fetch from API', { instanceId, appType });
+    }
+
+    const result = await processApplication(processor, preloadedMedia as any);
     const resultKey = getResultKey(instanceId, appType, instances.length);
     results[resultKey] = {
       ...result,
@@ -237,16 +260,18 @@ interface ApplicationProcessor<TMedia extends FilterableMedia> {
 
 // Generic function to process an application
 export async function processApplication<TMedia extends FilterableMedia>(
-  processor: ApplicationProcessor<TMedia>
+  processor: ApplicationProcessor<TMedia>,
+  preloadedMedia?: TMedia[]
 ): Promise<SearchResult> {
   try {
     logger.info(`Processing ${processor.name} search`, {
       count: processor.config.count,
       tagName: processor.config.tagName,
-      unattended: processor.unattended
+      unattended: processor.unattended,
+      usingCache: !!preloadedMedia
     });
 
-    let allMedia = await processor.getMedia(processor.config);
+    let allMedia = preloadedMedia || await processor.getMedia(processor.config);
     let filtered = await processor.filterMedia(processor.config, allMedia);
 
     // Unattended mode: if no media found, remove tag from all and re-filter
