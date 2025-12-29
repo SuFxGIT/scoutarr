@@ -255,14 +255,8 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: 'Instance not found or not configured' });
     }
 
-    if (!instanceConfig.tagName) {
-      logger.warn(`⚠️  Tag name not configured for instance`, { app, instanceId });
-      return res.status(400).json({ error: 'Tag name not configured for this instance' });
-    }
-
     logger.debug(`✅ Instance config found`, {
       instanceName: instanceConfig.name,
-      tagName: instanceConfig.tagName,
       url: instanceConfig.url
     });
 
@@ -270,25 +264,26 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     const service = getServiceForApp(app as AppType);
     logger.debug(`🔧 Service retrieved for ${app}`);
 
-    // Get tag ID based on app type
-    logger.debug(`🏷️  Getting tag ID`, { tagName: instanceConfig.tagName });
-    let tagId: number | null;
-    try {
-      tagId = await service.getTagId(instanceConfig, instanceConfig.tagName);
-    } catch (error: unknown) {
-      return res.status(400).json({ error: getErrorMessage(error) });
+    // Get list of Scoutarr-managed tags from instances table
+    const instance = await statsService.getInstance(instanceId);
+    if (!instance) {
+      logger.warn(`⚠️  Instance not found in database`, { instanceId });
+      return res.status(404).json({ error: 'Instance not found in database' });
     }
 
-    if (tagId === null) {
-      logger.info(`ℹ️  Tag does not exist, nothing to clear`, { tagName: instanceConfig.tagName });
-      return res.json({ success: true, message: 'Tag does not exist, nothing to clear' });
+    const scoutarrTags = JSON.parse(instance.scoutarr_tags || '[]') as string[];
+    const ignoreTags = JSON.parse(instance.ignore_tags || '[]') as string[];
+    const allManagedTags = [...scoutarrTags, ...ignoreTags];
+
+    if (allManagedTags.length === 0) {
+      logger.info(`ℹ️  No managed tags found for instance`, { instanceId });
+      return res.json({ success: true, message: 'No managed tags to clear' });
     }
 
-    logger.debug(`✅ Tag ID found`, { tagId });
+    logger.debug(`🏷️  Found managed tags to clear`, { tags: allManagedTags });
 
-    // Fetch all media from the Starr application to find items with the tag
-    // This approach works even if database tracking has been cleared
-    logger.debug(`📋 Fetching all media from ${app} to find tagged items`);
+    // Fetch all media from API to find items with tags
+    logger.debug(`📋 Fetching all media from ${app}`);
     let allMedia: any[];
     try {
       allMedia = await service.getMedia(instanceConfig);
@@ -298,53 +293,48 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: `Failed to fetch media: ${getErrorMessage(error)}` });
     }
 
-    // Filter media items that have the tag
-    const taggedMedia = allMedia.filter(media => media.tags && media.tags.includes(tagId));
-    const taggedMediaIds = taggedMedia.map(media => service.getMediaId(media));
+    // Convert tag IDs in media to tag names
+    const mediaWithTagNames = await Promise.all(
+      allMedia.map(async (item) => {
+        const tagNames = await service.convertTagIdsToNames(instanceConfig, item.tags);
+        return { ...item, tagNames };
+      })
+    );
 
-    logger.debug(`📋 Found ${taggedMediaIds.length} media items with tag in ${app}`, {
-      app,
-      instanceId,
-      tagId,
-      tagName: instanceConfig.tagName
-    });
-
-    if (taggedMediaIds.length === 0) {
-      logger.info(`ℹ️  No media found with tag`, { tagName: instanceConfig.tagName });
-      // Also clear any stale database records just in case
-      await statsService.clearTaggedMedia(app, instanceId, tagId);
-      return res.json({ success: true, message: 'No media found with this tag' });
+    // Clear each managed tag
+    let totalCleared = 0;
+    for (const tagName of allManagedTags) {
+      const tagId = await service.getTagId(instanceConfig, tagName);
+      if (tagId !== null) {
+        // Find media with this tag (by name)
+        const taggedMedia = mediaWithTagNames.filter(m => m.tagNames.includes(tagName));
+        if (taggedMedia.length > 0) {
+          const taggedMediaIds = taggedMedia.map(media => service.getMediaId(media));
+          logger.debug(`🏷️  Removing tag "${tagName}" from ${taggedMediaIds.length} items`);
+          await service.removeTag(instanceConfig, taggedMediaIds, tagId);
+          totalCleared += taggedMediaIds.length;
+        }
+      }
     }
 
-    logger.debug(`📋 Prepared ${taggedMediaIds.length} media IDs for tag removal`);
-
-    // Remove tag from media based on app type
-    logger.debug(`🏷️  Removing tag from media items`, { count: taggedMediaIds.length });
-    try {
-      await service.removeTag(instanceConfig, taggedMediaIds, tagId);
-      logger.debug(`✅ Tag removal request completed`);
-
-      // Clear tracked media records from database after successful removal
-      await statsService.clearTaggedMedia(app, instanceId, tagId);
-      logger.debug(`✅ Cleared tracked media records from database`);
-    } catch (error: unknown) {
-      return res.status(400).json({ error: getErrorMessage(error) });
-    }
+    // Clear scoutarr_tags list from database
+    await statsService.clearScoutarrTagsFromInstance(instanceId);
+    logger.debug(`✅ Cleared scoutarr tags from instance database record`);
 
     // Get media type name for logging
     const mediaTypeName = getMediaTypeKey(app as AppType);
 
-    logger.info(`✅ Cleared tag from ${taggedMediaIds.length} ${mediaTypeName}`, {
+    logger.info(`✅ Cleared ${allManagedTags.length} tags from ${totalCleared} ${mediaTypeName}`, {
       app,
       instanceId,
-      tagName: instanceConfig.tagName,
-      tagId,
-      count: taggedMediaIds.length
+      tags: allManagedTags,
+      count: totalCleared
     });
     res.json({
       success: true,
-      message: `Cleared tag from ${taggedMediaIds.length} ${mediaTypeName}`,
-      count: taggedMediaIds.length
+      message: `Cleared ${allManagedTags.length} tags from ${totalCleared} ${mediaTypeName}`,
+      count: totalCleared,
+      tags: allManagedTags
     });
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to clear tags');

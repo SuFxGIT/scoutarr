@@ -85,8 +85,18 @@ class SyncSchedulerService {
             const allMedia = await service.getMedia(instance);
             logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
 
+            // Convert tag IDs to names before syncing
+            logger.debug('🏷️  Converting tag IDs to names');
+            const mediaWithTagNames = await Promise.all(
+              allMedia.map(async (item) => {
+                const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+                return { ...item, tags: tagNames };
+              })
+            );
+            logger.debug('✅ Tag IDs converted to names');
+
             // Sync to database
-            await statsService.syncMediaToDatabase(instance.id, allMedia);
+            await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
             logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
             totalSynced += allMedia.length;
@@ -136,8 +146,18 @@ class SyncSchedulerService {
       const allMedia = await service.getMedia(instance);
       logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
 
+      // Convert tag IDs to names before syncing
+      logger.debug('🏷️  Converting tag IDs to names');
+      const mediaWithTagNames = await Promise.all(
+        allMedia.map(async (item) => {
+          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+          return { ...item, tags: tagNames };
+        })
+      );
+      logger.debug('✅ Tag IDs converted to names');
+
       // Sync to database
-      await statsService.syncMediaToDatabase(instance.id, allMedia);
+      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
       logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
     } catch (error: unknown) {
       logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {

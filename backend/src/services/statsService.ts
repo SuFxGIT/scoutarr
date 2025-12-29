@@ -68,18 +68,6 @@ class StatsService {
       )
     `);
 
-    // Create tagged_media table to track which tags were added by this application
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tagged_media (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        application TEXT NOT NULL,
-        instance_id TEXT NOT NULL,
-        tag_id INTEGER NOT NULL,
-        media_id INTEGER NOT NULL,
-        timestamp TEXT NOT NULL,
-        UNIQUE(application, instance_id, tag_id, media_id)
-      )
-    `);
 
     // Create instances table to store instance metadata
     this.db.exec(`
@@ -87,6 +75,8 @@ class StatsService {
         instance_id TEXT PRIMARY KEY,
         application TEXT NOT NULL,
         display_name TEXT,
+        scoutarr_tags TEXT,
+        ignore_tags TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -133,9 +123,6 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_upgrades_application ON upgrades(application);
       CREATE INDEX IF NOT EXISTS idx_upgrades_instance ON upgrades(instance);
-      CREATE INDEX IF NOT EXISTS idx_tagged_media_app_instance ON tagged_media(application, instance_id);
-      CREATE INDEX IF NOT EXISTS idx_tagged_media_tag_id ON tagged_media(tag_id);
-      CREATE INDEX IF NOT EXISTS idx_tagged_media_media_id ON tagged_media(media_id);
       CREATE INDEX IF NOT EXISTS idx_instances_application ON instances(application);
       CREATE INDEX IF NOT EXISTS idx_media_library_instance ON media_library(instance_id);
       CREATE INDEX IF NOT EXISTS idx_media_library_media_id ON media_library(media_id);
@@ -158,6 +145,53 @@ class StatsService {
       }
     } catch (error: unknown) {
       logger.warn('⚠️  Error checking/adding custom_format_score column', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Add scoutarr_tags and ignore_tags columns to instances table
+    try {
+      const instanceColumns = this.db.pragma('table_info(instances)') as Array<{ name: string }>;
+      const hasScoutarrTags = instanceColumns.some(col => col.name === 'scoutarr_tags');
+      const hasIgnoreTags = instanceColumns.some(col => col.name === 'ignore_tags');
+
+      if (!hasScoutarrTags) {
+        logger.info('📦 Adding scoutarr_tags column to instances table');
+        this.db.exec('ALTER TABLE instances ADD COLUMN scoutarr_tags TEXT');
+        // Initialize existing records with empty arrays
+        this.db.exec("UPDATE instances SET scoutarr_tags = '[]' WHERE scoutarr_tags IS NULL");
+        logger.info('✅ scoutarr_tags column added successfully');
+      }
+
+      if (!hasIgnoreTags) {
+        logger.info('📦 Adding ignore_tags column to instances table');
+        this.db.exec('ALTER TABLE instances ADD COLUMN ignore_tags TEXT');
+        // Initialize existing records with empty arrays
+        this.db.exec("UPDATE instances SET ignore_tags = '[]' WHERE ignore_tags IS NULL");
+        logger.info('✅ ignore_tags column added successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error checking/adding tag columns to instances table', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Drop tagged_media table and indexes (no longer needed)
+    try {
+      // Check if table exists
+      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
+      const hasTaggedMedia = tables.some(t => t.name === 'tagged_media');
+
+      if (hasTaggedMedia) {
+        logger.info('🗑️  Dropping tagged_media table and indexes (migrating to instances table)');
+        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_app_instance');
+        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_tag_id');
+        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_media_id');
+        this.db.exec('DROP TABLE IF EXISTS tagged_media');
+        logger.info('✅ tagged_media table and indexes removed successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error dropping tagged_media table', {
         error: getErrorMessage(error)
       });
     }
@@ -435,13 +469,8 @@ class StatsService {
       const deleteSearchesStmt = this.db.prepare('DELETE FROM upgrades');
       const searchesResult = deleteSearchesStmt.run();
 
-      // Also clear all tagged media records
-      const deleteTaggedMediaStmt = this.db.prepare('DELETE FROM tagged_media');
-      const taggedMediaResult = deleteTaggedMediaStmt.run();
-
-      logger.info('🗑️  Cleared all search data and tagged media records from stats database', {
-        searchesDeleted: searchesResult.changes,
-        taggedMediaDeleted: taggedMediaResult.changes
+      logger.info('🗑️  Cleared all search data from stats database', {
+        searchesDeleted: searchesResult.changes
       });
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -449,67 +478,6 @@ class StatsService {
         error: errorMessage
       });
       throw error;
-    }
-  }
-
-  async addTaggedMedia(
-    application: string,
-    instanceId: string,
-    tagId: number,
-    mediaIds: number[]
-  ): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
-    try {
-      const timestamp = new Date().toISOString();
-      const appKey = application.toLowerCase();
-
-      const insertStmt = this.db.prepare(`
-        INSERT OR IGNORE INTO tagged_media (application, instance_id, tag_id, media_id, timestamp)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-
-      // Insert each media ID individually
-      for (const mediaId of mediaIds) {
-        insertStmt.run(appKey, instanceId, tagId, mediaId, timestamp);
-      }
-
-      logger.debug('🏷️  Tagged media recorded', {
-        application: appKey,
-        instanceId,
-        tagId,
-        count: mediaIds.length
-      });
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error recording tagged media', {
-        error: errorMessage
-      });
-      throw error;
-    }
-  }
-
-  async getTaggedMediaIds(application: string, instanceId: string, tagId: number): Promise<number[]> {
-    if (!this.db) {
-      logger.warn('⚠️  Database not initialized, returning empty array');
-      return [];
-    }
-
-    try {
-      const appKey = application.toLowerCase();
-      const stmt = this.db.prepare(`
-        SELECT DISTINCT media_id
-        FROM tagged_media
-        WHERE application = ? AND instance_id = ? AND tag_id = ?
-      `);
-      const results = stmt.all(appKey, instanceId, tagId) as Array<{ media_id: number }>;
-      return results.map(row => row.media_id);
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting tagged media IDs', {
-        error: errorMessage
-      });
-      return [];
     }
   }
 
@@ -561,54 +529,51 @@ class StatsService {
     }
   }
 
-  async clearTaggedMedia(application: string, instanceId: string, tagId: number): Promise<void> {
-    if (!this.db) {
-      throw new Error('Database not initialized');
-    }
-
-    try {
-      const appKey = application.toLowerCase();
-      const deleteStmt = this.db.prepare(`
-        DELETE FROM tagged_media
-        WHERE application = ? AND instance_id = ? AND tag_id = ?
-      `);
-      const result = deleteStmt.run(appKey, instanceId, tagId);
-      
-      logger.info('🗑️  Cleared tagged media records', {
-        application: appKey,
-        instanceId,
-        tagId,
-        rowsDeleted: result.changes
-      });
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error clearing tagged media', {
-        error: errorMessage
-      });
-      throw error;
-    }
-  }
-
   // ========== Instance Management ==========
 
   async upsertInstance(
     instanceId: string,
     application: string,
-    displayName?: string
+    displayName?: string,
+    scoutarrTags?: string[],
+    ignoreTags?: string[]
   ): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
       const now = new Date().toISOString();
-      const stmt = this.db.prepare(`
-        INSERT INTO instances (instance_id, application, display_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(instance_id) DO UPDATE SET
-          display_name = excluded.display_name,
-          updated_at = excluded.updated_at
-      `);
 
-      stmt.run(instanceId, application.toLowerCase(), displayName || null, now, now);
+      // If tags are provided, use them; otherwise preserve existing values
+      if (scoutarrTags !== undefined || ignoreTags !== undefined) {
+        const stmt = this.db.prepare(`
+          INSERT INTO instances (instance_id, application, display_name, scoutarr_tags, ignore_tags, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(instance_id) DO UPDATE SET
+            display_name = excluded.display_name,
+            scoutarr_tags = excluded.scoutarr_tags,
+            ignore_tags = excluded.ignore_tags,
+            updated_at = excluded.updated_at
+        `);
+        stmt.run(
+          instanceId,
+          application.toLowerCase(),
+          displayName || null,
+          JSON.stringify(scoutarrTags || []),
+          JSON.stringify(ignoreTags || []),
+          now,
+          now
+        );
+      } else {
+        // Don't update tag columns if not provided
+        const stmt = this.db.prepare(`
+          INSERT INTO instances (instance_id, application, display_name, scoutarr_tags, ignore_tags, created_at, updated_at)
+          VALUES (?, ?, ?, '[]', '[]', ?, ?)
+          ON CONFLICT(instance_id) DO UPDATE SET
+            display_name = excluded.display_name,
+            updated_at = excluded.updated_at
+        `);
+        stmt.run(instanceId, application.toLowerCase(), displayName || null, now, now);
+      }
 
       logger.debug('✅ Instance upserted', { instanceId, application, displayName });
     } catch (error: unknown) {
@@ -622,6 +587,8 @@ class StatsService {
     instance_id: string;
     application: string;
     display_name: string | null;
+    scoutarr_tags: string;
+    ignore_tags: string;
     created_at: string;
     updated_at: string;
   } | null> {
@@ -633,6 +600,8 @@ class StatsService {
         instance_id: string;
         application: string;
         display_name: string | null;
+        scoutarr_tags: string;
+        ignore_tags: string;
         created_at: string;
         updated_at: string;
       } | undefined;
@@ -645,6 +614,59 @@ class StatsService {
     }
   }
 
+  /**
+   * Add a scoutarr tag to an instance's tracked tags
+   */
+  async addScoutarrTagToInstance(instanceId: string, tagName: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // Get current instance
+      const instance = await this.getInstance(instanceId);
+      if (!instance) {
+        logger.warn('⚠️  Instance not found, cannot add tag', { instanceId, tagName });
+        return;
+      }
+
+      const scoutarrTags = JSON.parse(instance.scoutarr_tags || '[]') as string[];
+
+      // Add if not already present
+      if (!scoutarrTags.includes(tagName)) {
+        scoutarrTags.push(tagName);
+
+        // Update database
+        const stmt = this.db.prepare(`
+          UPDATE instances SET scoutarr_tags = ?, updated_at = ? WHERE instance_id = ?
+        `);
+        stmt.run(JSON.stringify(scoutarrTags), new Date().toISOString(), instanceId);
+        logger.debug('✅ Added scoutarr tag to instance', { instanceId, tagName });
+      }
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error adding scoutarr tag to instance', { error: errorMessage, instanceId, tagName });
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all scoutarr tags from an instance
+   */
+  async clearScoutarrTagsFromInstance(instanceId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const stmt = this.db.prepare(`
+        UPDATE instances SET scoutarr_tags = '[]', updated_at = ? WHERE instance_id = ?
+      `);
+      stmt.run(new Date().toISOString(), instanceId);
+      logger.info('🗑️  Cleared scoutarr tags from instance', { instanceId });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error clearing scoutarr tags from instance', { error: errorMessage, instanceId });
+      throw error;
+    }
+  }
+
   // ========== Media Library Management ==========
 
   async syncMediaToDatabase(
@@ -653,7 +675,7 @@ class StatsService {
       id: number;
       title: string;
       monitored: boolean;
-      tags: number[];
+      tags: string[]; // Tag names, not IDs
       qualityProfileId: number;
       status: string;
       lastSearchTime?: string;
@@ -784,7 +806,7 @@ class StatsService {
     media_id: number;
     title: string;
     monitored: boolean;
-    tags: number[];
+    tags: string[]; // Tag names, not IDs
     quality_profile_id: number;
     status: string;
     last_search_time: string | null;
@@ -843,7 +865,7 @@ class StatsService {
         media_id: row.media_id,
         title: row.title,
         monitored: row.monitored === 1,
-        tags: JSON.parse(row.tags) as number[],
+        tags: JSON.parse(row.tags) as string[], // Tag names, not IDs
         quality_profile_id: row.quality_profile_id,
         status: row.status,
         last_search_time: row.last_search_time,

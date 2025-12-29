@@ -72,12 +72,11 @@ export interface MediaLibraryItem {
   status: string;
   qualityProfileId: number;
   qualityProfileName?: string;
-  tags: number[];
+  tags: string[]; // Tag names, not IDs
   lastSearched?: string;
   dateImported?: string;
   customFormatScore?: number;
   hasFile?: boolean;
-  customScore?: number;
 }
 
 export interface MediaLibraryResponse {

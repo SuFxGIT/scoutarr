@@ -277,10 +277,12 @@ export async function processApplication<TMedia extends FilterableMedia>(
     // Unattended mode: if no media found, remove tag from all and re-filter
     if (processor.unattended && filtered.length === 0) {
       logger.info(`🔄 Unattended mode: No media found, removing tag from all ${processor.name} and re-filtering`);
-      const tagId = await processor.getTagId(processor.config, processor.config.tagName);
-      if (tagId !== null) {
+      const tagName = processor.config.tagName;
+      const tagId = await processor.getTagId(processor.config, tagName);
+      if (tagId !== null && tagName) {
+        // Filter by tag NAME now (media.tags is now string[])
         const mediaWithTag = allMedia.filter(m => {
-          return m.monitored === processor.config.monitored && Array.isArray(m.tags) && m.tags.includes(tagId);
+          return m.monitored === processor.config.monitored && Array.isArray(m.tags) && m.tags.includes(tagName);
         });
         if (mediaWithTag.length > 0) {
           const mediaIds = mediaWithTag.map(processor.getMediaId);
@@ -318,12 +320,14 @@ export async function processApplication<TMedia extends FilterableMedia>(
     }
 
     // Add tag using editor endpoint
-    const tagId = await processor.getTagId(processor.config, processor.config.tagName);
-    if (tagId !== null && mediaIds.length > 0) {
+    const tagName = processor.config.tagName;
+    const tagId = await processor.getTagId(processor.config, tagName);
+    if (tagId !== null && mediaIds.length > 0 && tagName) {
       await processor.addTag(processor.config, mediaIds, tagId);
-      // Record tagged media in database so we can track which tags were added by this app
-      await statsService.addTaggedMedia(processor.appType, processor.instanceId, tagId, mediaIds);
-      logger.debug(`🏷️  Tagged ${processor.name}`, { mediaIds, tagId, count: mediaIds.length });
+
+      // Track tag in instances table
+      await statsService.addScoutarrTagToInstance(processor.instanceId, tagName);
+      logger.debug(`🏷️  Tagged ${processor.name}`, { mediaIds, tagId, tagName, count: mediaIds.length });
     }
 
     const items = toSearch.map(m => ({

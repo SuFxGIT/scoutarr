@@ -58,6 +58,41 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
   }
 
   /**
+   * Fetches all tags from the *arr API
+   */
+  async getAllTags(config: TConfig): Promise<Array<{ id: number; label: string }>> {
+    try {
+      const client = this.createClient(config);
+      const response = await client.get<Array<{ id: number; label: string }>>(`/api/${this.apiVersion}/tag`);
+      return response.data;
+    } catch (error: unknown) {
+      this.logError('Failed to fetch tags', error, { url: config.url });
+      throw error;
+    }
+  }
+
+  /**
+   * Converts tag IDs to tag names
+   */
+  async convertTagIdsToNames(config: TConfig, tagIds: number[]): Promise<string[]> {
+    if (tagIds.length === 0) return [];
+
+    try {
+      const allTags = await this.getAllTags(config);
+      const tagMap = new Map(allTags.map(t => [t.id, t.label]));
+
+      return tagIds.map(id => {
+        const tagName = tagMap.get(id);
+        return tagName || `unknown-tag-${id}`;
+      });
+    } catch (error: unknown) {
+      this.logError('Failed to convert tag IDs to names', error, { tagIds });
+      // Return unknown tags as fallback
+      return tagIds.map(id => `unknown-tag-${id}`);
+    }
+  }
+
+  /**
    * Adds a tag to media items
    */
   async addTag(config: TConfig, mediaIds: number[], tagId: number): Promise<void> {

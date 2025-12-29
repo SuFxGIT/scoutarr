@@ -7,7 +7,7 @@ import { StarrQualityProfile } from '@scoutarr/shared';
 export interface FilterableMedia {
   id: number;
   monitored: boolean;
-  tags: number[];
+  tags: string[]; // Tag names, not IDs
   qualityProfileId: number;
   status: string;
   lastSearchTime?: string;
@@ -53,12 +53,12 @@ export async function applyCommonFilters<T extends FilterableMedia>(
     filtered = filtered.filter(m => m.monitored === config.monitored);
   }
 
-  // Get tag ID for filtering - always only include media WITHOUT the tag for primary selection.
+  // Filter by tag name - always only include media WITHOUT the tag for primary selection.
   // Unattended mode behavior (removing tags and re-filtering when no media
   // is found) is handled at the scheduler layer, not here.
-  const tagId = await config.getTagId(config.tagName);
-  if (tagId !== null) {
-    filtered = filtered.filter(m => !m.tags.includes(tagId));
+  const tagName = config.tagName;
+  if (tagName) {
+    filtered = filtered.filter(m => !m.tags.includes(tagName));
   }
 
   // Filter by quality profile
@@ -68,19 +68,17 @@ export async function applyCommonFilters<T extends FilterableMedia>(
     if (profile) {
       filtered = filtered.filter(m => m.qualityProfileId === profile.id);
     } else {
-      logger.warn('⚠️  Quality profile not found, skipping profile filter', { 
+      logger.warn('⚠️  Quality profile not found, skipping profile filter', {
         profileName: config.qualityProfileName,
         availableProfiles: profiles.map(p => p.name)
       });
     }
   }
 
-  // Filter out media with ignore tag
+  // Filter out media with ignore tag (by name)
   if (config.ignoreTag) {
-    const ignoreTagId = await config.getTagId(config.ignoreTag);
-    if (ignoreTagId !== null) {
-      filtered = filtered.filter(m => !m.tags.includes(ignoreTagId));
-    }
+    const ignoreTag = config.ignoreTag;
+    filtered = filtered.filter(m => !m.tags.includes(ignoreTag));
   }
 
   return filtered;

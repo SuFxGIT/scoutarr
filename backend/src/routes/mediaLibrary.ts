@@ -71,9 +71,19 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
       await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
+      // Convert tag IDs to names before syncing
+      logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
+      const mediaWithTagNames = await Promise.all(
+        allMedia.map(async (item) => {
+          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+          return { ...item, tags: tagNames };
+        })
+      );
+      logger.debug('✅ [Scoutarr] Tag IDs converted to names');
+
       // Sync to database first (before filtering)
-      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
-      await statsService.syncMediaToDatabase(instanceId, allMedia);
+      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
+      await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
       logger.debug('✅ [Scoutarr DB] Synced media to database');
 
       // Apply instance filter settings
@@ -131,9 +141,19 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
         await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
+        // Convert tag IDs to names before syncing
+        logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
+        const mediaWithTagNames = await Promise.all(
+          allMedia.map(async (item) => {
+            const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+            return { ...item, tags: tagNames };
+          })
+        );
+        logger.debug('✅ [Scoutarr] Tag IDs converted to names');
+
         // Sync to database
-        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
-        await statsService.syncMediaToDatabase(instanceId, allMedia);
+        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
+        await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
         logger.debug('✅ [Scoutarr DB] Synced media to database');
 
         // Apply instance filter settings
@@ -306,10 +326,10 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       await service.addTag(instance, mediaIds, tagId);
       logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: mediaIds.length });
 
-      // Record in tagged_media table (updates last searched date)
-      logger.debug('💾 [Scoutarr DB] Recording tagged media', { count: mediaIds.length });
-      await statsService.addTaggedMedia(appType, instanceId, tagId, mediaIds);
-      logger.debug('✅ [Scoutarr DB] Tagged media recorded in database');
+      // Track tag in instances table
+      logger.debug('💾 [Scoutarr DB] Tracking tag in instance', { tagName });
+      await statsService.addScoutarrTagToInstance(instanceId, tagName);
+      logger.debug('✅ [Scoutarr DB] Tag tracked in instance');
     } else {
       logger.warn('⚠️  [Scoutarr] Tag not found, skipping tag addition', { tagName });
     }

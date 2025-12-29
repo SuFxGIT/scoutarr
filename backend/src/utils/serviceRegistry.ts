@@ -18,6 +18,7 @@ export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
   getQualityProfiles: (config: TConfig) => Promise<Array<{ id: number; name: string }>>;
   addTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
   removeTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
+  convertTagIdsToNames: (config: TConfig, tagIds: number[]) => Promise<string[]>;
 }
 
 /**
@@ -34,7 +35,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     addTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
       radarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
-      radarrService.removeTag(config, mediaIds, tagId)
+      radarrService.removeTag(config, mediaIds, tagId),
+    convertTagIdsToNames: (config: RadarrInstance, tagIds: number[]) =>
+      radarrService.convertTagIdsToNames(config, tagIds)
   },
   sonarr: {
     getMedia: (config: SonarrInstance) => sonarrService.getSeries(config),
@@ -46,7 +49,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     addTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
       sonarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
-      sonarrService.removeTag(config, mediaIds, tagId)
+      sonarrService.removeTag(config, mediaIds, tagId),
+    convertTagIdsToNames: (config: SonarrInstance, tagIds: number[]) =>
+      sonarrService.convertTagIdsToNames(config, tagIds)
   },
   lidarr: {
     getMedia: (config: LidarrInstance) => lidarrService.getArtists(config),
@@ -58,7 +63,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     addTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
       lidarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
-      lidarrService.removeTag(config, mediaIds, tagId)
+      lidarrService.removeTag(config, mediaIds, tagId),
+    convertTagIdsToNames: (config: LidarrInstance, tagIds: number[]) =>
+      lidarrService.convertTagIdsToNames(config, tagIds)
   },
   readarr: {
     getMedia: (config: ReadarrInstance) => readarrService.getAuthors(config),
@@ -70,7 +77,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     addTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
       readarrService.addTag(config, mediaIds, tagId),
     removeTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
-      readarrService.removeTag(config, mediaIds, tagId)
+      readarrService.removeTag(config, mediaIds, tagId),
+    convertTagIdsToNames: (config: ReadarrInstance, tagIds: number[]) =>
+      readarrService.convertTagIdsToNames(config, tagIds)
   }
 };
 
