@@ -2,6 +2,7 @@ import { ReadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export interface ReadarrAuthor extends FilterableMedia {
   authorName: string;
@@ -24,12 +25,71 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
     try {
       const client = this.createClient(config);
       const response = await client.get<ReadarrAuthor[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      // Normalize authorName to title for consistency
       const authors = response.data.map(author => ({
         ...author,
         title: author.authorName || author.title
       }));
-      logger.debug('📥 Fetched authors from Readarr', { count: authors.length, url: config.url });
+
+      // Readarr's /api/v1/author endpoint doesn't include customFormatScore in bookFiles
+      // We need to fetch book files separately to get custom format scores
+      const bookFileIds: number[] = [];
+
+      // Collect all book file IDs from all authors
+      for (const author of authors) {
+        const bookFiles = (author as { bookFiles?: Array<{ id?: number }> }).bookFiles;
+        if (bookFiles && Array.isArray(bookFiles)) {
+          bookFileIds.push(...bookFiles.map(f => f.id).filter((id): id is number => id !== undefined && id > 0));
+        }
+      }
+
+      if (bookFileIds.length > 0) {
+        try {
+          // Batch requests to avoid 414 URI Too Long errors
+          const batchSize = 100;
+          const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
+
+          for (let i = 0; i < bookFileIds.length; i += batchSize) {
+            const batch = bookFileIds.slice(i, i + batchSize);
+            const filesResponse = await client.get<Array<{ id: number; customFormatScore?: number }>>(`/api/${this.apiVersion}/bookfile`, {
+              params: { bookFileIds: batch },
+              paramsSerializer: { indexes: null }
+            });
+            allFiles.push(...filesResponse.data);
+          }
+
+          // Create a map of bookFileId -> customFormatScore
+          const fileScoresMap = new Map(
+            allFiles.map(f => [f.id, f.customFormatScore])
+          );
+
+          // Add customFormatScore to each author's bookFiles
+          return authors.map(author => {
+            const bookFiles = (author as { bookFiles?: Array<{ id?: number }> }).bookFiles;
+            if (bookFiles && Array.isArray(bookFiles) && bookFiles.length > 0) {
+              const updatedBookFiles = bookFiles.map(bookFile => {
+                if (bookFile.id && fileScoresMap.has(bookFile.id)) {
+                  return {
+                    ...bookFile,
+                    customFormatScore: fileScoresMap.get(bookFile.id)
+                  };
+                }
+                return bookFile;
+              });
+              return {
+                ...author,
+                bookFiles: updatedBookFiles
+              } as ReadarrAuthor;
+            }
+            return author;
+          });
+        } catch (error: unknown) {
+          logger.warn('Failed to fetch book files for custom format scores, continuing without scores', {
+            error: getErrorMessage(error)
+          });
+          return authors;
+        }
+      }
+
       return authors;
     } catch (error: unknown) {
       this.logError('Failed to fetch authors', error, { url: config.url });

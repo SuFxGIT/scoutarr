@@ -6,6 +6,7 @@ import { searchRouter } from './routes/search.js';
 import { statusRouter } from './routes/status.js';
 import { statsRouter } from './routes/stats.js';
 import { mediaLibraryRouter } from './routes/mediaLibrary.js';
+import { syncRouter } from './routes/sync.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
@@ -35,6 +36,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/status', statusRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/media-library', mediaLibraryRouter);
+app.use('/api/sync', syncRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -59,13 +61,17 @@ Promise.all([
   configService.initialize(),
   statsService.initialize()
 ]).then(async () => {
-  logger.debug('✅ Core services initialized, initializing scheduler');
+  logger.debug('✅ Core services initialized, initializing schedulers');
   await schedulerService.initialize();
-  
+
+  // Initialize sync scheduler
+  const { syncSchedulerService } = await import('./services/syncSchedulerService.js');
+  syncSchedulerService.start();
+
   logger.debug('📡 Starting HTTP server', { port: PORT });
   server = app.listen(PORT, () => {
-    logger.info(`🚀 Server started successfully`, { 
-      port: PORT, 
+    logger.info(`🚀 Server started successfully`, {
+      port: PORT,
       environment: process.env.NODE_ENV || 'development',
       pid: process.pid
     });

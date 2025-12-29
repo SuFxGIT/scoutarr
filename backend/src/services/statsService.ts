@@ -81,6 +81,41 @@ class StatsService {
       )
     `);
 
+    // Create instances table to store instance metadata
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS instances (
+        instance_id TEXT PRIMARY KEY,
+        application TEXT NOT NULL,
+        display_name TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
+    // Create media_library table to store media details
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS media_library (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id TEXT NOT NULL,
+        media_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        monitored INTEGER NOT NULL,
+        tags TEXT NOT NULL,
+        quality_profile_id INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        last_search_time TEXT,
+        added TEXT,
+        date_imported TEXT,
+        has_file INTEGER NOT NULL DEFAULT 0,
+        custom_score REAL,
+        custom_format_score INTEGER,
+        raw_data TEXT,
+        synced_at TEXT NOT NULL,
+        UNIQUE(instance_id, media_id),
+        FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
@@ -89,7 +124,31 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_tagged_media_app_instance ON tagged_media(application, instance_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_tag_id ON tagged_media(tag_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_media_id ON tagged_media(media_id);
+      CREATE INDEX IF NOT EXISTS idx_instances_application ON instances(application);
+      CREATE INDEX IF NOT EXISTS idx_media_library_instance ON media_library(instance_id);
+      CREATE INDEX IF NOT EXISTS idx_media_library_media_id ON media_library(media_id);
+      CREATE INDEX IF NOT EXISTS idx_media_library_monitored ON media_library(monitored);
+      CREATE INDEX IF NOT EXISTS idx_media_library_has_file ON media_library(has_file);
+      CREATE INDEX IF NOT EXISTS idx_media_library_status ON media_library(status);
+      CREATE INDEX IF NOT EXISTS idx_media_library_synced_at ON media_library(synced_at DESC);
     `);
+
+    // Migration: Add custom_format_score column if it doesn't exist
+    try {
+      // Check if column exists
+      const columns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
+      const hasCustomFormatScore = columns.some(col => col.name === 'custom_format_score');
+
+      if (!hasCustomFormatScore) {
+        logger.info('📦 Adding custom_format_score column to media_library table');
+        this.db.exec('ALTER TABLE media_library ADD COLUMN custom_format_score INTEGER');
+        logger.info('✅ custom_format_score column added successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error checking/adding custom_format_score column', {
+        error: getErrorMessage(error)
+      });
+    }
   }
 
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
@@ -514,6 +573,320 @@ class StatsService {
       logger.error('❌ Error clearing tagged media', {
         error: errorMessage
       });
+      throw error;
+    }
+  }
+
+  // ========== Instance Management ==========
+
+  async upsertInstance(
+    instanceId: string,
+    application: string,
+    displayName?: string
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const now = new Date().toISOString();
+      const stmt = this.db.prepare(`
+        INSERT INTO instances (instance_id, application, display_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(instance_id) DO UPDATE SET
+          display_name = excluded.display_name,
+          updated_at = excluded.updated_at
+      `);
+
+      stmt.run(instanceId, application.toLowerCase(), displayName || null, now, now);
+
+      logger.debug('✅ Instance upserted', { instanceId, application, displayName });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error upserting instance', { error: errorMessage });
+      throw error;
+    }
+  }
+
+  async getInstance(instanceId: string): Promise<{
+    instance_id: string;
+    application: string;
+    display_name: string | null;
+    created_at: string;
+    updated_at: string;
+  } | null> {
+    if (!this.db) return null;
+
+    try {
+      const stmt = this.db.prepare('SELECT * FROM instances WHERE instance_id = ?');
+      const result = stmt.get(instanceId) as {
+        instance_id: string;
+        application: string;
+        display_name: string | null;
+        created_at: string;
+        updated_at: string;
+      } | undefined;
+
+      return result || null;
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error getting instance', { error: errorMessage });
+      return null;
+    }
+  }
+
+  // ========== Media Library Management ==========
+
+  async syncMediaToDatabase(
+    instanceId: string,
+    mediaItems: Array<{
+      id: number;
+      title: string;
+      monitored: boolean;
+      tags: number[];
+      qualityProfileId: number;
+      status: string;
+      lastSearchTime?: string;
+      added?: string;
+      movieFile?: { dateAdded?: string };
+      episodeFile?: { dateAdded?: string };
+      trackFiles?: Array<{ dateAdded?: string }>;
+      bookFiles?: Array<{ dateAdded?: string }>;
+      [key: string]: unknown;
+    }>
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const syncTime = new Date().toISOString();
+
+      // Use a transaction for better performance
+      const insertStmt = this.db.prepare(`
+        INSERT INTO media_library (
+          instance_id, media_id, title, monitored, tags, quality_profile_id,
+          status, last_search_time, added, date_imported, has_file, custom_score,
+          custom_format_score, raw_data, synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(instance_id, media_id) DO UPDATE SET
+          title = excluded.title,
+          monitored = excluded.monitored,
+          tags = excluded.tags,
+          quality_profile_id = excluded.quality_profile_id,
+          status = excluded.status,
+          last_search_time = excluded.last_search_time,
+          added = excluded.added,
+          date_imported = excluded.date_imported,
+          has_file = excluded.has_file,
+          custom_format_score = excluded.custom_format_score,
+          raw_data = excluded.raw_data,
+          synced_at = excluded.synced_at
+      `);
+
+      const transaction = this.db.transaction((items: typeof mediaItems) => {
+        for (const item of items) {
+          // Extract dateImported and customFormatScore from file
+          let dateImported: string | undefined;
+          let hasFile = 0;
+          let customFormatScore: number | null = null;
+
+          if (item.movieFile?.dateAdded) {
+            dateImported = item.movieFile.dateAdded;
+            hasFile = 1;
+            customFormatScore = (item.movieFile as { customFormatScore?: number }).customFormatScore ?? null;
+          } else if (item.episodeFile?.dateAdded) {
+            dateImported = item.episodeFile.dateAdded;
+            hasFile = 1;
+            customFormatScore = (item.episodeFile as { customFormatScore?: number }).customFormatScore ?? null;
+          } else if (item.trackFiles && item.trackFiles.length > 0) {
+            const dates = item.trackFiles
+              .map(f => f.dateAdded)
+              .filter((d): d is string => !!d);
+            if (dates.length > 0) {
+              dateImported = dates.sort().reverse()[0];
+              hasFile = 1;
+              // For Lidarr, get customFormatScore from the most recent track file
+              const trackWithScore = item.trackFiles.find(f => (f as { customFormatScore?: number }).customFormatScore !== undefined);
+              customFormatScore = trackWithScore ? ((trackWithScore as { customFormatScore?: number }).customFormatScore ?? null) : null;
+            }
+          } else if (item.bookFiles && item.bookFiles.length > 0) {
+            const dates = item.bookFiles
+              .map(f => f.dateAdded)
+              .filter((d): d is string => !!d);
+            if (dates.length > 0) {
+              dateImported = dates.sort().reverse()[0];
+              hasFile = 1;
+              // For Readarr, get customFormatScore from the most recent book file
+              const bookWithScore = item.bookFiles.find(f => (f as { customFormatScore?: number }).customFormatScore !== undefined);
+              customFormatScore = bookWithScore ? ((bookWithScore as { customFormatScore?: number }).customFormatScore ?? null) : null;
+            }
+          }
+
+          insertStmt.run(
+            instanceId,
+            item.id,
+            item.title,
+            item.monitored ? 1 : 0,
+            JSON.stringify(item.tags),
+            item.qualityProfileId,
+            item.status,
+            item.lastSearchTime || null,
+            item.added || null,
+            dateImported || item.added || null,
+            hasFile,
+            null, // custom_score - to be set by user
+            customFormatScore,
+            JSON.stringify(item), // Store full raw data for future use
+            syncTime
+          );
+        }
+      });
+
+      transaction(mediaItems);
+
+      logger.info('✅ Media synced to database', {
+        instanceId,
+        count: mediaItems.length,
+        syncTime
+      });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('❌ Error syncing media to database', {
+        error: errorMessage,
+        stack: errorStack,
+        instanceId,
+        itemCount: mediaItems.length
+      });
+      throw error;
+    }
+  }
+
+  async getMediaFromDatabase(
+    instanceId: string,
+    filters?: {
+      monitored?: boolean;
+      hasFile?: boolean;
+      status?: string;
+    }
+  ): Promise<Array<{
+    id: number;
+    instance_id: string;
+    media_id: number;
+    title: string;
+    monitored: boolean;
+    tags: number[];
+    quality_profile_id: number;
+    status: string;
+    last_search_time: string | null;
+    added: string | null;
+    date_imported: string | null;
+    has_file: boolean;
+    custom_score: number | null;
+    custom_format_score: number | null;
+    synced_at: string;
+  }>> {
+    if (!this.db) return [];
+
+    try {
+      let query = 'SELECT * FROM media_library WHERE instance_id = ?';
+      const params: unknown[] = [instanceId];
+
+      if (filters?.monitored !== undefined) {
+        query += ' AND monitored = ?';
+        params.push(filters.monitored ? 1 : 0);
+      }
+
+      if (filters?.hasFile !== undefined) {
+        query += ' AND has_file = ?';
+        params.push(filters.hasFile ? 1 : 0);
+      }
+
+      if (filters?.status) {
+        query += ' AND status = ?';
+        params.push(filters.status);
+      }
+
+      query += ' ORDER BY title ASC';
+
+      const stmt = this.db.prepare(query);
+      const results = stmt.all(...params) as Array<{
+        id: number;
+        instance_id: string;
+        media_id: number;
+        title: string;
+        monitored: number;
+        tags: string;
+        quality_profile_id: number;
+        status: string;
+        last_search_time: string | null;
+        added: string | null;
+        date_imported: string | null;
+        has_file: number;
+        custom_score: number | null;
+        custom_format_score: number | null;
+        synced_at: string;
+      }>;
+
+      return results.map(row => ({
+        id: row.id,
+        instance_id: row.instance_id,
+        media_id: row.media_id,
+        title: row.title,
+        monitored: row.monitored === 1,
+        tags: JSON.parse(row.tags) as number[],
+        quality_profile_id: row.quality_profile_id,
+        status: row.status,
+        last_search_time: row.last_search_time,
+        added: row.added,
+        date_imported: row.date_imported,
+        has_file: row.has_file === 1,
+        custom_score: row.custom_score,
+        custom_format_score: row.custom_format_score,
+        synced_at: row.synced_at
+      }));
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error getting media from database', { error: errorMessage });
+      return [];
+    }
+  }
+
+  async updateMediaCustomScore(
+    instanceId: string,
+    mediaId: number,
+    customScore: number | null
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const stmt = this.db.prepare(`
+        UPDATE media_library
+        SET custom_score = ?
+        WHERE instance_id = ? AND media_id = ?
+      `);
+
+      stmt.run(customScore, instanceId, mediaId);
+
+      logger.debug('✅ Custom score updated', { instanceId, mediaId, customScore });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error updating custom score', { error: errorMessage });
+      throw error;
+    }
+  }
+
+  async deleteMediaForInstance(instanceId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const stmt = this.db.prepare('DELETE FROM media_library WHERE instance_id = ?');
+      const result = stmt.run(instanceId);
+
+      logger.info('🗑️  Deleted media for instance', {
+        instanceId,
+        rowsDeleted: result.changes
+      });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error deleting media for instance', { error: errorMessage });
       throw error;
     }
   }

@@ -49,6 +49,7 @@ function MediaLibrary() {
   const [sortField, setSortField] = useState<'title' | 'lastSearched' | 'dateImported'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
@@ -153,6 +154,20 @@ function MediaLibrary() {
     if (selectedMediaIds.size === 0) return;
     searchMutation.mutate();
   }, [selectedMediaIds.size, searchMutation]);
+
+  const handleSync = useCallback(async () => {
+    if (!instanceInfo) return;
+    setIsSyncing(true);
+    try {
+      await axios.post(`/api/sync/${instanceInfo.appType}/${instanceInfo.instanceId}`);
+      toast.success('Sync completed');
+      refetch(); // Refresh media list
+    } catch (error: unknown) {
+      toast.error('Sync failed: ' + getErrorMessage(error));
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [instanceInfo, refetch]);
 
   // Filter and sort media, pre-compute formatted dates
   const filteredAndSortedMedia = useMemo(() => {
@@ -390,6 +405,8 @@ function MediaLibrary() {
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
+                  <Box style={{ flex: '0.6', fontWeight: 500 }}>CF Score</Box>
+                  <Box style={{ flex: '0.5', fontWeight: 500 }}>File</Box>
                 </Flex>
 
                 {/* Virtualized Table Body */}
@@ -450,6 +467,18 @@ function MediaLibrary() {
                             {item.formattedDateImported}
                           </Text>
                         </Box>
+                        <Box style={{ flex: '0.6' }}>
+                          <Text size="2">
+                            {item.customFormatScore ?? '-'}
+                          </Text>
+                        </Box>
+                        <Box style={{ flex: '0.5' }}>
+                          {item.hasFile ? (
+                            <Badge size="1" color="green">✓</Badge>
+                          ) : (
+                            <Text size="1" color="gray">-</Text>
+                          )}
+                        </Box>
                       </Flex>
                     );
                   })}
@@ -458,6 +487,20 @@ function MediaLibrary() {
 
               {/* Manual Search Button */}
               <Flex justify="end" gap="2" pt="3">
+                <Button
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={isSyncing || !selectedInstance}
+                >
+                  {isSyncing ? (
+                    <>
+                      <Spinner size="1" />
+                      Syncing...
+                    </>
+                  ) : (
+                    'Sync Now'
+                  )}
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setSelectedMediaIds(new Set())}

@@ -15,9 +15,11 @@ export const mediaLibraryRouter = express.Router();
 
 // GET /api/media-library/:appType/:instanceId
 // Fetch all media for an instance with last searched dates
+// Query param: sync=true to force sync from API to database
 mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
   try {
     const { appType, instanceId } = req.params;
+    const shouldSync = req.query.sync === 'true';
 
     // Validate appType
     if (!APP_TYPES.includes(appType as AppType)) {
@@ -45,19 +47,78 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     logger.debug('📚 Fetching media library', {
       appType,
       instanceId,
-      instanceName: instance.name
+      instanceName: instance.name,
+      sync: shouldSync
     });
 
-    // Fetch all media
-    const allMedia = await service.getMedia(instance);
-    logger.debug('✅ Fetched all media', { count: allMedia.length });
+    // Upsert instance record
+    await statsService.upsertInstance(instanceId, appType, instance.name);
 
-    // Apply instance filter settings
-    const filteredMedia = await service.filterMedia(instance, allMedia);
-    logger.debug('✅ Applied instance filters', {
-      total: allMedia.length,
-      filtered: filteredMedia.length
-    });
+    // Check if we should sync from API or use database
+    let filteredMedia;
+    let fromCache = false;
+
+    if (shouldSync) {
+      // Sync from API
+      logger.debug('🔄 Syncing from API');
+      const allMedia = await service.getMedia(instance);
+      logger.debug('✅ Fetched all media from API', { count: allMedia.length });
+
+      // Sync to database first (before filtering)
+      await statsService.syncMediaToDatabase(instanceId, allMedia);
+      logger.debug('✅ Synced media to database');
+
+      // Apply instance filter settings
+      filteredMedia = await service.filterMedia(instance, allMedia);
+      logger.debug('✅ Applied instance filters', {
+        total: allMedia.length,
+        filtered: filteredMedia.length
+      });
+    } else {
+      // Try to get from database first
+      const dbMedia = await statsService.getMediaFromDatabase(instanceId);
+
+      if (dbMedia.length > 0) {
+        logger.debug('✅ Using cached media from database', { count: dbMedia.length });
+        fromCache = true;
+
+        // Convert database format to API format for filtering
+        filteredMedia = dbMedia.map(m => ({
+          id: m.media_id,
+          title: m.title,
+          monitored: m.monitored,
+          tags: m.tags,
+          qualityProfileId: m.quality_profile_id,
+          status: m.status,
+          lastSearchTime: m.last_search_time || undefined,
+          added: m.added || undefined,
+          movieFile: m.date_imported ? {
+            dateAdded: m.date_imported,
+            customFormatScore: m.custom_format_score
+          } : undefined,
+          episodeFile: m.date_imported ? {
+            dateAdded: m.date_imported,
+            customFormatScore: m.custom_format_score
+          } : undefined,
+        }));
+      } else {
+        // No data in database, fetch from API
+        logger.debug('📡 No cached data, fetching from API');
+        const allMedia = await service.getMedia(instance);
+        logger.debug('✅ Fetched all media from API', { count: allMedia.length });
+
+        // Sync to database
+        await statsService.syncMediaToDatabase(instanceId, allMedia);
+        logger.debug('✅ Synced media to database');
+
+        // Apply instance filter settings
+        filteredMedia = await service.filterMedia(instance, allMedia);
+        logger.debug('✅ Applied instance filters', {
+          total: allMedia.length,
+          filtered: filteredMedia.length
+        });
+      }
+    }
 
     // Get quality profiles for name mapping
     const profiles = await service.getQualityProfiles(instance);
@@ -66,24 +127,36 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
     const mediaWithDates = filteredMedia.map(m => {
-      // Extract dateImported from file (Radarr uses movieFile, Sonarr uses episodeFile,
-      // Lidarr uses trackFiles array, Readarr uses bookFiles array)
+      // Extract dateImported, customFormatScore, and hasFile from file
       let dateImported: string | undefined;
+      let customFormatScore: number | undefined;
+      let hasFile = false;
+
       if (m.movieFile?.dateAdded) {
         dateImported = m.movieFile.dateAdded;
+        hasFile = true;
+        customFormatScore = (m.movieFile as { customFormatScore?: number }).customFormatScore;
       } else if (m.episodeFile?.dateAdded) {
         dateImported = m.episodeFile.dateAdded;
+        hasFile = true;
+        customFormatScore = (m.episodeFile as { customFormatScore?: number }).customFormatScore;
       } else if (m.trackFiles && m.trackFiles.length > 0) {
         // For Lidarr, use the most recent track file
         const dates = m.trackFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
         if (dates.length > 0) {
           dateImported = dates.sort().reverse()[0]; // Most recent
+          hasFile = true;
+          const trackWithScore = m.trackFiles.find((f: { customFormatScore?: number }) => (f as { customFormatScore?: number }).customFormatScore !== undefined);
+          customFormatScore = trackWithScore ? (trackWithScore as { customFormatScore?: number }).customFormatScore : undefined;
         }
       } else if (m.bookFiles && m.bookFiles.length > 0) {
         // For Readarr, use the most recent book file
         const dates = m.bookFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
         if (dates.length > 0) {
           dateImported = dates.sort().reverse()[0]; // Most recent
+          hasFile = true;
+          const bookWithScore = m.bookFiles.find((f: { customFormatScore?: number }) => (f as { customFormatScore?: number }).customFormatScore !== undefined);
+          customFormatScore = bookWithScore ? (bookWithScore as { customFormatScore?: number }).customFormatScore : undefined;
         }
       }
 
@@ -96,7 +169,9 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         qualityProfileName: profileMap.get(m.qualityProfileId),
         tags: m.tags,
         lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
-        dateImported: dateImported || m.added // File import date, fallback to when added to library
+        dateImported: dateImported || m.added, // File import date, fallback to when added to library
+        customFormatScore,
+        hasFile
       };
     });
 
@@ -111,7 +186,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       media: mediaWithDates,
       total: mediaWithDates.length,
       instanceName: instance.name || `${appType}-${instanceId}`,
-      appType
+      appType,
+      fromCache
     });
 
   } catch (error: unknown) {
@@ -224,6 +300,50 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Search failed',
+      message: errorMessage
+    });
+  }
+});
+
+// PUT /api/media-library/:instanceId/:mediaId/score
+// Update custom score for a media item
+mediaLibraryRouter.put('/:instanceId/:mediaId/score', async (req, res) => {
+  try {
+    const { instanceId, mediaId } = req.params;
+    const { customScore } = req.body;
+
+    // Validate inputs
+    if (!instanceId || !mediaId) {
+      return res.status(400).json({ error: 'Missing required parameters: instanceId, mediaId' });
+    }
+
+    if (customScore !== null && (typeof customScore !== 'number' || customScore < 0 || customScore > 100)) {
+      return res.status(400).json({ error: 'Custom score must be a number between 0 and 100, or null' });
+    }
+
+    logger.debug('📝 Updating custom score', {
+      instanceId,
+      mediaId,
+      customScore
+    });
+
+    await statsService.updateMediaCustomScore(instanceId, parseInt(mediaId), customScore);
+
+    res.json({
+      success: true,
+      message: 'Custom score updated successfully'
+    });
+
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
+    logger.error('❌ Error updating custom score', {
+      error: errorMessage,
+      instanceId: req.params.instanceId,
+      mediaId: req.params.mediaId
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update custom score',
       message: errorMessage
     });
   }

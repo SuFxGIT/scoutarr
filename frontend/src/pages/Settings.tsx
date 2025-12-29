@@ -1449,6 +1449,70 @@ function Settings() {
           <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>
             <Card>
               <Flex direction="column" gap="4" p="4">
+                <Heading size="5">Tasks</Heading>
+                <Separator />
+
+                <Flex direction="row" align="center" justify="between" gap="2">
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Enable Automatic Sync</Text>
+                    <Tooltip content="Automatically sync media library from *arr apps at the specified interval.">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <Switch
+                    checked={config.tasks?.syncEnabled ?? true}
+                    onCheckedChange={(checked) => {
+                      if (!config.tasks) {
+                        setConfig({
+                          ...config,
+                          tasks: { syncInterval: 24, syncEnabled: checked }
+                        });
+                      } else {
+                        setConfig({
+                          ...config,
+                          tasks: { ...config.tasks, syncEnabled: checked }
+                        });
+                      }
+                    }}
+                  />
+                </Flex>
+
+                <Flex direction="column" gap="1">
+                  <Flex align="center" gap="1">
+                    <Text size="2" weight="medium">Sync Interval (hours)</Text>
+                    <Tooltip content="How often to sync media library from *arr apps. Minimum: 1 hour, Maximum: 168 hours (1 week).">
+                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                    </Tooltip>
+                  </Flex>
+                  <TextField.Root
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={(config.tasks?.syncInterval ?? 24).toString()}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 24;
+                      if (!config.tasks) {
+                        setConfig({
+                          ...config,
+                          tasks: { syncInterval: value, syncEnabled: true }
+                        });
+                      } else {
+                        setConfig({
+                          ...config,
+                          tasks: { ...config.tasks, syncInterval: value }
+                        });
+                      }
+                    }}
+                  />
+                  <Text size="1" color="gray">
+                    Media library will be synced from *arr apps every {config.tasks?.syncInterval ?? 24} hours
+                  </Text>
+                </Flex>
+              </Flex>
+            </Card>
+
+            <Card>
+              <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>
                 <Separator />
 

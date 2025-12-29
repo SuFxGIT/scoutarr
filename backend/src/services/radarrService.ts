@@ -2,6 +2,7 @@ import { RadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export interface RadarrMovie extends FilterableMedia {
   title: string;
@@ -23,7 +24,57 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
     try {
       const client = this.createClient(config);
       const response = await client.get<RadarrMovie[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      return response.data;
+      const movies = response.data;
+
+      // Radarr's /api/v3/movie endpoint doesn't include customFormatScore in movieFile
+      // We need to fetch movie files separately to get custom format scores
+      const movieFileIds = movies
+        .map(m => (m as { movieFile?: { id?: number } }).movieFile?.id)
+        .filter((id): id is number => id !== undefined && id > 0);
+
+      if (movieFileIds.length > 0) {
+        try {
+          // Batch requests to avoid 414 URI Too Long errors
+          const batchSize = 100;
+          const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
+
+          for (let i = 0; i < movieFileIds.length; i += batchSize) {
+            const batch = movieFileIds.slice(i, i + batchSize);
+            const filesResponse = await client.get<Array<{ id: number; customFormatScore?: number }>>(`/api/${this.apiVersion}/moviefile`, {
+              params: { movieFileIds: batch },
+              paramsSerializer: { indexes: null }
+            });
+            allFiles.push(...filesResponse.data);
+          }
+
+          // Create a map of movieFileId -> customFormatScore
+          const fileScoresMap = new Map(
+            allFiles.map(f => [f.id, f.customFormatScore])
+          );
+
+          // Add customFormatScore to each movie's movieFile
+          return movies.map(movie => {
+            const movieFile = (movie as { movieFile?: { id?: number } }).movieFile;
+            if (movieFile?.id && fileScoresMap.has(movieFile.id)) {
+              return {
+                ...movie,
+                movieFile: {
+                  ...movieFile,
+                  customFormatScore: fileScoresMap.get(movieFile.id)
+                }
+              } as RadarrMovie;
+            }
+            return movie;
+          });
+        } catch (error: unknown) {
+          logger.warn('Failed to fetch movie files for custom format scores, continuing without scores', {
+            error: getErrorMessage(error)
+          });
+          return movies;
+        }
+      }
+
+      return movies;
     } catch (error: unknown) {
       this.logError('Failed to fetch movies', error, { url: config.url });
       throw error;

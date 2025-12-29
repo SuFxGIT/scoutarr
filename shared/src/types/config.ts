@@ -91,8 +91,14 @@ export interface SchedulerConfig {
   unattended: boolean; // When enabled, automatically removes tags and re-filters when no media is found
 }
 
+export interface TasksConfig {
+  syncInterval: number; // Hours between syncs (default: 24)
+  syncEnabled: boolean; // Enable/disable automatic syncing
+}
+
 export interface Config {
   notifications: NotificationConfig;
   applications: ApplicationsConfig;
   scheduler: SchedulerConfig;
+  tasks: TasksConfig;
 }

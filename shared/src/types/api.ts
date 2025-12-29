@@ -75,6 +75,9 @@ export interface MediaLibraryItem {
   tags: number[];
   lastSearched?: string;
   dateImported?: string;
+  customFormatScore?: number;
+  hasFile?: boolean;
+  customScore?: number;
 }
 
 export interface MediaLibraryResponse {

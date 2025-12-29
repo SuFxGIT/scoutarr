@@ -2,6 +2,7 @@ import { SonarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export interface SonarrSeries extends FilterableMedia {
   title: string;
@@ -23,8 +24,57 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
     try {
       const client = this.createClient(config);
       const response = await client.get<SonarrSeries[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      logger.debug('📥 Fetched series from Sonarr', { count: response.data.length, url: config.url });
-      return response.data;
+      const series = response.data;
+
+      // Sonarr's /api/v3/series endpoint doesn't include customFormatScore in episodeFile
+      // We need to fetch episode files separately to get custom format scores
+      const episodeFileIds = series
+        .map(s => (s as { episodeFile?: { id?: number } }).episodeFile?.id)
+        .filter((id): id is number => id !== undefined && id > 0);
+
+      if (episodeFileIds.length > 0) {
+        try {
+          // Batch requests to avoid 414 URI Too Long errors
+          const batchSize = 100;
+          const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
+
+          for (let i = 0; i < episodeFileIds.length; i += batchSize) {
+            const batch = episodeFileIds.slice(i, i + batchSize);
+            const filesResponse = await client.get<Array<{ id: number; customFormatScore?: number }>>(`/api/${this.apiVersion}/episodefile`, {
+              params: { episodeFileIds: batch },
+              paramsSerializer: { indexes: null }
+            });
+            allFiles.push(...filesResponse.data);
+          }
+
+          // Create a map of episodeFileId -> customFormatScore
+          const fileScoresMap = new Map(
+            allFiles.map(f => [f.id, f.customFormatScore])
+          );
+
+          // Add customFormatScore to each series' episodeFile
+          return series.map(s => {
+            const episodeFile = (s as { episodeFile?: { id?: number } }).episodeFile;
+            if (episodeFile?.id && fileScoresMap.has(episodeFile.id)) {
+              return {
+                ...s,
+                episodeFile: {
+                  ...episodeFile,
+                  customFormatScore: fileScoresMap.get(episodeFile.id)
+                }
+              } as SonarrSeries;
+            }
+            return s;
+          });
+        } catch (error: unknown) {
+          logger.warn('Failed to fetch episode files for custom format scores, continuing without scores', {
+            error: getErrorMessage(error)
+          });
+          return series;
+        }
+      }
+
+      return series;
     } catch (error: unknown) {
       this.logError('Failed to fetch series', error, { url: config.url });
       throw error;

@@ -130,6 +130,11 @@ export const schedulerConfigSchema = z.object({
   unattended: z.boolean(),
 });
 
+export const tasksConfigSchema = z.object({
+  syncInterval: z.number().int().min(1).max(168),
+  syncEnabled: z.boolean(),
+});
+
 export const configSchema = z.object({
   notifications: notificationConfigSchema,
   applications: z.object({
@@ -139,5 +144,6 @@ export const configSchema = z.object({
     readarr: z.array(readarrInstanceSchema),
   }),
   scheduler: schedulerConfigSchema,
+  tasks: tasksConfigSchema,
 });
 

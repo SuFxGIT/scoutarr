@@ -77,6 +77,10 @@ class ConfigService {
         enabled: false,
         schedule: '0 */6 * * *', // Every 6 hours by default
         unattended: false
+      },
+      tasks: {
+        syncInterval: 24, // Default: sync every 24 hours
+        syncEnabled: true
       }
     };
 
@@ -116,6 +120,15 @@ class ConfigService {
       if (!Array.isArray(parsed.applications.readarr)) {
         logger.debug('⚠️  Readarr not an array, initializing empty array');
         parsed.applications.readarr = [];
+      }
+
+      // Normalize tasks config for backward compatibility
+      if (!parsed.tasks) {
+        logger.debug('⚠️  No tasks config found, initializing with defaults');
+        parsed.tasks = {
+          syncInterval: 24,
+          syncEnabled: true
+        };
       }
       
       // Count configured instances
@@ -160,9 +173,11 @@ class ConfigService {
       const config = await this.loadConfig();
       logger.info('🔄 Configuration reset to default', { configFile: CONFIG_FILE });
 
-      // Restart scheduler after reset
+      // Restart schedulers after reset
       const { schedulerService } = await import('./schedulerService.js');
       schedulerService.restart();
+      const { syncSchedulerService } = await import('./syncSchedulerService.js');
+      syncSchedulerService.restart();
 
       return config;
     } catch (error: unknown) {
@@ -200,11 +215,13 @@ class ConfigService {
         schedulerEnabled: config.scheduler?.enabled || false
       });
       
-      // Restart scheduler if config changed
-      logger.debug('🔄 Restarting scheduler due to config change');
+      // Restart schedulers if config changed
+      logger.debug('🔄 Restarting schedulers due to config change');
       const { schedulerService } = await import('./schedulerService.js');
       schedulerService.restart();
-      logger.debug('✅ Scheduler restarted');
+      const { syncSchedulerService } = await import('./syncSchedulerService.js');
+      syncSchedulerService.restart();
+      logger.debug('✅ Schedulers restarted');
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
