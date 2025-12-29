@@ -23,8 +23,10 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
   async getMovies(config: RadarrInstance): Promise<RadarrMovie[]> {
     try {
       const client = this.createClient(config);
+      logger.debug('📡 [Radarr API] Fetching movies', { url: config.url });
       const response = await client.get<RadarrMovie[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       const movies = response.data;
+      logger.debug('📡 [Radarr API] Fetched movies', { count: movies.length });
 
       // Radarr's /api/v3/movie endpoint doesn't include customFormatScore in movieFile
       // We need to fetch movie files separately to get custom format scores
@@ -34,6 +36,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
 
       if (movieFileIds.length > 0) {
         try {
+          logger.debug('📡 [Radarr API] Fetching movie files for custom format scores', { fileCount: movieFileIds.length });
           // Batch requests to avoid 414 URI Too Long errors
           const batchSize = 100;
           const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
@@ -46,6 +49,8 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
             });
             allFiles.push(...filesResponse.data);
           }
+
+          logger.debug('📡 [Radarr API] Fetched movie files', { count: allFiles.length });
 
           // Create a map of movieFileId -> customFormatScore
           const fileScoresMap = new Map(
@@ -67,7 +72,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
             return movie;
           });
         } catch (error: unknown) {
-          logger.warn('Failed to fetch movie files for custom format scores, continuing without scores', {
+          logger.warn('⚠️  [Radarr API] Failed to fetch movie files for custom format scores, continuing without scores', {
             error: getErrorMessage(error)
           });
           return movies;
@@ -84,10 +89,12 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
   async searchMovies(config: RadarrInstance, movieIds: number[]): Promise<void> {
     try {
       const client = this.createClient(config);
+      logger.debug('📡 [Radarr API] Starting movie search', { count: movieIds.length });
       await client.post(`/api/${this.apiVersion}/command`, {
         name: 'MoviesSearch',
         movieIds: movieIds
       });
+      logger.debug('📡 [Radarr API] Movie search command sent');
     } catch (error: unknown) {
       this.logError('Failed to search movies', error, { movieIds });
       throw error;

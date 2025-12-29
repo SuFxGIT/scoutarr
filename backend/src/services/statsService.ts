@@ -116,6 +116,18 @@ class StatsService {
       )
     `);
 
+    // Create quality_profiles table to cache quality profiles
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS quality_profiles (
+        instance_id TEXT NOT NULL,
+        profile_id INTEGER NOT NULL,
+        profile_name TEXT NOT NULL,
+        synced_at TEXT NOT NULL,
+        PRIMARY KEY (instance_id, profile_id),
+        FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
@@ -888,6 +900,69 @@ class StatsService {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Error deleting media for instance', { error: errorMessage });
       throw error;
+    }
+  }
+
+  // ========== Quality Profiles Management ==========
+
+  async syncQualityProfilesToDatabase(
+    instanceId: string,
+    profiles: Array<{ id: number; name: string }>
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const syncTime = new Date().toISOString();
+
+      // Delete existing profiles for this instance
+      const deleteStmt = this.db.prepare('DELETE FROM quality_profiles WHERE instance_id = ?');
+      deleteStmt.run(instanceId);
+
+      // Insert new profiles
+      const insertStmt = this.db.prepare(`
+        INSERT INTO quality_profiles (instance_id, profile_id, profile_name, synced_at)
+        VALUES (?, ?, ?, ?)
+      `);
+
+      const transaction = this.db.transaction((profs: typeof profiles) => {
+        for (const profile of profs) {
+          insertStmt.run(instanceId, profile.id, profile.name, syncTime);
+        }
+      });
+
+      transaction(profiles);
+
+      logger.debug('💾 [Scoutarr DB] Synced quality profiles to database', {
+        instanceId,
+        count: profiles.length
+      });
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error syncing quality profiles to database', { error: errorMessage });
+      throw error;
+    }
+  }
+
+  async getQualityProfilesFromDatabase(
+    instanceId: string
+  ): Promise<Array<{ id: number; name: string }>> {
+    if (!this.db) return [];
+
+    try {
+      const stmt = this.db.prepare('SELECT profile_id, profile_name FROM quality_profiles WHERE instance_id = ?');
+      const results = stmt.all(instanceId) as Array<{
+        profile_id: number;
+        profile_name: string;
+      }>;
+
+      return results.map(row => ({
+        id: row.profile_id,
+        name: row.profile_name
+      }));
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      logger.error('❌ Error getting quality profiles from database', { error: errorMessage });
+      return [];
     }
   }
 

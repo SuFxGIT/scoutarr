@@ -44,7 +44,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     // Get service for this app type
     const service = getServiceForApp(appType as AppType);
 
-    logger.debug('📚 Fetching media library', {
+    logger.debug('📚 [Scoutarr] Fetching media library', {
       appType,
       instanceId,
       instanceName: instance.name,
@@ -52,6 +52,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     });
 
     // Upsert instance record
+    logger.debug('💾 [Scoutarr DB] Upserting instance record', { instanceId, appType });
     await statsService.upsertInstance(instanceId, appType, instance.name);
 
     // Check if we should sync from API or use database
@@ -60,26 +61,35 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     if (shouldSync) {
       // Sync from API
-      logger.debug('🔄 Syncing from API');
+      logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
       const allMedia = await service.getMedia(instance);
-      logger.debug('✅ Fetched all media from API', { count: allMedia.length });
+      logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
+
+      // Fetch and sync quality profiles
+      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
+      const profiles = await service.getQualityProfiles(instance);
+      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
+      await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
       // Sync to database first (before filtering)
+      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
       await statsService.syncMediaToDatabase(instanceId, allMedia);
-      logger.debug('✅ Synced media to database');
+      logger.debug('✅ [Scoutarr DB] Synced media to database');
 
       // Apply instance filter settings
+      logger.debug('🔽 [Scoutarr] Applying instance filters');
       filteredMedia = await service.filterMedia(instance, allMedia);
-      logger.debug('✅ Applied instance filters', {
+      logger.debug('✅ [Scoutarr] Applied instance filters', {
         total: allMedia.length,
         filtered: filteredMedia.length
       });
     } else {
       // Try to get from database first
+      logger.debug('💾 [Scoutarr DB] Attempting to load from cache');
       const dbMedia = await statsService.getMediaFromDatabase(instanceId);
 
       if (dbMedia.length > 0) {
-        logger.debug('✅ Using cached media from database', { count: dbMedia.length });
+        logger.debug('✅ [Scoutarr DB] Using cached media from database', { count: dbMedia.length });
         fromCache = true;
 
         // Convert database format to API format for filtering
@@ -103,25 +113,34 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         }));
       } else {
         // No data in database, fetch from API
-        logger.debug('📡 No cached data, fetching from API');
+        logger.debug('📡 [Scoutarr DB] No cached data, fetching from *arr API', { appType });
         const allMedia = await service.getMedia(instance);
-        logger.debug('✅ Fetched all media from API', { count: allMedia.length });
+        logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
+
+        // Fetch and sync quality profiles
+        logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
+        const profiles = await service.getQualityProfiles(instance);
+        logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database', { count: profiles.length });
+        await statsService.syncQualityProfilesToDatabase(instanceId, profiles);
 
         // Sync to database
+        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
         await statsService.syncMediaToDatabase(instanceId, allMedia);
-        logger.debug('✅ Synced media to database');
+        logger.debug('✅ [Scoutarr DB] Synced media to database');
 
         // Apply instance filter settings
+        logger.debug('🔽 [Scoutarr] Applying instance filters');
         filteredMedia = await service.filterMedia(instance, allMedia);
-        logger.debug('✅ Applied instance filters', {
+        logger.debug('✅ [Scoutarr] Applied instance filters', {
           total: allMedia.length,
           filtered: filteredMedia.length
         });
       }
     }
 
-    // Get quality profiles for name mapping
-    const profiles = await service.getQualityProfiles(instance);
+    // Get quality profiles for name mapping (from cache)
+    logger.debug('💾 [Scoutarr DB] Loading quality profiles from cache');
+    const profiles = await statsService.getQualityProfilesFromDatabase(instanceId);
     const profileMap = new Map(profiles.map(p => [p.id, p.name]));
 
     // Transform media to response format
@@ -176,9 +195,10 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     });
 
     const withLastSearchCount = mediaWithDates.filter(m => m.lastSearched).length;
-    logger.debug('✅ Media library prepared', {
+    logger.debug('✅ [Scoutarr] Media library prepared', {
       total: mediaWithDates.length,
-      withLastSearchTime: withLastSearchCount
+      withLastSearchTime: withLastSearchCount,
+      fromCache
     });
 
     // Return response
@@ -233,7 +253,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       return res.status(404).json({ error: 'Instance not found' });
     }
 
-    logger.info('🔎 Manual search started', {
+    logger.info('🔎 [Scoutarr] Manual search started', {
       appType,
       instanceId,
       instanceName: instance.name,
@@ -247,40 +267,43 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     if (appType === 'radarr') {
       // Radarr supports bulk search
       await radarrService.searchMovies(instance as RadarrInstance, mediaIds);
-      logger.debug('✅ Bulk search started for Radarr', { count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Bulk search started for Radarr', { count: mediaIds.length });
     } else if (appType === 'sonarr') {
       // Sonarr requires one-by-one
       for (const mediaId of mediaIds) {
         await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search started for Sonarr', { count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Sequential search started for Sonarr', { count: mediaIds.length });
     } else if (appType === 'lidarr') {
       // Lidarr requires one-by-one
       for (const mediaId of mediaIds) {
         await lidarrService.searchArtists(instance as LidarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search started for Lidarr', { count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Sequential search started for Lidarr', { count: mediaIds.length });
     } else if (appType === 'readarr') {
       // Readarr requires one-by-one
       for (const mediaId of mediaIds) {
         await readarrService.searchAuthors(instance as ReadarrInstance, mediaId);
       }
-      logger.debug('✅ Sequential search started for Readarr', { count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Sequential search started for Readarr', { count: mediaIds.length });
     }
 
     // Add tag to searched items
     const tagName = instance.tagName || 'upgradinatorr';
+    logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Getting tag ID`, { tagName });
     const tagId = await service.getTagId(instance, tagName);
 
     if (tagId !== null) {
+      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Adding tag to media`, { tagId, count: mediaIds.length });
       await service.addTag(instance, mediaIds, tagId);
-      logger.debug('✅ Tag added to media', { tagId, count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: mediaIds.length });
 
       // Record in tagged_media table (updates last searched date)
+      logger.debug('💾 [Scoutarr DB] Recording tagged media', { count: mediaIds.length });
       await statsService.addTaggedMedia(appType, instanceId, tagId, mediaIds);
-      logger.debug('✅ Tagged media recorded in database');
+      logger.debug('✅ [Scoutarr DB] Tagged media recorded in database');
     } else {
-      logger.warn('⚠️  Tag not found, skipping tag addition', { tagName });
+      logger.warn('⚠️  [Scoutarr] Tag not found, skipping tag addition', { tagName });
     }
 
     // Return success
@@ -321,12 +344,13 @@ mediaLibraryRouter.put('/:instanceId/:mediaId/score', async (req, res) => {
       return res.status(400).json({ error: 'Custom score must be a number between 0 and 100, or null' });
     }
 
-    logger.debug('📝 Updating custom score', {
+    logger.debug('📝 [Scoutarr] Updating custom score', {
       instanceId,
       mediaId,
       customScore
     });
 
+    logger.debug('💾 [Scoutarr DB] Updating media custom score in database');
     await statsService.updateMediaCustomScore(instanceId, parseInt(mediaId), customScore);
 
     res.json({

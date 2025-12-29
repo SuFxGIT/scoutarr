@@ -24,11 +24,13 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
   async getAuthors(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
     try {
       const client = this.createClient(config);
+      logger.debug('📡 [Readarr API] Fetching authors', { url: config.url });
       const response = await client.get<ReadarrAuthor[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       const authors = response.data.map(author => ({
         ...author,
         title: author.authorName || author.title
       }));
+      logger.debug('📡 [Readarr API] Fetched authors', { count: authors.length });
 
       // Readarr's /api/v1/author endpoint doesn't include customFormatScore in bookFiles
       // We need to fetch book files separately to get custom format scores
@@ -44,6 +46,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
 
       if (bookFileIds.length > 0) {
         try {
+          logger.debug('📡 [Readarr API] Fetching book files for custom format scores', { fileCount: bookFileIds.length });
           // Batch requests to avoid 414 URI Too Long errors
           const batchSize = 100;
           const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
@@ -56,6 +59,8 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
             });
             allFiles.push(...filesResponse.data);
           }
+
+          logger.debug('📡 [Readarr API] Fetched book files', { count: allFiles.length });
 
           // Create a map of bookFileId -> customFormatScore
           const fileScoresMap = new Map(
@@ -83,7 +88,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
             return author;
           });
         } catch (error: unknown) {
-          logger.warn('Failed to fetch book files for custom format scores, continuing without scores', {
+          logger.warn('⚠️  [Readarr API] Failed to fetch book files for custom format scores, continuing without scores', {
             error: getErrorMessage(error)
           });
           return authors;
@@ -101,11 +106,12 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
     try {
       const client = this.createClient(config);
       // Readarr only supports searching one author at a time
+      logger.debug('📡 [Readarr API] Starting author search', { authorId });
       await client.post(`/api/${this.apiVersion}/command`, {
         name: 'AuthorSearch',
         authorId
       });
-      logger.debug('🔎 Searched for author', { authorId });
+      logger.debug('📡 [Readarr API] Author search command sent', { authorId });
     } catch (error: unknown) {
       this.logError('Failed to search author', error, { authorId });
       throw error;

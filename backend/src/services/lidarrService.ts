@@ -24,11 +24,13 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
   async getArtists(config: LidarrInstance): Promise<LidarrArtist[]> {
     try {
       const client = this.createClient(config);
+      logger.debug('📡 [Lidarr API] Fetching artists', { url: config.url });
       const response = await client.get<LidarrArtist[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       const artists = response.data.map(artist => ({
         ...artist,
         title: artist.artistName || artist.title
       }));
+      logger.debug('📡 [Lidarr API] Fetched artists', { count: artists.length });
 
       // Lidarr's /api/v1/artist endpoint doesn't include customFormatScore in trackFiles
       // We need to fetch track files separately to get custom format scores
@@ -44,6 +46,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
 
       if (trackFileIds.length > 0) {
         try {
+          logger.debug('📡 [Lidarr API] Fetching track files for custom format scores', { fileCount: trackFileIds.length });
           // Batch requests to avoid 414 URI Too Long errors
           const batchSize = 100;
           const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
@@ -56,6 +59,8 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
             });
             allFiles.push(...filesResponse.data);
           }
+
+          logger.debug('📡 [Lidarr API] Fetched track files', { count: allFiles.length });
 
           // Create a map of trackFileId -> customFormatScore
           const fileScoresMap = new Map(
@@ -83,7 +88,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
             return artist;
           });
         } catch (error: unknown) {
-          logger.warn('Failed to fetch track files for custom format scores, continuing without scores', {
+          logger.warn('⚠️  [Lidarr API] Failed to fetch track files for custom format scores, continuing without scores', {
             error: getErrorMessage(error)
           });
           return artists;
@@ -101,11 +106,12 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
     try {
       const client = this.createClient(config);
       // Lidarr only supports searching one artist at a time
+      logger.debug('📡 [Lidarr API] Starting artist search', { artistId });
       await client.post(`/api/${this.apiVersion}/command`, {
         name: 'ArtistSearch',
         artistId
       });
-      logger.debug('🔎 Searched for artist', { artistId });
+      logger.debug('📡 [Lidarr API] Artist search command sent', { artistId });
     } catch (error: unknown) {
       this.logError('Failed to search artist', error, { artistId });
       throw error;

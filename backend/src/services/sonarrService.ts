@@ -23,8 +23,10 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
   async getSeries(config: SonarrInstance): Promise<SonarrSeries[]> {
     try {
       const client = this.createClient(config);
+      logger.debug('📡 [Sonarr API] Fetching series', { url: config.url });
       const response = await client.get<SonarrSeries[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       const series = response.data;
+      logger.debug('📡 [Sonarr API] Fetched series', { count: series.length });
 
       // Sonarr's /api/v3/series endpoint doesn't include customFormatScore in episodeFile
       // We need to fetch episode files separately to get custom format scores
@@ -34,6 +36,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
 
       if (episodeFileIds.length > 0) {
         try {
+          logger.debug('📡 [Sonarr API] Fetching episode files for custom format scores', { fileCount: episodeFileIds.length });
           // Batch requests to avoid 414 URI Too Long errors
           const batchSize = 100;
           const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
@@ -46,6 +49,8 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
             });
             allFiles.push(...filesResponse.data);
           }
+
+          logger.debug('📡 [Sonarr API] Fetched episode files', { count: allFiles.length });
 
           // Create a map of episodeFileId -> customFormatScore
           const fileScoresMap = new Map(
@@ -67,7 +72,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
             return s;
           });
         } catch (error: unknown) {
-          logger.warn('Failed to fetch episode files for custom format scores, continuing without scores', {
+          logger.warn('⚠️  [Sonarr API] Failed to fetch episode files for custom format scores, continuing without scores', {
             error: getErrorMessage(error)
           });
           return series;
@@ -85,11 +90,12 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
     try {
       const client = this.createClient(config);
       // Sonarr only supports searching one series at a time
+      logger.debug('📡 [Sonarr API] Starting series search', { seriesId });
       await client.post(`/api/${this.apiVersion}/command`, {
         name: 'SeriesSearch',
         seriesId
       });
-      logger.debug('🔎 Searched for series', { seriesId });
+      logger.debug('📡 [Sonarr API] Series search command sent', { seriesId });
     } catch (error: unknown) {
       this.logError('Failed to search series', error, { seriesId });
       throw error;

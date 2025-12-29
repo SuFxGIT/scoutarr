@@ -76,6 +76,11 @@ class SyncSchedulerService {
             // Upsert instance record
             await statsService.upsertInstance(instance.id, appType, instance.name);
 
+            // Fetch quality profiles from API
+            logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
+            const profiles = await service.getQualityProfiles(instance);
+            await statsService.syncQualityProfilesToDatabase(instance.id, profiles);
+
             // Fetch all media from API
             const allMedia = await service.getMedia(instance);
             logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
@@ -121,6 +126,11 @@ class SyncSchedulerService {
 
       // Upsert instance record
       await statsService.upsertInstance(instance.id, appType, instance.name);
+
+      // Fetch quality profiles from API
+      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
+      const profiles = await service.getQualityProfiles(instance);
+      await statsService.syncQualityProfilesToDatabase(instance.id, profiles);
 
       // Fetch all media from API
       const allMedia = await service.getMedia(instance);
