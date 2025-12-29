@@ -56,9 +56,9 @@ class StatsService {
   private createTables(): void {
     if (!this.db) throw new Error('Database not initialized');
 
-    // Create searches table (keeping table name as 'upgrades' for database compatibility)
+    // Create search history table
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS upgrades (
+      CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp TEXT NOT NULL,
         application TEXT NOT NULL,
@@ -109,9 +109,9 @@ class StatsService {
 
     // Create indexes for better query performance
     this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
-      CREATE INDEX IF NOT EXISTS idx_upgrades_application ON upgrades(application);
-      CREATE INDEX IF NOT EXISTS idx_upgrades_instance ON upgrades(instance);
+      CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_history_application ON history(application);
+      CREATE INDEX IF NOT EXISTS idx_history_instance ON history(instance);
       CREATE INDEX IF NOT EXISTS idx_instances_application ON instances(application);
       CREATE INDEX IF NOT EXISTS idx_media_library_instance ON media_library(instance_id);
       CREATE INDEX IF NOT EXISTS idx_media_library_media_id ON media_library(media_id);
@@ -216,6 +216,105 @@ class StatsService {
         error: getErrorMessage(error)
       });
     }
+
+    // Migration: Remove redundant columns from media_library
+    // Note: SQLite doesn't support DROP COLUMN in older versions, so we'll recreate the table
+    try {
+      const columns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
+      const hasQualityProfileId = columns.some(col => col.name === 'quality_profile_id');
+      const hasCustomScore = columns.some(col => col.name === 'custom_score');
+
+      if (hasQualityProfileId || hasCustomScore) {
+        logger.info('🔄 Migrating media_library table to remove redundant columns');
+
+        // Create new table without quality_profile_id and custom_score
+        this.db.exec(`
+          CREATE TABLE media_library_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            instance_id TEXT NOT NULL,
+            media_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            monitored INTEGER NOT NULL,
+            tags TEXT NOT NULL,
+            quality_profile_name TEXT,
+            status TEXT NOT NULL,
+            last_search_time TEXT,
+            added TEXT,
+            date_imported TEXT,
+            has_file INTEGER NOT NULL DEFAULT 0,
+            custom_format_score INTEGER,
+            raw_data TEXT,
+            synced_at TEXT NOT NULL,
+            UNIQUE(instance_id, media_id),
+            FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
+          )
+        `);
+
+        // Copy data from old table to new table
+        this.db.exec(`
+          INSERT INTO media_library_new (
+            id, instance_id, media_id, title, monitored, tags, quality_profile_name,
+            status, last_search_time, added, date_imported, has_file,
+            custom_format_score, raw_data, synced_at
+          )
+          SELECT
+            id, instance_id, media_id, title, monitored, tags, quality_profile_name,
+            status, last_search_time, added, date_imported, has_file,
+            custom_format_score, raw_data, synced_at
+          FROM media_library
+        `);
+
+        // Drop old table
+        this.db.exec('DROP TABLE media_library');
+
+        // Rename new table
+        this.db.exec('ALTER TABLE media_library_new RENAME TO media_library');
+
+        // Recreate indexes
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_media_library_instance ON media_library(instance_id);
+          CREATE INDEX IF NOT EXISTS idx_media_library_media_id ON media_library(media_id);
+          CREATE INDEX IF NOT EXISTS idx_media_library_monitored ON media_library(monitored);
+          CREATE INDEX IF NOT EXISTS idx_media_library_has_file ON media_library(has_file);
+          CREATE INDEX IF NOT EXISTS idx_media_library_status ON media_library(status);
+          CREATE INDEX IF NOT EXISTS idx_media_library_synced_at ON media_library(synced_at DESC);
+        `);
+
+        logger.info('✅ media_library table migrated successfully (removed quality_profile_id and custom_score)');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error migrating media_library table', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Rename upgrades table to history
+    try {
+      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
+      const hasUpgrades = tables.some(t => t.name === 'upgrades');
+      const hasHistory = tables.some(t => t.name === 'history');
+
+      if (hasUpgrades && !hasHistory) {
+        logger.info('🔄 Renaming upgrades table to history');
+        this.db.exec('ALTER TABLE upgrades RENAME TO history');
+
+        // Drop old indexes
+        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_timestamp');
+        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_application');
+        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_instance');
+
+        // Create new indexes
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC)');
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_application ON history(application)');
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_instance ON history(instance)');
+
+        logger.info('✅ upgrades table renamed to history successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error renaming upgrades table to history', {
+        error: getErrorMessage(error)
+      });
+    }
   }
 
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
@@ -226,7 +325,7 @@ class StatsService {
       const appKey = application.toLowerCase();
 
       const insertStmt = this.db.prepare(`
-        INSERT INTO upgrades (timestamp, application, instance, count, items)
+        INSERT INTO history (timestamp, application, instance, count, items)
         VALUES (?, ?, ?, ?, ?)
       `);
 
@@ -266,14 +365,14 @@ class StatsService {
     }
 
     // Get total searches
-    const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM upgrades');
+    const totalStmt = this.db.prepare('SELECT SUM(count) as total FROM history');
     const totalResult = totalStmt.get() as { total: number | null };
     const totalSearches = totalResult.total || 0;
 
     // Get searches by application
     const byAppStmt = this.db.prepare(`
       SELECT application, SUM(count) as total
-      FROM upgrades
+      FROM history
       GROUP BY application
     `);
     const byAppResults = byAppStmt.all() as Array<{ application: string; total: number }>;
@@ -290,7 +389,7 @@ class StatsService {
           ELSE application
         END as instance_key,
         SUM(count) as total
-      FROM upgrades
+      FROM history
       GROUP BY instance_key
     `);
     const byInstanceResults = byInstanceStmt.all() as Array<{ instance_key: string; total: number }>;
@@ -302,7 +401,7 @@ class StatsService {
     // Get recent searches (limited for API response)
     const recentStmt = this.db.prepare(`
       SELECT timestamp, application, instance, count, items
-      FROM upgrades
+      FROM history
       ORDER BY timestamp DESC
       LIMIT ?
     `);
@@ -325,7 +424,7 @@ class StatsService {
     // Get last search timestamp
     const lastStmt = this.db.prepare(`
       SELECT timestamp
-      FROM upgrades
+      FROM history
       ORDER BY timestamp DESC
       LIMIT 1
     `);
@@ -391,7 +490,7 @@ class StatsService {
     try {
       logger.debug('📊 Counting total searches');
       // Get total count
-      const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM upgrades');
+      const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM history');
       const countResult = countStmt.get() as { count: number };
       const total = countResult.count;
       const totalPages = Math.ceil(total / pageSize);
@@ -402,7 +501,7 @@ class StatsService {
       logger.debug('📊 Fetching paginated results', { offset, limit: pageSize });
       const stmt = this.db.prepare(`
         SELECT timestamp, application, instance, count, items
-        FROM upgrades
+        FROM history
         ORDER BY timestamp DESC
         LIMIT ? OFFSET ?
       `);
@@ -487,7 +586,7 @@ class StatsService {
     try {
       // Delete all entries from the searches table
       // This clears recent searches and stats but keeps the database structure
-      const deleteSearchesStmt = this.db.prepare('DELETE FROM upgrades');
+      const deleteSearchesStmt = this.db.prepare('DELETE FROM history');
       const searchesResult = deleteSearchesStmt.run();
 
       logger.info('🗑️  Cleared all search data from stats database', {
@@ -697,7 +796,6 @@ class StatsService {
       title: string;
       monitored: boolean;
       tags: string[]; // Tag names, not IDs
-      qualityProfileId: number;
       qualityProfileName?: string; // Profile name from API
       status: string;
       lastSearchTime?: string;
@@ -717,15 +815,14 @@ class StatsService {
       // Use a transaction for better performance
       const insertStmt = this.db.prepare(`
         INSERT INTO media_library (
-          instance_id, media_id, title, monitored, tags, quality_profile_id, quality_profile_name,
-          status, last_search_time, added, date_imported, has_file, custom_score,
+          instance_id, media_id, title, monitored, tags, quality_profile_name,
+          status, last_search_time, added, date_imported, has_file,
           custom_format_score, raw_data, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id, media_id) DO UPDATE SET
           title = excluded.title,
           monitored = excluded.monitored,
           tags = excluded.tags,
-          quality_profile_id = excluded.quality_profile_id,
           quality_profile_name = excluded.quality_profile_name,
           status = excluded.status,
           last_search_time = excluded.last_search_time,
@@ -782,14 +879,12 @@ class StatsService {
             item.title,
             item.monitored ? 1 : 0,
             JSON.stringify(item.tags),
-            item.qualityProfileId,
             item.qualityProfileName || null,
             item.status,
             item.lastSearchTime || null,
             item.added || null,
             dateImported || item.added || null,
             hasFile,
-            null, // custom_score - to be set by user
             customFormatScore,
             JSON.stringify(item), // Store full raw data for future use
             syncTime
@@ -831,14 +926,12 @@ class StatsService {
     title: string;
     monitored: boolean;
     tags: string[]; // Tag names, not IDs
-    quality_profile_id: number;
     quality_profile_name: string | null; // Profile name
     status: string;
     last_search_time: string | null;
     added: string | null;
     date_imported: string | null;
     has_file: boolean;
-    custom_score: number | null;
     custom_format_score: number | null;
     synced_at: string;
   }>> {
@@ -873,14 +966,12 @@ class StatsService {
         title: string;
         monitored: number;
         tags: string;
-        quality_profile_id: number;
         quality_profile_name: string | null;
         status: string;
         last_search_time: string | null;
         added: string | null;
         date_imported: string | null;
         has_file: number;
-        custom_score: number | null;
         custom_format_score: number | null;
         synced_at: string;
       }>;
@@ -892,14 +983,12 @@ class StatsService {
         title: row.title,
         monitored: row.monitored === 1,
         tags: JSON.parse(row.tags) as string[], // Tag names, not IDs
-        quality_profile_id: row.quality_profile_id,
         quality_profile_name: row.quality_profile_name,
         status: row.status,
         last_search_time: row.last_search_time,
         added: row.added,
         date_imported: row.date_imported,
         has_file: row.has_file === 1,
-        custom_score: row.custom_score,
         custom_format_score: row.custom_format_score,
         synced_at: row.synced_at
       }));
@@ -907,30 +996,6 @@ class StatsService {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Error getting media from database', { error: errorMessage });
       return [];
-    }
-  }
-
-  async updateMediaCustomScore(
-    instanceId: string,
-    mediaId: number,
-    customScore: number | null
-  ): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
-    try {
-      const stmt = this.db.prepare(`
-        UPDATE media_library
-        SET custom_score = ?
-        WHERE instance_id = ? AND media_id = ?
-      `);
-
-      stmt.run(customScore, instanceId, mediaId);
-
-      logger.debug('✅ Custom score updated', { instanceId, mediaId, customScore });
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error updating custom score', { error: errorMessage });
-      throw error;
     }
   }
 

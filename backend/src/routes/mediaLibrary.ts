@@ -115,7 +115,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
           title: m.title,
           monitored: m.monitored,
           tags: m.tags,
-          qualityProfileId: m.quality_profile_id,
           qualityProfileName: m.quality_profile_name || undefined,
           status: m.status,
           lastSearchTime: m.last_search_time || undefined,
@@ -222,7 +221,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         title: service.getMediaTitle(m),
         monitored: m.monitored,
         status: m.status,
-        qualityProfileId: m.qualityProfileId,
         qualityProfileName: m.qualityProfileName,
         tags: m.tags,
         lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
@@ -366,47 +364,4 @@ mediaLibraryRouter.post('/search', async (req, res) => {
   }
 });
 
-// PUT /api/media-library/:instanceId/:mediaId/score
-// Update custom score for a media item
-mediaLibraryRouter.put('/:instanceId/:mediaId/score', async (req, res) => {
-  try {
-    const { instanceId, mediaId } = req.params;
-    const { customScore } = req.body;
-
-    // Validate inputs
-    if (!instanceId || !mediaId) {
-      return res.status(400).json({ error: 'Missing required parameters: instanceId, mediaId' });
-    }
-
-    if (customScore !== null && (typeof customScore !== 'number' || customScore < 0 || customScore > 100)) {
-      return res.status(400).json({ error: 'Custom score must be a number between 0 and 100, or null' });
-    }
-
-    logger.debug('📝 [Scoutarr] Updating custom score', {
-      instanceId,
-      mediaId,
-      customScore
-    });
-
-    logger.debug('💾 [Scoutarr DB] Updating media custom score in database');
-    await statsService.updateMediaCustomScore(instanceId, parseInt(mediaId), customScore);
-
-    res.json({
-      success: true,
-      message: 'Custom score updated successfully'
-    });
-
-  } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error('❌ Error updating custom score', {
-      error: errorMessage,
-      instanceId: req.params.instanceId,
-      mediaId: req.params.mediaId
-    });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update custom score',
-      message: errorMessage
-    });
-  }
-});
+export default mediaLibraryRouter;

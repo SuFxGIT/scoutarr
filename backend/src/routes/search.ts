@@ -152,7 +152,6 @@ async function processAppInstances<T extends StarrInstanceConfig>(
         title: m.title,
         monitored: m.monitored,
         tags: m.tags,
-        qualityProfileId: m.quality_profile_id,
         qualityProfileName: m.quality_profile_name || undefined,
         status: m.status,
         lastSearchTime: m.last_search_time || undefined,

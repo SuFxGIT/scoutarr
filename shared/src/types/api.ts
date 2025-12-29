@@ -70,7 +70,6 @@ export interface MediaLibraryItem {
   title: string;
   monitored: boolean;
   status: string;
-  qualityProfileId: number;
   qualityProfileName?: string;
   tags: string[]; // Tag names, not IDs
   lastSearched?: string;
