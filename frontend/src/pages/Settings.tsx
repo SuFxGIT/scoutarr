@@ -370,9 +370,9 @@ function Settings() {
       showErrorToast(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
       return;
     }
-    const newId = `${app}-${Date.now()}`;
     const nextInstanceId = getNextInstanceId(app, instances);
-    
+    const newId = `${app}-${nextInstanceId}`;
+
     let defaultConfig: StarrInstanceConfig;
     if (app === 'radarr') {
       defaultConfig = {
