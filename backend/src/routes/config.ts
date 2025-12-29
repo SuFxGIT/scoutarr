@@ -143,24 +143,6 @@ configRouter.post('/test/:app', async (req, res) => {
       }
     }
 
-    // Save connection status to database
-    try {
-      await statsService.saveConnectionStatus(
-        app,
-        instanceId,
-        testResult.success,
-        true, // configured since we have URL and API key
-        testResult.version,
-        testResult.appName,
-        testResult.error
-      );
-    } catch (statusError: unknown) {
-      // Log but don't fail the test if status save fails
-      logger.warn('⚠️  Failed to save connection status', {
-        error: statusError instanceof Error ? statusError.message : 'Unknown error'
-      });
-    }
-
     if (testResult.success) {
       logger.info(`✅ Connection test successful for ${app}`, { 
         url: appConfig.url, 

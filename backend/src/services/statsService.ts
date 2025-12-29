@@ -81,22 +81,6 @@ class StatsService {
       )
     `);
 
-    // Create connection_status table to store connection test results
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS connection_status (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        application TEXT NOT NULL,
-        instance_id TEXT,
-        connected INTEGER NOT NULL,
-        configured INTEGER NOT NULL,
-        version TEXT,
-        app_name TEXT,
-        error TEXT,
-        timestamp TEXT NOT NULL,
-        UNIQUE(application, instance_id)
-      )
-    `);
-
     // Create indexes for better query performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_upgrades_timestamp ON upgrades(timestamp DESC);
@@ -105,7 +89,6 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_tagged_media_app_instance ON tagged_media(application, instance_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_tag_id ON tagged_media(tag_id);
       CREATE INDEX IF NOT EXISTS idx_tagged_media_media_id ON tagged_media(media_id);
-      CREATE INDEX IF NOT EXISTS idx_connection_status_app_instance ON connection_status(application, instance_id);
     `);
   }
 
@@ -532,99 +515,6 @@ class StatsService {
         error: errorMessage
       });
       throw error;
-    }
-  }
-
-  async saveConnectionStatus(
-    application: string,
-    instanceId: string | null,
-    connected: boolean,
-    configured: boolean,
-    version?: string,
-    appName?: string,
-    error?: string
-  ): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
-    try {
-      const timestamp = new Date().toISOString();
-      const appKey = application.toLowerCase();
-
-      const insertStmt = this.db.prepare(`
-        INSERT OR REPLACE INTO connection_status 
-        (application, instance_id, connected, configured, version, app_name, error, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      insertStmt.run(
-        appKey,
-        instanceId || null,
-        connected ? 1 : 0,
-        configured ? 1 : 0,
-        version || null,
-        appName || null,
-        error || null,
-        timestamp
-      );
-
-      logger.debug('💾 Connection status saved', {
-        application: appKey,
-        instanceId,
-        connected,
-        configured
-      });
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error saving connection status', {
-        error: errorMessage
-      });
-      throw error;
-    }
-  }
-
-  async getConnectionStatus(): Promise<Record<string, { connected: boolean; configured: boolean; version?: string; appName?: string; error?: string; instanceName?: string }>> {
-    if (!this.db) {
-      logger.warn('⚠️  Database not initialized, returning empty connection status');
-      return {};
-    }
-
-    try {
-      const stmt = this.db.prepare(`
-        SELECT application, instance_id, connected, configured, version, app_name, error
-        FROM connection_status
-        ORDER BY timestamp DESC
-      `);
-      const results = stmt.all() as Array<{
-        application: string;
-        instance_id: string | null;
-        connected: number;
-        configured: number;
-        version: string | null;
-        app_name: string | null;
-        error: string | null;
-      }>;
-
-      const status: Record<string, { connected: boolean; configured: boolean; version?: string; appName?: string; error?: string; instanceName?: string }> = {};
-      
-      for (const row of results) {
-        const key = row.instance_id ? `${row.application}-${row.instance_id}` : row.application;
-        status[key] = {
-          connected: row.connected === 1,
-          configured: row.configured === 1,
-          version: row.version || undefined,
-          appName: row.app_name || undefined,
-          error: row.error || undefined
-        };
-      }
-
-      logger.debug('✅ Connection status retrieved', { count: Object.keys(status).length });
-      return status;
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting connection status', {
-        error: errorMessage
-      });
-      return {};
     }
   }
 
