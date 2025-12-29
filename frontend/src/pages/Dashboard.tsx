@@ -31,7 +31,6 @@ function Dashboard() {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedSearch, setSelectedSearch] = useState<Stats['recentSearches'][number] | null>(null);
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   // Fetch config to get instance names
@@ -73,26 +72,6 @@ function Dashboard() {
     },
     enabled: true, // Fetch on mount to load cached history from database
     staleTime: Infinity, // History never goes stale - it only changes when runs happen
-  });
-
-  // Fetch run preview - load from database on mount
-  const { data: manualRunResults } = useQuery<SearchResults>({
-    queryKey: ['runPreview'],
-    queryFn: async () => {
-      // Try to get cached preview from database
-      try {
-        const cachedResponse = await axios.get('/api/search/run-preview');
-        if (cachedResponse.status === 200) {
-          return cachedResponse.data;
-        }
-      } catch (error) {
-        // If no cached preview exists, return empty object (don't generate new on mount)
-        return {};
-      }
-      return {};
-    },
-    enabled: false, // Don't fetch on mount - only fetch when button is clicked
-    staleTime: Infinity, // Preview never goes stale - it only changes when config/runs happen
   });
 
   // Fetch stats - load from database on mount
@@ -182,21 +161,6 @@ function Dashboard() {
       toast.error('Failed to clear history: ' + getErrorMessage(error));
       // Only refetch on error to get the actual state
       refetchHistory();
-    },
-  });
-
-  // Mutation for generating run preview
-  const runPreviewMutation = useMutation({
-    mutationFn: async () => {
-      const response = await axios.post('/api/search/run-preview');
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(['runPreview'], data);
-      setShowPreviewDialog(true);
-    },
-    onError: (error: unknown) => {
-      toast.error('Failed to generate preview: ' + getErrorMessage(error));
     },
   });
 
@@ -417,22 +381,6 @@ function Dashboard() {
                     <PlayIcon /> {runSearchMutation.isPending ? 'Running...' : 'Manually Run Now'}
                   </Button>
                 </span>
-              </Tooltip>
-              <Tooltip content="Generate and preview what will be searched in the next run.">
-                <Button
-                  size="2"
-                  variant="outline"
-                  onClick={() => runPreviewMutation.mutate()}
-                  disabled={runPreviewMutation.isPending}
-                >
-                  {runPreviewMutation.isPending ? (
-                    <>
-                      <Spinner size="1" /> Generating...
-                    </>
-                  ) : (
-                    'Next Run Preview'
-                  )}
-                </Button>
               </Tooltip>
               <Tooltip content="Clear log history.">
                 <span>
@@ -800,44 +748,6 @@ function Dashboard() {
             </Card>
           );
         })()}
-
-        {/* Dialog for preview of next run */}
-        <Dialog.Root open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-          <Dialog.Content maxWidth="500px">
-            <Dialog.Title>Next Run Preview</Dialog.Title>
-            <Separator mb="4" />
-            {manualRunResults && Object.keys(manualRunResults).length > 0 ? (
-              <Flex direction="column" gap="2">
-                {Object.entries(manualRunResults).map(([appKey, result]) => {
-                  if (!result.success) {
-                    return null;
-                  }
-
-                  const appName = result.instanceName || formatAppName(appKey);
-                  const count = result.count || 0;
-                  const total = result.total || 0;
-                  const mediaType = result.movies ? 'movies' : result.artists ? 'artists' : result.authors ? 'authors' : 'series';
-                  const mediaTypeLabel = mediaType === 'movies' ? 'Movie' : mediaType === 'artists' ? 'Artist' : mediaType === 'authors' ? 'Author' : 'Series';
-                  const mediaTypeLabelPlural = count === 1 ? mediaTypeLabel : mediaTypeLabel + 's';
-
-                  return (
-                    <Flex key={appKey} align="center" gap="2" py="2">
-                      <AppIcon app={appKey} size={16} variant="light" />
-                      <Text size="3" weight="medium" style={{ flex: 1 }}>{appName}</Text>
-                      <Text size="2" color="gray">
-                        Will search {count} {mediaTypeLabelPlural} out of {total}
-                      </Text>
-                    </Flex>
-                  );
-                })}
-              </Flex>
-            ) : (
-              <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                No preview available
-              </Text>
-            )}
-          </Dialog.Content>
-        </Dialog.Root>
 
         {/* Dialog for viewing all items in a recent search entry */}
         <Dialog.Root

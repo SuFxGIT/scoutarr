@@ -14,8 +14,6 @@ export interface SearchResults {
   [key: string]: {
     success: boolean;
     searched?: number;
-    count?: number;
-    total?: number;
     movies?: Array<{ id: number; title: string }>;
     series?: Array<{ id: number; title: string }>;
     artists?: Array<{ id: number; title: string }>;
