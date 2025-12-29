@@ -48,10 +48,16 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       instanceName: instance.name
     });
 
-    // Fetch all media - NO FILTERING for Library view
-    // We want to show everything, not just what the scheduler would pick
+    // Fetch all media
     const allMedia = await service.getMedia(instance);
     logger.debug('✅ Fetched all media', { count: allMedia.length });
+
+    // Apply instance filter settings
+    const filteredMedia = await service.filterMedia(instance, allMedia);
+    logger.debug('✅ Applied instance filters', {
+      total: allMedia.length,
+      filtered: filteredMedia.length
+    });
 
     // Get quality profiles for name mapping
     const profiles = await service.getQualityProfiles(instance);
@@ -59,7 +65,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
-    const mediaWithDates = allMedia.map(m => {
+    const mediaWithDates = filteredMedia.map(m => {
       // Extract dateImported from file (Radarr uses movieFile, Sonarr uses episodeFile,
       // Lidarr uses trackFiles array, Readarr uses bookFiles array)
       let dateImported: string | undefined;
