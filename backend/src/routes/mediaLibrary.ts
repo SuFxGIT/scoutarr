@@ -93,7 +93,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         fromCache = true;
 
         // Convert database format to API format for filtering
-        filteredMedia = dbMedia.map(m => ({
+        const mediaFromDb = dbMedia.map(m => ({
           id: m.media_id,
           title: m.title,
           monitored: m.monitored,
@@ -111,6 +111,14 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
             customFormatScore: m.custom_format_score
           } : undefined,
         }));
+
+        // Re-apply instance filters (settings may have changed since sync)
+        logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
+        filteredMedia = await service.filterMedia(instance, mediaFromDb);
+        logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
+          total: mediaFromDb.length,
+          filtered: filteredMedia.length
+        });
       } else {
         // No data in database, fetch from API
         logger.debug('📡 [Scoutarr DB] No cached data, fetching from *arr API', { appType });

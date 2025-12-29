@@ -46,7 +46,7 @@ function MediaLibrary() {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [sortField, setSortField] = useState<'title' | 'lastSearched' | 'dateImported'>('title');
+  const [sortField, setSortField] = useState<'title' | 'status' | 'qualityProfileName' | 'monitored' | 'lastSearched' | 'dateImported' | 'customFormatScore' | 'hasFile'>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -141,7 +141,7 @@ function MediaLibrary() {
     });
   }, []);
 
-  const handleSort = useCallback((field: 'title' | 'lastSearched' | 'dateImported') => {
+  const handleSort = useCallback((field: 'title' | 'status' | 'qualityProfileName' | 'monitored' | 'lastSearched' | 'dateImported' | 'customFormatScore' | 'hasFile') => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -209,6 +209,14 @@ function MediaLibrary() {
       let comparison = 0;
       if (sortField === 'title') {
         comparison = a.title.localeCompare(b.title);
+      } else if (sortField === 'status') {
+        comparison = a.status.localeCompare(b.status);
+      } else if (sortField === 'qualityProfileName') {
+        const aProfile = a.qualityProfileName || '';
+        const bProfile = b.qualityProfileName || '';
+        comparison = aProfile.localeCompare(bProfile);
+      } else if (sortField === 'monitored') {
+        comparison = (a.monitored === b.monitored) ? 0 : a.monitored ? -1 : 1;
       } else if (sortField === 'lastSearched') {
         const aDate = a.lastSearched ? new Date(a.lastSearched).getTime() : 0;
         const bDate = b.lastSearched ? new Date(b.lastSearched).getTime() : 0;
@@ -217,6 +225,12 @@ function MediaLibrary() {
         const aDate = a.dateImported ? new Date(a.dateImported).getTime() : 0;
         const bDate = b.dateImported ? new Date(b.dateImported).getTime() : 0;
         comparison = aDate - bDate;
+      } else if (sortField === 'customFormatScore') {
+        const aScore = a.customFormatScore ?? -Infinity;
+        const bScore = b.customFormatScore ?? -Infinity;
+        comparison = aScore - bScore;
+      } else if (sortField === 'hasFile') {
+        comparison = (a.hasFile === b.hasFile) ? 0 : a.hasFile ? -1 : 1;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -382,9 +396,36 @@ function MediaLibrary() {
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
-                  <Box style={{ flex: '1', fontWeight: 500 }}>Status</Box>
-                  <Box style={{ flex: '1.3', fontWeight: 500 }}>Quality Profile</Box>
-                  <Box style={{ flex: '0.7', fontWeight: 500 }}>Monitored</Box>
+                  <Box
+                    style={{ flex: '1', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('status')}
+                  >
+                    <Flex align="center" gap="1">
+                      Status
+                      {sortField === 'status' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                  <Box
+                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('qualityProfileName')}
+                  >
+                    <Flex align="center" gap="1">
+                      Quality Profile
+                      {sortField === 'qualityProfileName' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                  <Box
+                    style={{ flex: '0.7', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('monitored')}
+                  >
+                    <Flex align="center" gap="1">
+                      Monitored
+                      {sortField === 'monitored' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
                   <Box
                     style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
                     onClick={() => handleSort('lastSearched')}
@@ -405,8 +446,26 @@ function MediaLibrary() {
                         (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
                     </Flex>
                   </Box>
-                  <Box style={{ flex: '0.6', fontWeight: 500 }}>CF Score</Box>
-                  <Box style={{ flex: '0.5', fontWeight: 500 }}>File</Box>
+                  <Box
+                    style={{ flex: '0.6', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('customFormatScore')}
+                  >
+                    <Flex align="center" gap="1">
+                      CF Score
+                      {sortField === 'customFormatScore' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
+                  <Box
+                    style={{ flex: '0.5', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => handleSort('hasFile')}
+                  >
+                    <Flex align="center" gap="1">
+                      File
+                      {sortField === 'hasFile' &&
+                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
+                    </Flex>
+                  </Box>
                 </Flex>
 
                 {/* Virtualized Table Body */}
