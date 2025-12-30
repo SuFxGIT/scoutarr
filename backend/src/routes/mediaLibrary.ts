@@ -13,6 +13,9 @@ import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrI
 
 export const mediaLibraryRouter = express.Router();
 
+// Track ongoing syncs per instance to prevent concurrent syncs
+const syncLocks = new Map<string, boolean>();
+
 // GET /api/media-library/:appType/:instanceId
 // Fetch all media for an instance with last searched dates
 // Query param: sync=true to force sync from API to database
@@ -61,8 +64,20 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     let fromCache = false;
 
     if (shouldSync) {
-      // Sync from API
-      logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
+      // Check if sync is already in progress for this instance
+      const lockKey = `${appType}:${instanceId}`;
+      if (syncLocks.get(lockKey)) {
+        return res.status(409).json({
+          error: 'Sync already in progress for this instance. Please wait for it to complete.'
+        });
+      }
+
+      // Set sync lock
+      syncLocks.set(lockKey, true);
+
+      try {
+        // Sync from API
+        logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
 
       // For Sonarr, fetch episodes instead of series
       let allMedia;
@@ -103,17 +118,21 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       await statsService.syncMediaToDatabase(instanceId, mediaWithProfileNames);
       logger.debug('✅ [Scoutarr DB] Synced media to database');
 
-      // Apply instance filter settings (unless skipFilters is true)
-      if (shouldSkipFilters) {
-        logger.debug('⏭️  [Scoutarr] Skipping instance filters (showAll=true)');
-        filteredMedia = allMedia;
-      } else {
-        logger.debug('🔽 [Scoutarr] Applying instance filters');
-        filteredMedia = await service.filterMedia(instance, allMedia);
-        logger.debug('✅ [Scoutarr] Applied instance filters', {
-          total: allMedia.length,
-          filtered: filteredMedia.length
-        });
+        // Apply instance filter settings (unless skipFilters is true)
+        if (shouldSkipFilters) {
+          logger.debug('⏭️  [Scoutarr] Skipping instance filters (showAll=true)');
+          filteredMedia = allMedia;
+        } else {
+          logger.debug('🔽 [Scoutarr] Applying instance filters');
+          filteredMedia = await service.filterMedia(instance, allMedia);
+          logger.debug('✅ [Scoutarr] Applied instance filters', {
+            total: allMedia.length,
+            filtered: filteredMedia.length
+          });
+        }
+      } finally {
+        // Always release the lock
+        syncLocks.delete(lockKey);
       }
     } else {
       // Try to get from database first

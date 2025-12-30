@@ -1,7 +1,6 @@
 import { AxiosInstance } from 'axios';
 import logger from './logger.js';
 import { getErrorMessage } from './errorUtils.js';
-import { getRateLimiter } from './rateLimiter.js';
 
 interface FileWithScore {
   id: number;
@@ -16,106 +15,121 @@ interface FetchOptions {
   paramName: string;       // 'movieFileIds', 'episodeFileIds', etc.
   fileIds: number[];
   appName: string;
-  instanceId?: string;     // Optional instance ID for rate limiting
 }
 
 /**
- * Fetches custom format scores for media files in batches
- * Common pattern used across all *arr services
- * Batches requests to avoid 414 URI Too Long errors
+ * Fetches custom format scores for media files
+ * Intelligently batches large requests to avoid 414 URI Too Long errors
+ * Handles Sonarr's 500 errors (stale IDs) gracefully
  */
 export async function fetchCustomFormatScores(
   options: FetchOptions
 ): Promise<Map<number, { score?: number; dateAdded?: string }>> {
-  const { client, apiVersion, endpoint, paramName, fileIds, appName, instanceId } = options;
+  const { client, apiVersion, endpoint, paramName, fileIds, appName } = options;
 
   if (fileIds.length === 0) {
     return new Map();
   }
 
-  // Get rate limiter for this instance (60 requests per minute)
-  const rateLimiter = instanceId ? getRateLimiter(instanceId, 60, 60000) : null;
+  // Use batching only for large requests (>100 files) to avoid 414 errors
+  const BATCH_SIZE = 100;
+  const shouldBatch = fileIds.length > BATCH_SIZE;
 
-  try {
-    logger.debug(`📡 [${appName} API] Fetching ${endpoint} for custom format scores`, {
-      fileCount: fileIds.length,
-      rateLimitEnabled: !!rateLimiter
-    });
+  if (!shouldBatch) {
+    // Small request - fetch directly
+    return fetchBatch(client, apiVersion, endpoint, paramName, fileIds, appName);
+  }
 
-    const batchSize = 25;
-    const allFiles: FileWithScore[] = [];
+  // Large request - batch it
+  const batches: number[][] = [];
+  for (let i = 0; i < fileIds.length; i += BATCH_SIZE) {
+    batches.push(fileIds.slice(i, i + BATCH_SIZE));
+  }
 
-    for (let i = 0; i < fileIds.length; i += batchSize) {
-      const batch = fileIds.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(fileIds.length / batchSize);
+  logger.debug(`📡 [${appName}] Fetching ${endpoint} in ${batches.length} batches`, {
+    totalFiles: fileIds.length
+  });
 
-      logger.debug(`📡 [${appName} API] Fetching batch ${batchNumber} of ${totalBatches}`, {
-        batchSize: batch.length,
-        firstId: batch[0],
-        lastId: batch[batch.length - 1]
-      });
+  const allResults = new Map<number, { score?: number; dateAdded?: string }>();
+  let successCount = 0;
+  let failCount = 0;
 
-      try {
-        // Wait for rate limiter before making request
-        if (rateLimiter) {
-          await rateLimiter.acquire();
-        }
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    const result = await fetchBatch(client, apiVersion, endpoint, paramName, batch, appName);
 
-        const filesResponse = await client.get<FileWithScore[]>(
-          `/api/${apiVersion}/${endpoint}`,
-          {
-            params: { [paramName]: batch },
-            paramsSerializer: { indexes: null }
-          }
-        );
-        allFiles.push(...filesResponse.data);
-
-        logger.debug(`📡 [${appName} API] Batch ${batchNumber} fetched`, {
-          count: filesResponse.data.length
-        });
-      } catch (batchError: unknown) {
-        const errorMsg = getErrorMessage(batchError);
-        const errorDetails = batchError instanceof Error && 'response' in batchError
-          ? { status: (batchError as any).response?.status, data: (batchError as any).response?.data }
-          : {};
-
-        logger.warn(
-          `⚠️  [${appName} API] Failed to fetch batch ${batchNumber} of ${totalBatches}`,
-          {
-            error: errorMsg,
-            batchSize: batch.length,
-            firstId: batch[0],
-            lastId: batch[batch.length - 1],
-            ...errorDetails
-          }
-        );
-
-        // Continue with remaining batches instead of failing completely
-        // This way we get partial data instead of nothing
-      }
+    if (result.size > 0) {
+      successCount++;
+      result.forEach((value, key) => allResults.set(key, value));
+    } else {
+      failCount++;
     }
+  }
 
-    logger.debug(`📡 [${appName} API] Fetched ${endpoint}`, { count: allFiles.length });
+  logger.debug(`✅ [${appName}] Fetched ${allResults.size}/${fileIds.length} ${endpoint} (${successCount}/${batches.length} batches succeeded)`);
 
-    return new Map(allFiles.map(f => [f.id, {
+  return allResults;
+}
+
+/**
+ * Fetches a single batch of file scores
+ */
+async function fetchBatch(
+  client: AxiosInstance,
+  apiVersion: 'v1' | 'v3',
+  endpoint: string,
+  paramName: string,
+  fileIds: number[],
+  appName: string
+): Promise<Map<number, { score?: number; dateAdded?: string }>> {
+  try {
+    const filesResponse = await client.get<FileWithScore[]>(
+      `/api/${apiVersion}/${endpoint}`,
+      {
+        params: { [paramName]: fileIds },
+        paramsSerializer: { indexes: null }
+      }
+    );
+
+    return new Map(filesResponse.data.map(f => [f.id, {
       score: f.customFormatScore,
       dateAdded: f.dateAdded
     }]));
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error);
-    const errorDetails = error instanceof Error && 'response' in error
-      ? { status: (error as any).response?.status, data: (error as any).response?.data }
-      : {};
 
-    logger.warn(
-      `⚠️  [${appName} API] Failed to fetch ${endpoint} for custom format scores`,
-      {
+    // Extract detailed error info from axios error
+    let statusCode: number | undefined;
+    let responseData: any;
+
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      statusCode = axiosError.response?.status;
+      responseData = axiosError.response?.data;
+    }
+
+    // Log warning for 414 or 500 errors, but continue gracefully
+    if (statusCode === 414) {
+      logger.warn(`⚠️  [${appName}] 414 URI Too Long - batch size too large (${fileIds.length} files)`);
+    } else if (statusCode === 500) {
+      // Sonarr sometimes has stale episode file IDs in its database
+      const message = responseData?.message || '';
+      if (message.includes('Expected query to return')) {
+        logger.debug(`⚠️  [${appName}] Sonarr database has stale file IDs (${fileIds.length} requested, got ${message})`);
+      } else {
+        logger.warn(`⚠️  [${appName}] API 500 error fetching ${endpoint}`, {
+          error: errorMsg,
+          fileCount: fileIds.length
+        });
+      }
+    } else {
+      logger.warn(`⚠️  [${appName}] Failed to fetch ${endpoint}`, {
         error: errorMsg,
         fileCount: fileIds.length,
-        ...errorDetails
-      }
-    );
+        status: statusCode
+      });
+    }
+
     return new Map();
   }
 }

@@ -60,8 +60,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
         endpoint: 'episodefile',
         paramName: 'episodeFileIds',
         fileIds: episodeFileIds,
-        appName: this.appName,
-        instanceId: `sonarr-${config.url}`
+        appName: this.appName
       });
 
       // Add customFormatScore and dateAdded to each series' episodeFile
@@ -110,7 +109,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
       logger.debug('📡 [Sonarr API] Fetching series for episode sync');
       const series = await this.getSeries(config);
 
-      // Step 2: Fetch episodes for each series
+      // Step 2: Fetch episodes for each series (with custom format scores per series)
       const allEpisodes: SonarrEpisode[] = [];
 
       for (const s of series) {
@@ -127,54 +126,50 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
         // Filter to only episodes with files
         const episodesWithFiles = episodesResponse.data.filter(ep => ep.hasFile);
 
-        // Attach series metadata to each episode
-        const episodesWithSeries = episodesWithFiles.map(ep => ({
-          ...ep,
-          seriesId: s.id,
-          seriesTitle: s.title,
-          qualityProfileId: (s as { qualityProfileId?: number }).qualityProfileId,
-          tags: s.tags,
-          monitored: ep.monitored && s.monitored, // Both must be monitored
-          status: (s as { status?: string }).status || 'continuing', // Inherit series status
-        }));
+        // Fetch custom format scores for this series' episode files
+        const episodeFileIds = episodesWithFiles
+          .map(ep => ep.episodeFileId)
+          .filter((id): id is number => id !== undefined && id > 0);
 
-        allEpisodes.push(...episodesWithSeries);
+        const fileScoresMap = await fetchCustomFormatScores({
+          client,
+          apiVersion: this.apiVersion,
+          endpoint: 'episodefile',
+          paramName: 'episodeFileIds',
+          fileIds: episodeFileIds,
+          appName: this.appName
+        });
+
+        // Attach series metadata and custom format scores to each episode
+        const episodesWithMetadata = episodesWithFiles.map(ep => {
+          const fileData = ep.episodeFileId
+            ? fileScoresMap.get(ep.episodeFileId)
+            : undefined;
+
+          return {
+            ...ep,
+            seriesId: s.id,
+            seriesTitle: s.title,
+            qualityProfileId: (s as { qualityProfileId?: number }).qualityProfileId,
+            tags: s.tags,
+            monitored: ep.monitored && s.monitored, // Both must be monitored
+            status: (s as { status?: string }).status || 'continuing',
+            episodeFile: {
+              id: ep.episodeFileId,
+              dateAdded: fileData?.dateAdded || ep.episodeFile?.dateAdded,
+              customFormatScore: fileData?.score
+            }
+          };
+        });
+
+        allEpisodes.push(...episodesWithMetadata);
       }
 
-      logger.debug('✅ [Sonarr API] Fetched episodes with files', {
+      logger.debug('✅ [Sonarr API] Fetched episodes with files and custom format scores', {
         count: allEpisodes.length
       });
 
-      // Step 3: Batch fetch custom format scores
-      const episodeFileIds = allEpisodes
-        .map(ep => ep.episodeFileId)
-        .filter((id): id is number => id !== undefined && id > 0);
-
-      const fileScoresMap = await fetchCustomFormatScores({
-        client,
-        apiVersion: this.apiVersion,
-        endpoint: 'episodefile',
-        paramName: 'episodeFileIds',
-        fileIds: episodeFileIds,
-        appName: this.appName,
-        instanceId: `sonarr-${config.url}`
-      });
-
-      // Step 4: Attach custom format scores and dateAdded to episodes
-      return allEpisodes.map(ep => {
-        const fileData = ep.episodeFileId
-          ? fileScoresMap.get(ep.episodeFileId)
-          : undefined;
-
-        return {
-          ...ep,
-          episodeFile: {
-            id: ep.episodeFileId,
-            dateAdded: fileData?.dateAdded || ep.episodeFile?.dateAdded,
-            customFormatScore: fileData?.score
-          }
-        };
-      });
+      return allEpisodes;
 
     } catch (error: unknown) {
       this.logError('Failed to fetch episodes for sync', error, { url: config.url });

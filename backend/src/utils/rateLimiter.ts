@@ -17,6 +17,17 @@ export class RateLimiter {
   }
 
   /**
+   * Get current request count in the window
+   */
+  getCurrentCount(): number {
+    const now = Date.now();
+    this.requestTimes = this.requestTimes.filter(
+      time => now - time < this.windowMs
+    );
+    return this.requestTimes.length;
+  }
+
+  /**
    * Wait if necessary to respect rate limit, then record this request
    */
   async acquire(): Promise<void> {

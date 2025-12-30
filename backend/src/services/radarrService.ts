@@ -41,7 +41,7 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
         paramName: 'movieFileIds',
         fileIds: movieFileIds,
         appName: this.appName,
-        instanceId: `radarr-${config.url}`
+        
       });
 
       // Add customFormatScore and dateAdded to each movie's movieFile

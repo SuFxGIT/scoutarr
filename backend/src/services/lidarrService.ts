@@ -51,7 +51,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         paramName: 'trackFileIds',
         fileIds: trackFileIds,
         appName: this.appName,
-        instanceId: `lidarr-${config.url}`
+        
       });
 
       // Add customFormatScore and dateAdded to each artist's trackFiles

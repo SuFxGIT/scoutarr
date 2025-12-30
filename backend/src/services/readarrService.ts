@@ -51,7 +51,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
         paramName: 'bookFileIds',
         fileIds: bookFileIds,
         appName: this.appName,
-        instanceId: `readarr-${config.url}`
+        
       });
 
       // Add customFormatScore and dateAdded to each author's bookFiles
