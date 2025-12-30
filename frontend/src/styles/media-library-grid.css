@@ -8,7 +8,7 @@
   --rdg-border-color: var(--gray-a6);
   --rdg-color: var(--gray-12);
   --rdg-font-size: 0.875rem;
-  --rdg-selection-color: var(--accent-9);
+  --rdg-selection-color: transparent;
   --rdg-checkbox-focus-color: var(--accent-8);
 
   border: 1px solid var(--gray-a6);
@@ -75,6 +75,7 @@
 /* Sort indicator styling */
 .media-library-grid .rdg-sort-arrow {
   fill: var(--accent-9);
+  margin-left: 0.5rem;
 }
 
 /* Header sort hover effect */
