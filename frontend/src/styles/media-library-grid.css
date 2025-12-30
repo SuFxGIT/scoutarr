@@ -20,6 +20,7 @@
   padding-block: 0.75rem;
   padding-inline: 0.75rem;
   border-bottom: 1px solid var(--gray-a4);
+  border-right: 1px solid var(--yellow-a6);
   display: flex;
   align-items: center;
 }
@@ -35,11 +36,14 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  user-select: none;
 }
 
 .media-library-grid .rdg-header-cell {
   padding-block: 0.625rem;
   padding-inline: 0.75rem;
+  border-right: 1px solid var(--yellow-a6);
+  user-select: none;
 }
 
 .media-library-grid .rdg-row {
