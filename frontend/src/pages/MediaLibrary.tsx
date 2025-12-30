@@ -1,27 +1,33 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import DataGrid, { Column, SelectColumn, SortColumn } from 'react-data-grid';
+import 'react-data-grid/lib/styles.css';
+import '../styles/media-library-grid.css';
 import {
   Flex,
   Heading,
   Button,
   Card,
   Text,
-  Badge,
   Separator,
   Spinner,
   Box,
   Select,
-  Checkbox,
   Callout,
   TextField,
+  Tooltip,
 } from '@radix-ui/themes';
 import {
-  ChevronUpIcon,
-  ChevronDownIcon,
   MagnifyingGlassIcon,
   InfoCircledIcon,
   CrossCircledIcon,
+  EyeOpenIcon,
+  EyeClosedIcon,
+  CheckCircledIcon,
+  ClockIcon,
+  FileIcon,
+  DotFilledIcon,
+  CheckIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -37,6 +43,110 @@ import type { Config } from '../types/config';
 const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
 type AppType = typeof APP_TYPES[number];
 
+// Helper functions for status icons
+function getStatusIcon(status: string) {
+  const statusLower = status.toLowerCase();
+
+  if (statusLower.includes('released') || statusLower.includes('available')) {
+    return <CheckCircledIcon />;
+  }
+  if (statusLower.includes('announced') || statusLower.includes('continuing')) {
+    return <ClockIcon />;
+  }
+  if (statusLower.includes('missing')) {
+    return <CrossCircledIcon />;
+  }
+
+  return <DotFilledIcon />; // Default
+}
+
+function getMonitoredIcon(monitored: boolean) {
+  return monitored ? <EyeOpenIcon /> : <EyeClosedIcon />;
+}
+
+function getFileIcon(hasFile?: boolean) {
+  return hasFile ? <CheckIcon /> : <FileIcon />;
+}
+
+function getStatusTooltip(status: string): string {
+  const statusLower = status.toLowerCase();
+
+  if (statusLower.includes('released')) return 'Status: Released';
+  if (statusLower.includes('available')) return 'Status: Available';
+  if (statusLower.includes('announced')) return 'Status: Announced';
+  if (statusLower.includes('continuing')) return 'Status: Continuing';
+  if (statusLower.includes('missing')) return 'Status: Missing';
+
+  return `Status: ${status}`;
+}
+
+// Cell renderer components
+interface TitleCellProps {
+  row: MediaLibraryItem & {
+    formattedLastSearched: string;
+    formattedDateImported: string;
+  };
+}
+
+function TitleCell({ row }: TitleCellProps) {
+  return (
+    <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
+      <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
+        <Tooltip content={getStatusTooltip(row.status)}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getStatusIcon(row.status)}
+          </Box>
+        </Tooltip>
+        <Tooltip content={row.monitored ? 'Monitored' : 'Not Monitored'}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getMonitoredIcon(row.monitored)}
+          </Box>
+        </Tooltip>
+        <Tooltip content={row.hasFile ? 'File Present' : 'No File'}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getFileIcon(row.hasFile)}
+          </Box>
+        </Tooltip>
+      </Flex>
+      <Text
+        size="2"
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {row.title}
+      </Text>
+    </Flex>
+  );
+}
+
+function QualityProfileCell({ row }: TitleCellProps) {
+  return <Text size="2">{row.qualityProfileName || 'N/A'}</Text>;
+}
+
+function LastSearchedCell({ row }: TitleCellProps) {
+  return (
+    <Text size="2" color="gray">
+      {row.formattedLastSearched}
+    </Text>
+  );
+}
+
+function LastImportedCell({ row }: TitleCellProps) {
+  return (
+    <Text size="2" color="gray">
+      {row.formattedDateImported}
+    </Text>
+  );
+}
+
+function CFScoreCell({ row }: TitleCellProps) {
+  return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
+}
+
 function MediaLibrary() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -46,8 +156,9 @@ function MediaLibrary() {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [sortField, setSortField] = useState<'title' | 'status' | 'qualityProfileName' | 'monitored' | 'lastSearched' | 'dateImported' | 'customFormatScore' | 'hasFile'>('title');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>([
+    { columnKey: 'title', direction: 'ASC' }
+  ]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -120,35 +231,7 @@ function MediaLibrary() {
     setSearchParams({ instance: value });
   };
 
-  const handleSelectAll = useCallback(() => {
-    if (!mediaData) return;
-    if (selectedMediaIds.size === mediaData.media.length) {
-      setSelectedMediaIds(new Set());
-    } else {
-      setSelectedMediaIds(new Set(mediaData.media.map((m: MediaLibraryItem) => m.id)));
-    }
-  }, [mediaData, selectedMediaIds.size]);
 
-  const handleSelectItem = useCallback((mediaId: number) => {
-    setSelectedMediaIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(mediaId)) {
-        newSet.delete(mediaId);
-      } else {
-        newSet.add(mediaId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const handleSort = useCallback((field: 'title' | 'status' | 'qualityProfileName' | 'monitored' | 'lastSearched' | 'dateImported' | 'customFormatScore' | 'hasFile') => {
-    if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  }, [sortField]);
 
   const handleManualSearch = useCallback(async () => {
     if (selectedMediaIds.size === 0) return;
@@ -203,37 +286,38 @@ function MediaLibrary() {
       });
     }
 
-    // Sort filtered results
+    // Sort filtered results based on react-data-grid sort columns
     const sorted = [...filtered];
-    sorted.sort((a, b) => {
-      let comparison = 0;
-      if (sortField === 'title') {
-        comparison = a.title.localeCompare(b.title);
-      } else if (sortField === 'status') {
-        comparison = a.status.localeCompare(b.status);
-      } else if (sortField === 'qualityProfileName') {
-        const aProfile = a.qualityProfileName || '';
-        const bProfile = b.qualityProfileName || '';
-        comparison = aProfile.localeCompare(bProfile);
-      } else if (sortField === 'monitored') {
-        comparison = (a.monitored === b.monitored) ? 0 : a.monitored ? -1 : 1;
-      } else if (sortField === 'lastSearched') {
-        const aDate = a.lastSearched ? new Date(a.lastSearched).getTime() : 0;
-        const bDate = b.lastSearched ? new Date(b.lastSearched).getTime() : 0;
-        comparison = aDate - bDate;
-      } else if (sortField === 'dateImported') {
-        const aDate = a.dateImported ? new Date(a.dateImported).getTime() : 0;
-        const bDate = b.dateImported ? new Date(b.dateImported).getTime() : 0;
-        comparison = aDate - bDate;
-      } else if (sortField === 'customFormatScore') {
-        const aScore = a.customFormatScore ?? -Infinity;
-        const bScore = b.customFormatScore ?? -Infinity;
-        comparison = aScore - bScore;
-      } else if (sortField === 'hasFile') {
-        comparison = (a.hasFile === b.hasFile) ? 0 : a.hasFile ? -1 : 1;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
+    if (sortColumns.length > 0) {
+      const { columnKey, direction } = sortColumns[0];
+      const multiplier = direction === 'ASC' ? 1 : -1;
+
+      sorted.sort((a, b) => {
+        let comparison = 0;
+
+        if (columnKey === 'title') {
+          comparison = a.title.localeCompare(b.title);
+        } else if (columnKey === 'qualityProfileName') {
+          const aProfile = a.qualityProfileName || '';
+          const bProfile = b.qualityProfileName || '';
+          comparison = aProfile.localeCompare(bProfile);
+        } else if (columnKey === 'lastSearched') {
+          const aDate = a.lastSearched ? new Date(a.lastSearched).getTime() : 0;
+          const bDate = b.lastSearched ? new Date(b.lastSearched).getTime() : 0;
+          comparison = aDate - bDate;
+        } else if (columnKey === 'dateImported') {
+          const aDate = a.dateImported ? new Date(a.dateImported).getTime() : 0;
+          const bDate = b.dateImported ? new Date(b.dateImported).getTime() : 0;
+          comparison = aDate - bDate;
+        } else if (columnKey === 'customFormatScore') {
+          const aScore = a.customFormatScore ?? -Infinity;
+          const bScore = b.customFormatScore ?? -Infinity;
+          comparison = aScore - bScore;
+        }
+
+        return comparison * multiplier;
+      });
+    }
 
     // Pre-compute formatted dates to avoid formatting on every render
     return sorted.map(item => ({
@@ -241,7 +325,7 @@ function MediaLibrary() {
       formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
       formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : 'N/A'
     }));
-  }, [mediaData?.media, sortField, sortDirection, searchQuery]);
+  }, [mediaData?.media, sortColumns, searchQuery]);
 
   // Check if any instances are configured
   const hasAnyInstances = useMemo(() => {
@@ -252,14 +336,48 @@ function MediaLibrary() {
     });
   }, [config]);
 
-  // Virtual scrolling setup
-  const parentRef = useRef<HTMLDivElement>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: filteredAndSortedMedia.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 50, // Estimated row height
-    overscan: 5, // Render 5 extra items above and below viewport
-  });
+  // Column configuration for DataGrid
+  const columns: readonly Column<MediaLibraryItem & {
+    formattedLastSearched: string;
+    formattedDateImported: string;
+  }>[] = useMemo(() => [
+    SelectColumn,
+    {
+      key: 'title',
+      name: 'Title',
+      sortable: true,
+      resizable: true,
+      renderCell: (props) => <TitleCell row={props.row} />
+    },
+    {
+      key: 'qualityProfileName',
+      name: 'Quality Profile',
+      sortable: true,
+      resizable: true,
+      renderCell: (props) => <QualityProfileCell row={props.row} />
+    },
+    {
+      key: 'lastSearched',
+      name: 'Last Searched',
+      sortable: true,
+      resizable: true,
+      renderCell: (props) => <LastSearchedCell row={props.row} />
+    },
+    {
+      key: 'dateImported',
+      name: 'Last Imported',
+      sortable: true,
+      resizable: true,
+      renderCell: (props) => <LastImportedCell row={props.row} />
+    },
+    {
+      key: 'customFormatScore',
+      name: 'CF Score',
+      sortable: true,
+      resizable: true,
+      renderCell: (props) => <CFScoreCell row={props.row} />
+    }
+  ], []);
 
   return (
     <Flex direction="column" gap="4">
@@ -366,185 +484,27 @@ function MediaLibrary() {
 
           {mediaData && mediaData.media.length > 0 && (
             <>
-              {/* Virtual Table Container */}
-              <Box style={{ overflow: 'auto', maxHeight: '600px' }} ref={parentRef}>
-                {/* Table Header - Fixed */}
-                <Flex
-                  style={{
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
-                    backgroundColor: 'var(--color-panel)',
-                    borderBottom: '1px solid var(--gray-6)',
+              {/* DataGrid */}
+              <Box style={{ height: '900px' }}>
+                <DataGrid
+                  className="media-library-grid"
+                  columns={columns}
+                  rows={filteredAndSortedMedia}
+                  rowKeyGetter={(row) => row.id}
+                  selectedRows={selectedMediaIds}
+                  onSelectedRowsChange={setSelectedMediaIds}
+                  sortColumns={sortColumns}
+                  onSortColumnsChange={setSortColumns}
+                  rowHeight={55}
+                  defaultColumnOptions={{
+                    sortable: true,
+                    resizable: true
                   }}
-                  p="2"
-                  gap="2"
-                >
-                  <Box style={{ width: '50px', flexShrink: 0 }}>
-                    <Checkbox
-                      checked={selectedMediaIds.size === mediaData.media.length}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </Box>
-                  <Box
-                    style={{ flex: '2', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('title')}
-                  >
-                    <Flex align="center" gap="1">
-                      Title
-                      {sortField === 'title' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '1', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('status')}
-                  >
-                    <Flex align="center" gap="1">
-                      Status
-                      {sortField === 'status' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('qualityProfileName')}
-                  >
-                    <Flex align="center" gap="1">
-                      Quality Profile
-                      {sortField === 'qualityProfileName' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '0.7', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('monitored')}
-                  >
-                    <Flex align="center" gap="1">
-                      Monitored
-                      {sortField === 'monitored' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('lastSearched')}
-                  >
-                    <Flex align="center" gap="1">
-                      Last Searched
-                      {sortField === 'lastSearched' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '1.3', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('dateImported')}
-                  >
-                    <Flex align="center" gap="1">
-                      Date Imported
-                      {sortField === 'dateImported' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '0.6', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('customFormatScore')}
-                  >
-                    <Flex align="center" gap="1">
-                      CF Score
-                      {sortField === 'customFormatScore' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                  <Box
-                    style={{ flex: '0.5', cursor: 'pointer', fontWeight: 500 }}
-                    onClick={() => handleSort('hasFile')}
-                  >
-                    <Flex align="center" gap="1">
-                      File
-                      {sortField === 'hasFile' &&
-                        (sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />)}
-                    </Flex>
-                  </Box>
-                </Flex>
-
-                {/* Virtualized Table Body */}
-                <div
-                  style={{
-                    height: `${rowVirtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative',
-                  }}
-                >
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const item = filteredAndSortedMedia[virtualRow.index];
-                    return (
-                      <Flex
-                        key={item.id}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: `${virtualRow.size}px`,
-                          transform: `translateY(${virtualRow.start}px)`,
-                          borderBottom: '1px solid var(--gray-4)',
-                        }}
-                        p="2"
-                        gap="2"
-                        align="center"
-                      >
-                        <Box style={{ width: '50px', flexShrink: 0 }}>
-                          <Checkbox
-                            checked={selectedMediaIds.has(item.id)}
-                            onCheckedChange={() => handleSelectItem(item.id)}
-                          />
-                        </Box>
-                        <Box style={{ flex: '2' }}>
-                          <Text size="2">{item.title}</Text>
-                        </Box>
-                        <Box style={{ flex: '1' }}>
-                          <Badge size="1" variant="soft">
-                            {item.status}
-                          </Badge>
-                        </Box>
-                        <Box style={{ flex: '1.3' }}>
-                          <Text size="2">{item.qualityProfileName || 'N/A'}</Text>
-                        </Box>
-                        <Box style={{ flex: '0.7' }}>
-                          <Badge size="1" color={item.monitored ? 'green' : 'gray'}>
-                            {item.monitored ? 'Yes' : 'No'}
-                          </Badge>
-                        </Box>
-                        <Box style={{ flex: '1.3' }}>
-                          <Text size="2" color="gray">
-                            {item.formattedLastSearched}
-                          </Text>
-                        </Box>
-                        <Box style={{ flex: '1.3' }}>
-                          <Text size="2" color="gray">
-                            {item.formattedDateImported}
-                          </Text>
-                        </Box>
-                        <Box style={{ flex: '0.6' }}>
-                          <Text size="2">
-                            {item.customFormatScore ?? '-'}
-                          </Text>
-                        </Box>
-                        <Box style={{ flex: '0.5' }}>
-                          {item.hasFile ? (
-                            <Badge size="1" color="green">✓</Badge>
-                          ) : (
-                            <Text size="1" color="gray">-</Text>
-                          )}
-                        </Box>
-                      </Flex>
-                    );
-                  })}
-                </div>
+                  style={{ height: '100%' }}
+                />
               </Box>
 
-              {/* Manual Search Button */}
+              {/* Action Buttons */}
               <Flex justify="end" gap="2" pt="3">
                 <Button
                   variant="outline"
