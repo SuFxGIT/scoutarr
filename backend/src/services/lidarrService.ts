@@ -2,7 +2,7 @@ import { LidarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
 import logger from '../utils/logger.js';
 import { applyCommonFilters, FilterableMedia } from '../utils/filterUtils.js';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { fetchCustomFormatScores } from '../utils/customFormatUtils.js';
 
 export interface LidarrArtist extends FilterableMedia {
   artistName: string;
@@ -44,58 +44,35 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         }
       }
 
-      if (trackFileIds.length > 0) {
-        try {
-          logger.debug('📡 [Lidarr API] Fetching track files for custom format scores', { fileCount: trackFileIds.length });
-          // Batch requests to avoid 414 URI Too Long errors
-          const batchSize = 100;
-          const allFiles: Array<{ id: number; customFormatScore?: number }> = [];
+      const fileScoresMap = await fetchCustomFormatScores({
+        client,
+        apiVersion: this.apiVersion,
+        endpoint: 'trackfile',
+        paramName: 'trackFileIds',
+        fileIds: trackFileIds,
+        appName: this.appName
+      });
 
-          for (let i = 0; i < trackFileIds.length; i += batchSize) {
-            const batch = trackFileIds.slice(i, i + batchSize);
-            const filesResponse = await client.get<Array<{ id: number; customFormatScore?: number }>>(`/api/${this.apiVersion}/trackfile`, {
-              params: { trackFileIds: batch },
-              paramsSerializer: { indexes: null }
-            });
-            allFiles.push(...filesResponse.data);
-          }
-
-          logger.debug('📡 [Lidarr API] Fetched track files', { count: allFiles.length });
-
-          // Create a map of trackFileId -> customFormatScore
-          const fileScoresMap = new Map(
-            allFiles.map(f => [f.id, f.customFormatScore])
-          );
-
-          // Add customFormatScore to each artist's trackFiles
-          return artists.map(artist => {
-            const trackFiles = (artist as { trackFiles?: Array<{ id?: number }> }).trackFiles;
-            if (trackFiles && Array.isArray(trackFiles) && trackFiles.length > 0) {
-              const updatedTrackFiles = trackFiles.map(trackFile => {
-                if (trackFile.id && fileScoresMap.has(trackFile.id)) {
-                  return {
-                    ...trackFile,
-                    customFormatScore: fileScoresMap.get(trackFile.id)
-                  };
-                }
-                return trackFile;
-              });
+      // Add customFormatScore to each artist's trackFiles
+      return artists.map(artist => {
+        const trackFiles = (artist as { trackFiles?: Array<{ id?: number }> }).trackFiles;
+        if (trackFiles && Array.isArray(trackFiles) && trackFiles.length > 0) {
+          const updatedTrackFiles = trackFiles.map(trackFile => {
+            if (trackFile.id && fileScoresMap.has(trackFile.id)) {
               return {
-                ...artist,
-                trackFiles: updatedTrackFiles
-              } as LidarrArtist;
+                ...trackFile,
+                customFormatScore: fileScoresMap.get(trackFile.id)
+              };
             }
-            return artist;
+            return trackFile;
           });
-        } catch (error: unknown) {
-          logger.warn('⚠️  [Lidarr API] Failed to fetch track files for custom format scores, continuing without scores', {
-            error: getErrorMessage(error)
-          });
-          return artists;
+          return {
+            ...artist,
+            trackFiles: updatedTrackFiles
+          } as LidarrArtist;
         }
-      }
-
-      return artists;
+        return artist;
+      });
     } catch (error: unknown) {
       this.logError('Failed to fetch artists', error, { url: config.url });
       throw error;

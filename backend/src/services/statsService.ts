@@ -138,85 +138,6 @@ class StatsService {
       });
     }
 
-    // Migration: Add scoutarr_tags and ignore_tags columns to instances table
-    try {
-      const instanceColumns = this.db.pragma('table_info(instances)') as Array<{ name: string }>;
-      const hasScoutarrTags = instanceColumns.some(col => col.name === 'scoutarr_tags');
-      const hasIgnoreTags = instanceColumns.some(col => col.name === 'ignore_tags');
-
-      if (!hasScoutarrTags) {
-        logger.info('📦 Adding scoutarr_tags column to instances table');
-        this.db.exec('ALTER TABLE instances ADD COLUMN scoutarr_tags TEXT');
-        // Initialize existing records with empty arrays
-        this.db.exec("UPDATE instances SET scoutarr_tags = '[]' WHERE scoutarr_tags IS NULL");
-        logger.info('✅ scoutarr_tags column added successfully');
-      }
-
-      if (!hasIgnoreTags) {
-        logger.info('📦 Adding ignore_tags column to instances table');
-        this.db.exec('ALTER TABLE instances ADD COLUMN ignore_tags TEXT');
-        // Initialize existing records with empty arrays
-        this.db.exec("UPDATE instances SET ignore_tags = '[]' WHERE ignore_tags IS NULL");
-        logger.info('✅ ignore_tags column added successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error checking/adding tag columns to instances table', {
-        error: getErrorMessage(error)
-      });
-    }
-
-    // Migration: Drop tagged_media table and indexes (no longer needed)
-    try {
-      // Check if table exists
-      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
-      const hasTaggedMedia = tables.some(t => t.name === 'tagged_media');
-
-      if (hasTaggedMedia) {
-        logger.info('🗑️  Dropping tagged_media table and indexes (migrating to instances table)');
-        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_app_instance');
-        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_tag_id');
-        this.db.exec('DROP INDEX IF EXISTS idx_tagged_media_media_id');
-        this.db.exec('DROP TABLE IF EXISTS tagged_media');
-        logger.info('✅ tagged_media table and indexes removed successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error dropping tagged_media table', {
-        error: getErrorMessage(error)
-      });
-    }
-
-    // Migration: Add quality_profile_name column to media_library table
-    try {
-      const mediaColumns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
-      const hasQualityProfileName = mediaColumns.some(col => col.name === 'quality_profile_name');
-
-      if (!hasQualityProfileName) {
-        logger.info('📦 Adding quality_profile_name column to media_library table');
-        this.db.exec('ALTER TABLE media_library ADD COLUMN quality_profile_name TEXT');
-        logger.info('✅ quality_profile_name column added successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error adding quality_profile_name column', {
-        error: getErrorMessage(error)
-      });
-    }
-
-    // Migration: Drop quality_profiles table (no longer needed)
-    try {
-      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
-      const hasQualityProfiles = tables.some(t => t.name === 'quality_profiles');
-
-      if (hasQualityProfiles) {
-        logger.info('🗑️  Dropping quality_profiles table (migrating to inline storage)');
-        this.db.exec('DROP TABLE IF EXISTS quality_profiles');
-        logger.info('✅ quality_profiles table removed successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error dropping quality_profiles table', {
-        error: getErrorMessage(error)
-      });
-    }
-
     // Migration: Remove redundant columns from media_library
     // Note: SQLite doesn't support DROP COLUMN in older versions, so we'll recreate the table
     try {
@@ -288,33 +209,6 @@ class StatsService {
       });
     }
 
-    // Migration: Rename upgrades table to history
-    try {
-      const tables = this.db.pragma('table_list') as Array<{ name: string }>;
-      const hasUpgrades = tables.some(t => t.name === 'upgrades');
-      const hasHistory = tables.some(t => t.name === 'history');
-
-      if (hasUpgrades && !hasHistory) {
-        logger.info('🔄 Renaming upgrades table to history');
-        this.db.exec('ALTER TABLE upgrades RENAME TO history');
-
-        // Drop old indexes
-        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_timestamp');
-        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_application');
-        this.db.exec('DROP INDEX IF EXISTS idx_upgrades_instance');
-
-        // Create new indexes
-        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC)');
-        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_application ON history(application)');
-        this.db.exec('CREATE INDEX IF NOT EXISTS idx_history_instance ON history(instance)');
-
-        logger.info('✅ upgrades table renamed to history successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error renaming upgrades table to history', {
-        error: getErrorMessage(error)
-      });
-    }
   }
 
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
@@ -598,54 +492,6 @@ class StatsService {
         error: errorMessage
       });
       throw error;
-    }
-  }
-
-  async getMediaLastSearched(
-    application: string,
-    instanceId: string,
-    mediaIds: number[]
-  ): Promise<Map<number, string>> {
-    if (!this.db) {
-      logger.warn('⚠️  Database not initialized, returning empty map');
-      return new Map();
-    }
-
-    if (mediaIds.length === 0) {
-      return new Map();
-    }
-
-    try {
-      const appKey = application.toLowerCase();
-      const placeholders = mediaIds.map(() => '?').join(',');
-      const stmt = this.db.prepare(`
-        SELECT media_id, MAX(timestamp) as last_searched
-        FROM tagged_media
-        WHERE application = ? AND instance_id = ? AND media_id IN (${placeholders})
-        GROUP BY media_id
-      `);
-      const results = stmt.all(appKey, instanceId, ...mediaIds) as Array<{
-        media_id: number;
-        last_searched: string;
-      }>;
-
-      const map = new Map<number, string>();
-      for (const row of results) {
-        map.set(row.media_id, row.last_searched);
-      }
-
-      logger.debug('✅ Retrieved last searched dates', {
-        application: appKey,
-        instanceId,
-        count: map.size
-      });
-      return map;
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error getting media last searched dates', {
-        error: errorMessage
-      });
-      return new Map();
     }
   }
 

@@ -23,7 +23,7 @@ function getStoredTheme(): ThemeMode {
       return stored;
     }
   } catch (error) {
-    console.error('Failed to read theme from localStorage:', error);
+    // Silent fail - use default theme if localStorage unavailable (e.g., private browsing)
   }
   return 'dark'; // Default to dark as the app currently uses
 }
@@ -40,7 +40,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY, newTheme);
       setThemeState(newTheme);
     } catch (error) {
-      console.error('Failed to save theme to localStorage:', error);
+      // Silent fail - theme works but won't persist (e.g., private browsing mode)
     }
   };
 

@@ -5,6 +5,20 @@ import { extractItemsFromResult } from '../utils/starrUtils.js';
 import { SearchResults } from '@scoutarr/shared';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
+/**
+ * Notification Service
+ *
+ * Error Handling Strategy:
+ * - Each notification method handles its own errors independently
+ * - Errors are logged but don't throw (fail silently)
+ * - This ensures one failing notification doesn't block others
+ * - The sendNotifications method tracks success/failure counts
+ *
+ * Pattern appears duplicated across codebase but this is intentional:
+ * - Each service has different error types and recovery strategies
+ * - Independent failure is a feature, not a bug
+ * - Allows partial notification success (e.g., Discord succeeds, Pushover fails)
+ */
 class NotificationService {
   async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {
     logger.debug('📤 Preparing to send notifications', { 

@@ -8,6 +8,21 @@ import { handleRouteError } from '../utils/errorUtils.js';
 
 export const statusRouter = express.Router();
 
+/**
+ * Checks if any instance across all applications has scheduler enabled
+ */
+function hasAnyInstanceSchedulerEnabled(config: any): boolean {
+  for (const appType of APP_TYPES) {
+    const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
+    for (const instance of instances) {
+      if (instance.scheduleEnabled && instance.schedule) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Get status of all applications
 statusRouter.get('/', async (req, res) => {
   const startTime = Date.now();
@@ -80,20 +95,10 @@ statusRouter.get('/', async (req, res) => {
 
     // Add scheduler status
     const schedulerStatus = schedulerService.getStatus(config);
-    
+
     // Check if any instance schedulers are enabled
-    let anyInstanceEnabled = false;
-    for (const appType of APP_TYPES) {
-      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-      for (const instance of instances) {
-        if (instance.scheduleEnabled && instance.schedule) {
-          anyInstanceEnabled = true;
-          break;
-        }
-      }
-      if (anyInstanceEnabled) break;
-    }
-    
+    const anyInstanceEnabled = hasAnyInstanceSchedulerEnabled(config);
+
     // Enabled if global OR any instance scheduler is enabled
     const globalEnabled = config.scheduler?.enabled || false;
     
@@ -123,20 +128,10 @@ statusRouter.get('/scheduler', async (req, res) => {
   try {
     const config = configService.getConfig();
     const schedulerStatus = schedulerService.getStatus(config);
-    
+
     // Check if any instance schedulers are enabled
-    let anyInstanceEnabled = false;
-    for (const appType of APP_TYPES) {
-      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-      for (const instance of instances) {
-        if (instance.scheduleEnabled && instance.schedule) {
-          anyInstanceEnabled = true;
-          break;
-        }
-      }
-      if (anyInstanceEnabled) break;
-    }
-    
+    const anyInstanceEnabled = hasAnyInstanceSchedulerEnabled(config);
+
     // Enabled if global OR any instance scheduler is enabled
     const globalEnabled = config.scheduler?.enabled || false;
     
