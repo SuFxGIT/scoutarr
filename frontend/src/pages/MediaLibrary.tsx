@@ -28,6 +28,7 @@ import {
   ClockIcon,
   DotFilledIcon,
   CalendarIcon,
+  BadgeIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -98,6 +99,8 @@ interface TitleCellProps {
 }
 
 function TitleCell({ row }: TitleCellProps) {
+  const tagsList = row.tags && row.tags.length > 0 ? row.tags.join(', ') : null;
+
   return (
     <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
       <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
@@ -111,6 +114,13 @@ function TitleCell({ row }: TitleCellProps) {
             {getMonitoredIcon(row.monitored)}
           </Box>
         </Tooltip>
+        {tagsList && (
+          <Tooltip content={tagsList}>
+            <Box style={{ display: 'flex', alignItems: 'center' }}>
+              <BadgeIcon width="16" height="16" />
+            </Box>
+          </Tooltip>
+        )}
       </Flex>
       <Text
         size="2"
@@ -441,21 +451,6 @@ function MediaLibrary() {
               </Select.Content>
             </Select.Root>
           )}
-          {selectedInstance && (
-            <>
-              <Separator />
-              <Flex align="center" gap="2" style={{ paddingTop: '8px' }}>
-                <Switch
-                  checked={showAll}
-                  onCheckedChange={handleShowAllChange}
-                />
-                <Text size="2">Show all media (disable instance filters)</Text>
-                <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
-                  <InfoCircledIcon style={{ cursor: 'help' }} />
-                </Tooltip>
-              </Flex>
-            </>
-          )}
         </Flex>
       </Card>
 
@@ -472,6 +467,20 @@ function MediaLibrary() {
             )}
           </Flex>
           <Separator />
+
+          {/* Show All Media Toggle */}
+          {selectedInstance && (
+            <Flex align="center" gap="2">
+              <Switch
+                checked={showAll}
+                onCheckedChange={handleShowAllChange}
+              />
+              <Text size="2">Show all media (disable instance filters)</Text>
+              <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
+                <InfoCircledIcon style={{ cursor: 'help' }} />
+              </Tooltip>
+            </Flex>
+          )}
 
           {/* Search Bar */}
           {mediaData && mediaData.media.length > 0 && (
