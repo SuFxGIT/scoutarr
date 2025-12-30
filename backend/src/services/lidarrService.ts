@@ -50,18 +50,21 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         endpoint: 'trackfile',
         paramName: 'trackFileIds',
         fileIds: trackFileIds,
-        appName: this.appName
+        appName: this.appName,
+        instanceId: `lidarr-${config.url}`
       });
 
-      // Add customFormatScore to each artist's trackFiles
+      // Add customFormatScore and dateAdded to each artist's trackFiles
       return artists.map(artist => {
-        const trackFiles = (artist as { trackFiles?: Array<{ id?: number }> }).trackFiles;
+        const trackFiles = (artist as { trackFiles?: Array<{ id?: number; dateAdded?: string }> }).trackFiles;
         if (trackFiles && Array.isArray(trackFiles) && trackFiles.length > 0) {
           const updatedTrackFiles = trackFiles.map(trackFile => {
             if (trackFile.id && fileScoresMap.has(trackFile.id)) {
+              const fileData = fileScoresMap.get(trackFile.id);
               return {
                 ...trackFile,
-                customFormatScore: fileScoresMap.get(trackFile.id)
+                customFormatScore: fileData?.score,
+                dateAdded: fileData?.dateAdded || trackFile.dateAdded
               };
             }
             return trackFile;

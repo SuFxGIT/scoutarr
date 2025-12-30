@@ -2,8 +2,10 @@ import logger from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
+import { sonarrService } from './sonarrService.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
+import { SonarrInstance } from '@scoutarr/shared';
 
 class SyncSchedulerService {
   private intervalId: NodeJS.Timeout | null = null;
@@ -81,8 +83,16 @@ class SyncSchedulerService {
             const profiles = await service.getQualityProfiles(instance);
 
             // Fetch all media from API
-            const allMedia = await service.getMedia(instance);
-            logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+            // For Sonarr, fetch episodes instead of series
+            let allMedia;
+            if (appType === 'sonarr') {
+              logger.debug('🔄 [Sonarr] Fetching episodes for sync');
+              allMedia = await sonarrService.getEpisodesForSync(instance as SonarrInstance);
+              logger.debug(`✅ Fetched ${allMedia.length} episodes from ${appType} instance ${instance.id}`);
+            } else {
+              allMedia = await service.getMedia(instance);
+              logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+            }
 
             // Convert tag IDs to names before syncing
             logger.debug('🏷️  Converting tag IDs to names');
@@ -150,8 +160,16 @@ class SyncSchedulerService {
       const profiles = await service.getQualityProfiles(instance);
 
       // Fetch all media from API
-      const allMedia = await service.getMedia(instance);
-      logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+      // For Sonarr, fetch episodes instead of series
+      let allMedia;
+      if (appType === 'sonarr') {
+        logger.debug('🔄 [Sonarr] Fetching episodes for sync');
+        allMedia = await sonarrService.getEpisodesForSync(instance as SonarrInstance);
+        logger.debug(`✅ Fetched ${allMedia.length} episodes from ${appType} instance ${instance.id}`);
+      } else {
+        allMedia = await service.getMedia(instance);
+        logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+      }
 
       // Convert tag IDs to names before syncing
       logger.debug('🏷️  Converting tag IDs to names');

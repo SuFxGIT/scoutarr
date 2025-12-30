@@ -161,6 +161,90 @@ function CFScoreCell({ row }: TitleCellProps) {
   return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
 }
 
+// Hierarchical cell component for Sonarr episodes
+interface HierarchicalTitleCellProps extends TitleCellProps {
+  expandedSeriesIds: Set<number>;
+  onToggleExpand: (seriesId: number) => void;
+}
+
+function HierarchicalTitleCell({ row, expandedSeriesIds, onToggleExpand }: HierarchicalTitleCellProps) {
+  const rowType = (row as { rowType?: string }).rowType;
+  const depth = (row as { depth?: number }).depth || 0;
+  const paddingLeft = depth * 20;
+  const seriesId = (row as { seriesId?: number }).seriesId;
+
+  if (rowType === 'series') {
+    const isExpanded = seriesId !== undefined && expandedSeriesIds.has(seriesId);
+    return (
+      <Flex
+        gap="2"
+        align="center"
+        style={{ paddingLeft: `${paddingLeft}px`, fontWeight: 'bold', cursor: 'pointer' }}
+        onClick={() => {
+          if (seriesId !== undefined) {
+            onToggleExpand(seriesId);
+          }
+        }}
+      >
+        <Text size="2">{isExpanded ? '▼' : '▶'}</Text>
+        <Text size="2">{row.title}</Text>
+      </Flex>
+    );
+  }
+
+  if (rowType === 'season') {
+    return (
+      <Text
+        size="2"
+        weight="bold"
+        style={{ paddingLeft: `${paddingLeft}px` }}
+      >
+        {row.title}
+      </Text>
+    );
+  }
+
+  // Episode row
+  const tagsList = row.tags && row.tags.length > 0 ? row.tags.join(', ') : null;
+  const seasonNum = row.seasonNumber || 0;
+  const episodeNum = row.episodeNumber || 0;
+
+  return (
+    <Flex gap="2" align="center" style={{ paddingLeft: `${paddingLeft}px`, width: '100%', overflow: 'hidden' }}>
+      <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
+        <Tooltip content={getStatusTooltip(row.status)}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getStatusIcon(row.status)}
+          </Box>
+        </Tooltip>
+        <Tooltip content={row.monitored ? 'Monitored' : 'Not Monitored'}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getMonitoredIcon(row.monitored)}
+          </Box>
+        </Tooltip>
+        {tagsList && (
+          <Tooltip content={tagsList}>
+            <Box style={{ display: 'flex', alignItems: 'center' }}>
+              <BadgeIcon width="16" height="16" />
+            </Box>
+          </Tooltip>
+        )}
+      </Flex>
+      <Text
+        size="2"
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        S{String(seasonNum).padStart(2, '0')}E{String(episodeNum).padStart(2, '0')} - {row.title}
+      </Text>
+    </Flex>
+  );
+}
+
 function MediaLibrary() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -177,6 +261,7 @@ function MediaLibrary() {
   const [isSyncing, setIsSyncing] = useState(false);
   const showAllParam = searchParams.get('showAll');
   const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
+  const [expandedSeriesIds, setExpandedSeriesIds] = useState<Set<number>>(new Set());
 
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
@@ -326,7 +411,15 @@ function MediaLibrary() {
         let comparison = 0;
 
         if (columnKey === 'title') {
-          comparison = a.title.localeCompare(b.title);
+          if (instanceInfo?.appType === 'sonarr' && a.seriesTitle && b.seriesTitle) {
+            // Sort by series -> season -> episode
+            comparison =
+              (a.seriesTitle || '').localeCompare(b.seriesTitle || '') ||
+              ((a.seasonNumber || 0) - (b.seasonNumber || 0)) ||
+              ((a.episodeNumber || 0) - (b.episodeNumber || 0));
+          } else {
+            comparison = a.title.localeCompare(b.title);
+          }
         } else if (columnKey === 'qualityProfileName') {
           const aProfile = a.qualityProfileName || '';
           const bProfile = b.qualityProfileName || '';
@@ -350,12 +443,99 @@ function MediaLibrary() {
     }
 
     // Pre-compute formatted dates to avoid formatting on every render
-    return sorted.map(item => ({
+    const withFormattedDates = sorted.map(item => ({
       ...item,
       formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
       formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : 'N/A'
     }));
-  }, [mediaData?.media, sortColumns, searchQuery]);
+
+    // For Sonarr, group episodes by series/season hierarchy
+    if (instanceInfo?.appType === 'sonarr' && withFormattedDates.length > 0 && withFormattedDates[0].seriesId !== undefined) {
+      const seriesMap = new Map<number, {
+        seriesId: number;
+        seriesTitle: string;
+        seasons: Map<number, typeof withFormattedDates>;
+      }>();
+
+      // Group episodes by series and season
+      withFormattedDates.forEach(item => {
+        if (item.seriesId !== undefined) {
+          if (!seriesMap.has(item.seriesId)) {
+            seriesMap.set(item.seriesId, {
+              seriesId: item.seriesId,
+              seriesTitle: item.seriesTitle || 'Unknown Series',
+              seasons: new Map()
+            });
+          }
+
+          const series = seriesMap.get(item.seriesId)!;
+          const seasonNum = item.seasonNumber || 0;
+
+          if (!series.seasons.has(seasonNum)) {
+            series.seasons.set(seasonNum, []);
+          }
+
+          series.seasons.get(seasonNum)!.push(item);
+        }
+      });
+
+      // Flatten into rows with hierarchy markers
+      const rows: any[] = [];
+      seriesMap.forEach((series) => {
+        const isExpanded = expandedSeriesIds.has(series.seriesId);
+
+        // Series header row
+        rows.push({
+          id: series.seriesId * -1,
+          title: series.seriesTitle,
+          rowType: 'series',
+          depth: 0,
+          seriesId: series.seriesId,
+          monitored: true,
+          status: '',
+          tags: [],
+          formattedLastSearched: 'N/A',
+          formattedDateImported: 'N/A'
+        });
+
+        if (isExpanded) {
+          // Sort seasons
+          const sortedSeasons = Array.from(series.seasons.entries())
+            .sort((a, b) => a[0] - b[0]);
+
+          sortedSeasons.forEach(([seasonNum, episodes]) => {
+            // Season header row
+            rows.push({
+              id: series.seriesId * -1000 - seasonNum,
+              title: `Season ${seasonNum}`,
+              rowType: 'season',
+              depth: 1,
+              monitored: true,
+              status: '',
+              tags: [],
+              formattedLastSearched: 'N/A',
+              formattedDateImported: 'N/A'
+            });
+
+            // Episode rows (sorted by episode number)
+            episodes
+              .sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0))
+              .forEach(episode => {
+                rows.push({
+                  ...episode,
+                  rowType: 'episode',
+                  depth: 2
+                });
+              });
+          });
+        }
+      });
+
+      return rows;
+    }
+
+    return withFormattedDates;
+  }, [mediaData?.media, sortColumns, searchQuery, instanceInfo?.appType, expandedSeriesIds]);
 
   // Check if any instances are configured
   const hasAnyInstances = useMemo(() => {
@@ -366,6 +546,32 @@ function MediaLibrary() {
     });
   }, [config]);
 
+  // Callback for toggling series expansion
+  const handleToggleExpand = useCallback((seriesId: number) => {
+    setExpandedSeriesIds(prev => {
+      const next = new Set(prev);
+      if (next.has(seriesId)) {
+        next.delete(seriesId);
+      } else {
+        next.add(seriesId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Filter selection to episodes only (exclude series/season headers)
+  const handleSelectedRowsChange = useCallback((selectedRows: Set<number>) => {
+    if (instanceInfo?.appType === 'sonarr') {
+      // Filter out series/season headers (negative IDs)
+      const episodeIds = new Set(
+        Array.from(selectedRows).filter(id => id > 0)
+      );
+      setSelectedMediaIds(episodeIds);
+    } else {
+      setSelectedMediaIds(selectedRows);
+    }
+  }, [instanceInfo?.appType]);
+
   // Column configuration for DataGrid
   const columns: readonly Column<MediaLibraryItem & {
     formattedLastSearched: string;
@@ -374,10 +580,12 @@ function MediaLibrary() {
     SelectColumn,
     {
       key: 'title',
-      name: 'Title',
+      name: instanceInfo?.appType === 'sonarr' ? 'Episode' : 'Title',
       sortable: true,
       resizable: true,
-      renderCell: (props) => <TitleCell row={props.row} />
+      renderCell: (props) => instanceInfo?.appType === 'sonarr'
+        ? <HierarchicalTitleCell row={props.row} expandedSeriesIds={expandedSeriesIds} onToggleExpand={handleToggleExpand} />
+        : <TitleCell row={props.row} />
     },
     {
       key: 'qualityProfileName',
@@ -407,7 +615,7 @@ function MediaLibrary() {
       resizable: true,
       renderCell: (props) => <CFScoreCell row={props.row} />
     }
-  ], []);
+  ], [instanceInfo?.appType, expandedSeriesIds, handleToggleExpand]);
 
   return (
     <Flex direction="column" gap="4">
@@ -537,7 +745,7 @@ function MediaLibrary() {
                   rows={filteredAndSortedMedia}
                   rowKeyGetter={(row) => row.id}
                   selectedRows={selectedMediaIds}
-                  onSelectedRowsChange={setSelectedMediaIds}
+                  onSelectedRowsChange={handleSelectedRowsChange}
                   sortColumns={sortColumns}
                   onSortColumnsChange={setSortColumns}
                   rowHeight={55}

@@ -179,7 +179,7 @@ class StatsService {
             custom_format_score, raw_data, synced_at
           )
           SELECT
-            id, instance_id, media_id, title, monitored, tags, quality_profile_name,
+            id, instance_id, media_id, title, monitored, tags, NULL,
             status, last_search_time, added, date_imported, has_file,
             custom_format_score, raw_data, synced_at
           FROM media_library
@@ -205,6 +205,36 @@ class StatsService {
       }
     } catch (error: unknown) {
       logger.warn('⚠️  Error migrating media_library table', {
+        error: getErrorMessage(error)
+      });
+    }
+
+    // Migration: Add episode support columns
+    try {
+      const columns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
+      const hasMediaType = columns.some(col => col.name === 'media_type');
+
+      if (!hasMediaType) {
+        logger.info('📦 Adding episode support columns to media_library table');
+        this.db.exec(`
+          ALTER TABLE media_library ADD COLUMN media_type TEXT NOT NULL DEFAULT 'movie';
+          ALTER TABLE media_library ADD COLUMN series_id INTEGER;
+          ALTER TABLE media_library ADD COLUMN series_title TEXT;
+          ALTER TABLE media_library ADD COLUMN season_number INTEGER;
+          ALTER TABLE media_library ADD COLUMN episode_number INTEGER;
+        `);
+
+        // Create indexes for episode queries
+        this.db.exec(`
+          CREATE INDEX IF NOT EXISTS idx_media_library_media_type ON media_library(media_type);
+          CREATE INDEX IF NOT EXISTS idx_media_library_series_id ON media_library(series_id);
+          CREATE INDEX IF NOT EXISTS idx_media_library_season ON media_library(season_number);
+        `);
+
+        logger.info('✅ Episode support columns added successfully');
+      }
+    } catch (error: unknown) {
+      logger.warn('⚠️  Error adding episode support columns', {
         error: getErrorMessage(error)
       });
     }
@@ -650,6 +680,11 @@ class StatsService {
       episodeFile?: { dateAdded?: string };
       trackFiles?: Array<{ dateAdded?: string }>;
       bookFiles?: Array<{ dateAdded?: string }>;
+      // Episode-specific fields
+      seriesId?: number;
+      seriesTitle?: string;
+      seasonNumber?: number;
+      episodeNumber?: number;
       [key: string]: unknown;
     }>
   ): Promise<void> {
@@ -663,8 +698,9 @@ class StatsService {
         INSERT INTO media_library (
           instance_id, media_id, title, monitored, tags, quality_profile_name,
           status, last_search_time, added, date_imported, has_file,
-          custom_format_score, raw_data, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          custom_format_score, media_type, series_id, series_title,
+          season_number, episode_number, raw_data, synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id, media_id) DO UPDATE SET
           title = excluded.title,
           monitored = excluded.monitored,
@@ -676,12 +712,27 @@ class StatsService {
           date_imported = excluded.date_imported,
           has_file = excluded.has_file,
           custom_format_score = excluded.custom_format_score,
+          media_type = excluded.media_type,
+          series_id = excluded.series_id,
+          series_title = excluded.series_title,
+          season_number = excluded.season_number,
+          episode_number = excluded.episode_number,
           raw_data = excluded.raw_data,
           synced_at = excluded.synced_at
       `);
 
       const transaction = this.db.transaction((items: typeof mediaItems) => {
         for (const item of items) {
+          // Determine media type
+          let mediaType = 'movie';
+          if (item.seasonNumber !== undefined) {
+            mediaType = 'episode';
+          } else if (item.trackFiles) {
+            mediaType = 'album';
+          } else if (item.bookFiles) {
+            mediaType = 'book';
+          }
+
           // Extract dateImported and customFormatScore from file
           let dateImported: string | undefined;
           let hasFile = 0;
@@ -732,6 +783,11 @@ class StatsService {
             dateImported || item.added || null,
             hasFile,
             customFormatScore,
+            mediaType,
+            item.seriesId || null,
+            item.seriesTitle || null,
+            item.seasonNumber || null,
+            item.episodeNumber || null,
             JSON.stringify(item), // Store full raw data for future use
             syncTime
           );
@@ -739,6 +795,24 @@ class StatsService {
       });
 
       transaction(mediaItems);
+
+      // Clean up stale episodes (episodes that weren't updated in this sync)
+      // This handles series deletions in Sonarr
+      if (mediaItems.length > 0 && mediaItems[0].seasonNumber !== undefined) {
+        const deleteStmt = this.db.prepare(`
+          DELETE FROM media_library
+          WHERE instance_id = ?
+            AND media_type = 'episode'
+            AND synced_at < ?
+        `);
+        const deletedCount = deleteStmt.run(instanceId, syncTime).changes;
+        if (deletedCount > 0) {
+          logger.info('🗑️  Cleaned up stale episodes', {
+            instanceId,
+            deletedCount
+          });
+        }
+      }
 
       logger.info('✅ Media synced to database', {
         instanceId,
@@ -780,6 +854,11 @@ class StatsService {
     has_file: boolean;
     custom_format_score: number | null;
     synced_at: string;
+    // Episode fields
+    series_id: number | null;
+    series_title: string | null;
+    season_number: number | null;
+    episode_number: number | null;
   }>> {
     if (!this.db) return [];
 
@@ -820,6 +899,10 @@ class StatsService {
         has_file: number;
         custom_format_score: number | null;
         synced_at: string;
+        series_id: number | null;
+        series_title: string | null;
+        season_number: number | null;
+        episode_number: number | null;
       }>;
 
       return results.map(row => ({
@@ -836,7 +919,11 @@ class StatsService {
         date_imported: row.date_imported,
         has_file: row.has_file === 1,
         custom_format_score: row.custom_format_score,
-        synced_at: row.synced_at
+        synced_at: row.synced_at,
+        series_id: row.series_id,
+        series_title: row.series_title,
+        season_number: row.season_number,
+        episode_number: row.episode_number
       }));
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);

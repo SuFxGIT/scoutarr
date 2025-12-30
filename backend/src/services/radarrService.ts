@@ -40,18 +40,21 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
         endpoint: 'moviefile',
         paramName: 'movieFileIds',
         fileIds: movieFileIds,
-        appName: this.appName
+        appName: this.appName,
+        instanceId: `radarr-${config.url}`
       });
 
-      // Add customFormatScore to each movie's movieFile
+      // Add customFormatScore and dateAdded to each movie's movieFile
       return movies.map(movie => {
         const movieFile = (movie as { movieFile?: { id?: number } }).movieFile;
         if (movieFile?.id && fileScoresMap.has(movieFile.id)) {
+          const fileData = fileScoresMap.get(movieFile.id);
           return {
             ...movie,
             movieFile: {
               ...movieFile,
-              customFormatScore: fileScoresMap.get(movieFile.id)
+              customFormatScore: fileData?.score,
+              dateAdded: fileData?.dateAdded || (movieFile as { dateAdded?: string }).dateAdded
             }
           } as RadarrMovie;
         }

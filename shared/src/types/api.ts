@@ -76,6 +76,11 @@ export interface MediaLibraryItem {
   dateImported?: string;
   customFormatScore?: number;
   hasFile?: boolean;
+  // Episode-specific fields (for Sonarr)
+  seriesId?: number;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
 }
 
 export interface MediaLibraryResponse {

@@ -8,6 +8,26 @@ export interface SonarrSeries extends FilterableMedia {
   title: string;
 }
 
+export interface SonarrEpisode {
+  id: number;
+  seriesId: number;
+  seriesTitle?: string; // Added during fetch
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  hasFile: boolean;
+  monitored: boolean;
+  status: string;
+  episodeFileId?: number;
+  episodeFile?: {
+    id?: number;
+    dateAdded?: string;
+    customFormatScore?: number;
+  };
+  qualityProfileId?: number;
+  tags?: number[] | string[];
+}
+
 class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
   protected readonly appName = 'Sonarr';
   protected readonly apiVersion = 'v3' as const;
@@ -40,18 +60,21 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
         endpoint: 'episodefile',
         paramName: 'episodeFileIds',
         fileIds: episodeFileIds,
-        appName: this.appName
+        appName: this.appName,
+        instanceId: `sonarr-${config.url}`
       });
 
-      // Add customFormatScore to each series' episodeFile
+      // Add customFormatScore and dateAdded to each series' episodeFile
       return series.map(s => {
         const episodeFile = (s as { episodeFile?: { id?: number } }).episodeFile;
         if (episodeFile?.id && fileScoresMap.has(episodeFile.id)) {
+          const fileData = fileScoresMap.get(episodeFile.id);
           return {
             ...s,
             episodeFile: {
               ...episodeFile,
-              customFormatScore: fileScoresMap.get(episodeFile.id)
+              customFormatScore: fileData?.score,
+              dateAdded: fileData?.dateAdded
             }
           } as SonarrSeries;
         }
@@ -75,6 +98,107 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
       logger.debug('📡 [Sonarr API] Series search command sent', { seriesId });
     } catch (error: unknown) {
       this.logError('Failed to search series', error, { seriesId });
+      throw error;
+    }
+  }
+
+  async getEpisodesForSync(config: SonarrInstance): Promise<SonarrEpisode[]> {
+    try {
+      const client = this.createClient(config);
+
+      // Step 1: Get all series
+      logger.debug('📡 [Sonarr API] Fetching series for episode sync');
+      const series = await this.getSeries(config);
+
+      // Step 2: Fetch episodes for each series
+      const allEpisodes: SonarrEpisode[] = [];
+
+      for (const s of series) {
+        logger.debug('📡 [Sonarr API] Fetching episodes for series', {
+          seriesId: s.id,
+          title: s.title
+        });
+
+        const episodesResponse = await client.get<SonarrEpisode[]>(
+          `/api/${this.apiVersion}/episode`,
+          { params: { seriesId: s.id } }
+        );
+
+        // Filter to only episodes with files
+        const episodesWithFiles = episodesResponse.data.filter(ep => ep.hasFile);
+
+        // Attach series metadata to each episode
+        const episodesWithSeries = episodesWithFiles.map(ep => ({
+          ...ep,
+          seriesId: s.id,
+          seriesTitle: s.title,
+          qualityProfileId: (s as { qualityProfileId?: number }).qualityProfileId,
+          tags: s.tags,
+          monitored: ep.monitored && s.monitored, // Both must be monitored
+          status: (s as { status?: string }).status || 'continuing', // Inherit series status
+        }));
+
+        allEpisodes.push(...episodesWithSeries);
+      }
+
+      logger.debug('✅ [Sonarr API] Fetched episodes with files', {
+        count: allEpisodes.length
+      });
+
+      // Step 3: Batch fetch custom format scores
+      const episodeFileIds = allEpisodes
+        .map(ep => ep.episodeFileId)
+        .filter((id): id is number => id !== undefined && id > 0);
+
+      const fileScoresMap = await fetchCustomFormatScores({
+        client,
+        apiVersion: this.apiVersion,
+        endpoint: 'episodefile',
+        paramName: 'episodeFileIds',
+        fileIds: episodeFileIds,
+        appName: this.appName,
+        instanceId: `sonarr-${config.url}`
+      });
+
+      // Step 4: Attach custom format scores and dateAdded to episodes
+      return allEpisodes.map(ep => {
+        const fileData = ep.episodeFileId
+          ? fileScoresMap.get(ep.episodeFileId)
+          : undefined;
+
+        return {
+          ...ep,
+          episodeFile: {
+            id: ep.episodeFileId,
+            dateAdded: fileData?.dateAdded || ep.episodeFile?.dateAdded,
+            customFormatScore: fileData?.score
+          }
+        };
+      });
+
+    } catch (error: unknown) {
+      this.logError('Failed to fetch episodes for sync', error, { url: config.url });
+      throw error;
+    }
+  }
+
+  async searchEpisodes(config: SonarrInstance, episodeIds: number[]): Promise<void> {
+    try {
+      const client = this.createClient(config);
+
+      for (const episodeId of episodeIds) {
+        logger.debug('📡 [Sonarr API] Starting episode search', { episodeId });
+        await client.post(`/api/${this.apiVersion}/command`, {
+          name: 'EpisodeSearch',
+          episodeIds: [episodeId]
+        });
+      }
+
+      logger.debug('📡 [Sonarr API] Episode search commands sent', {
+        count: episodeIds.length
+      });
+    } catch (error: unknown) {
+      this.logError('Failed to search episodes', error, { episodeIds });
       throw error;
     }
   }

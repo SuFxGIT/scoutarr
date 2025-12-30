@@ -63,8 +63,17 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     if (shouldSync) {
       // Sync from API
       logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
-      const allMedia = await service.getMedia(instance);
-      logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
+
+      // For Sonarr, fetch episodes instead of series
+      let allMedia;
+      if (appType === 'sonarr') {
+        logger.debug('🔄 [Scoutarr] Syncing episodes from Sonarr API');
+        allMedia = await sonarrService.getEpisodesForSync(instance as SonarrInstance);
+        logger.debug('✅ [Scoutarr] Fetched episodes from Sonarr API', { count: allMedia.length });
+      } else {
+        allMedia = await service.getMedia(instance);
+        logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
+      }
 
       // Fetch and sync quality profiles
       logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
@@ -133,6 +142,11 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
             dateAdded: m.date_imported,
             customFormatScore: m.custom_format_score
           } : undefined,
+          // Include episode fields for Sonarr
+          seriesId: m.series_id,
+          seriesTitle: m.series_title,
+          seasonNumber: m.season_number,
+          episodeNumber: m.episode_number,
         }));
 
         // Re-apply instance filters (settings may have changed since sync, unless skipFilters is true)
@@ -232,6 +246,14 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         }
       }
 
+      // Add episode info if present
+      const episodeInfo = (m as { seasonNumber?: number }).seasonNumber !== undefined ? {
+        seriesId: (m as { seriesId?: number }).seriesId,
+        seriesTitle: (m as { seriesTitle?: string }).seriesTitle,
+        seasonNumber: (m as { seasonNumber?: number }).seasonNumber,
+        episodeNumber: (m as { episodeNumber?: number }).episodeNumber
+      } : {};
+
       return {
         id: service.getMediaId(m),
         title: service.getMediaTitle(m),
@@ -242,7 +264,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
         dateImported: dateImported || m.added, // File import date, fallback to when added to library
         customFormatScore,
-        hasFile
+        hasFile,
+        ...episodeInfo
       };
     });
 
@@ -321,11 +344,9 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       await radarrService.searchMovies(instance as RadarrInstance, mediaIds);
       logger.debug('✅ [Scoutarr] Bulk search started for Radarr', { count: mediaIds.length });
     } else if (appType === 'sonarr') {
-      // Sonarr requires one-by-one
-      for (const mediaId of mediaIds) {
-        await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
-      }
-      logger.debug('✅ [Scoutarr] Sequential search started for Sonarr', { count: mediaIds.length });
+      // For Sonarr, search episodes instead of series
+      await sonarrService.searchEpisodes(instance as SonarrInstance, mediaIds);
+      logger.debug('✅ [Scoutarr] Episode search started for Sonarr', { count: mediaIds.length });
     } else if (appType === 'lidarr') {
       // Lidarr requires one-by-one
       for (const mediaId of mediaIds) {

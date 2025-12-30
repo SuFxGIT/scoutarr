@@ -50,18 +50,21 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
         endpoint: 'bookfile',
         paramName: 'bookFileIds',
         fileIds: bookFileIds,
-        appName: this.appName
+        appName: this.appName,
+        instanceId: `readarr-${config.url}`
       });
 
-      // Add customFormatScore to each author's bookFiles
+      // Add customFormatScore and dateAdded to each author's bookFiles
       return authors.map(author => {
-        const bookFiles = (author as { bookFiles?: Array<{ id?: number }> }).bookFiles;
+        const bookFiles = (author as { bookFiles?: Array<{ id?: number; dateAdded?: string }> }).bookFiles;
         if (bookFiles && Array.isArray(bookFiles) && bookFiles.length > 0) {
           const updatedBookFiles = bookFiles.map(bookFile => {
             if (bookFile.id && fileScoresMap.has(bookFile.id)) {
+              const fileData = fileScoresMap.get(bookFile.id);
               return {
                 ...bookFile,
-                customFormatScore: fileScoresMap.get(bookFile.id)
+                customFormatScore: fileData?.score,
+                dateAdded: fileData?.dateAdded || bookFile.dateAdded
               };
             }
             return bookFile;
