@@ -21,11 +21,12 @@ import {
   MagnifyingGlassIcon,
   InfoCircledIcon,
   CrossCircledIcon,
-  EyeOpenIcon,
-  EyeClosedIcon,
+  BookmarkFilledIcon,
+  BookmarkIcon,
   CheckCircledIcon,
   ClockIcon,
   DotFilledIcon,
+  CalendarIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -45,13 +46,23 @@ type AppType = typeof APP_TYPES[number];
 function getStatusIcon(status: string) {
   const statusLower = status.toLowerCase();
 
+  // Released - available to download
   if (statusLower.includes('released') || statusLower.includes('available')) {
     return <CheckCircledIcon />;
   }
-  if (statusLower.includes('announced') || statusLower.includes('continuing')) {
+
+  // In Cinemas - theatrical release
+  if (statusLower.includes('cinemas') || statusLower.includes('theater')) {
+    return <CalendarIcon />;
+  }
+
+  // Announced/Upcoming - not yet available
+  if (statusLower.includes('announced') || statusLower.includes('continuing') || statusLower.includes('upcoming')) {
     return <ClockIcon />;
   }
-  if (statusLower.includes('missing')) {
+
+  // Missing/Ended
+  if (statusLower.includes('missing') || statusLower.includes('ended')) {
     return <CrossCircledIcon />;
   }
 
@@ -59,7 +70,7 @@ function getStatusIcon(status: string) {
 }
 
 function getMonitoredIcon(monitored: boolean) {
-  return monitored ? <EyeOpenIcon /> : <EyeClosedIcon />;
+  return monitored ? <BookmarkFilledIcon /> : <BookmarkIcon />;
 }
 
 function getStatusTooltip(status: string): string {
@@ -67,9 +78,12 @@ function getStatusTooltip(status: string): string {
 
   if (statusLower.includes('released')) return 'Status: Released';
   if (statusLower.includes('available')) return 'Status: Available';
+  if (statusLower.includes('cinemas') || statusLower.includes('theater')) return 'Status: In Cinemas';
   if (statusLower.includes('announced')) return 'Status: Announced';
   if (statusLower.includes('continuing')) return 'Status: Continuing';
+  if (statusLower.includes('upcoming')) return 'Status: Upcoming';
   if (statusLower.includes('missing')) return 'Status: Missing';
+  if (statusLower.includes('ended')) return 'Status: Ended';
 
   return `Status: ${status}`;
 }
