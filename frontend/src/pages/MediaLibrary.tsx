@@ -339,7 +339,7 @@ function MediaLibrary() {
             </Flex>
           )}
 
-          {error && (
+          {error && !isLoading && (
             <Callout.Root color="red">
               <Callout.Icon>
                 <CrossCircledIcon />

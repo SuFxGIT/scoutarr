@@ -480,7 +480,7 @@ function Settings() {
     );
   }
 
-  if (loadError || !config) {
+  if (loadError && !loading) {
     return (
       <Callout.Root color="red" style={{ padding: '2rem' }}>
         <Callout.Text>Failed to load configuration</Callout.Text>
@@ -491,6 +491,10 @@ function Settings() {
         </Callout.Text>
       </Callout.Root>
     );
+  }
+
+  if (!config) {
+    return null;
   }
 
   const renderTestButton = (app: string, instanceId?: string) => {
