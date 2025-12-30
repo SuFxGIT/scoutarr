@@ -25,9 +25,7 @@ import {
   EyeClosedIcon,
   CheckCircledIcon,
   ClockIcon,
-  FileIcon,
   DotFilledIcon,
-  CheckIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -64,10 +62,6 @@ function getMonitoredIcon(monitored: boolean) {
   return monitored ? <EyeOpenIcon /> : <EyeClosedIcon />;
 }
 
-function getFileIcon(hasFile?: boolean) {
-  return hasFile ? <CheckIcon /> : <FileIcon />;
-}
-
 function getStatusTooltip(status: string): string {
   const statusLower = status.toLowerCase();
 
@@ -100,11 +94,6 @@ function TitleCell({ row }: TitleCellProps) {
         <Tooltip content={row.monitored ? 'Monitored' : 'Not Monitored'}>
           <Box style={{ display: 'flex', alignItems: 'center' }}>
             {getMonitoredIcon(row.monitored)}
-          </Box>
-        </Tooltip>
-        <Tooltip content={row.hasFile ? 'File Present' : 'No File'}>
-          <Box style={{ display: 'flex', alignItems: 'center' }}>
-            {getFileIcon(row.hasFile)}
           </Box>
         </Tooltip>
       </Flex>
