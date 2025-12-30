@@ -3,10 +3,13 @@ import type { MediaLibraryResponse, MediaSearchResponse } from '@scoutarr/shared
 
 export async function fetchMediaLibrary(
   appType: string,
-  instanceId: string
+  instanceId: string,
+  skipFilters?: boolean
 ): Promise<MediaLibraryResponse> {
+  const params = skipFilters ? { skipFilters: 'true' } : {};
   const response = await axios.get<MediaLibraryResponse>(
-    `/api/media-library/${appType}/${instanceId}`
+    `/api/media-library/${appType}/${instanceId}`,
+    { params }
   );
   return response.data;
 }

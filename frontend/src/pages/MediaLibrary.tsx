@@ -16,6 +16,7 @@ import {
   Callout,
   TextField,
   Tooltip,
+  Switch,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -164,6 +165,8 @@ function MediaLibrary() {
   ]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const showAllParam = searchParams.get('showAll');
+  const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
 
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
@@ -197,10 +200,10 @@ function MediaLibrary() {
     error,
     refetch,
   } = useQuery<MediaLibraryResponse>({
-    queryKey: ['mediaLibrary', selectedInstance],
+    queryKey: ['mediaLibrary', selectedInstance, showAll],
     queryFn: async () => {
       if (!instanceInfo) return { media: [], total: 0, instanceName: '', appType: '' };
-      return fetchMediaLibrary(instanceInfo.appType, instanceInfo.instanceId);
+      return fetchMediaLibrary(instanceInfo.appType, instanceInfo.instanceId, showAll);
     },
     enabled: !!instanceInfo,
     staleTime: 30000, // 30 seconds
@@ -230,11 +233,25 @@ function MediaLibrary() {
   const handleInstanceChange = (value: string) => {
     setSelectedInstance(value);
     setSelectedMediaIds(new Set()); // Clear selection when changing instance
-    // Update URL to persist instance selection
-    setSearchParams({ instance: value });
+    // Update URL to persist both instance and showAll
+    if (showAll) {
+      setSearchParams({ instance: value, showAll: 'true' });
+    } else {
+      setSearchParams({ instance: value });
+    }
   };
 
-
+  const handleShowAllChange = (checked: boolean) => {
+    setShowAll(checked);
+    // Update URL to persist state
+    if (selectedInstance) {
+      if (checked) {
+        setSearchParams({ instance: selectedInstance, showAll: 'true' });
+      } else {
+        setSearchParams({ instance: selectedInstance });
+      }
+    }
+  };
 
   const handleManualSearch = useCallback(async () => {
     if (selectedMediaIds.size === 0) return;
@@ -424,6 +441,21 @@ function MediaLibrary() {
               </Select.Content>
             </Select.Root>
           )}
+          {selectedInstance && (
+            <>
+              <Separator />
+              <Flex align="center" gap="2" style={{ paddingTop: '8px' }}>
+                <Switch
+                  checked={showAll}
+                  onCheckedChange={handleShowAllChange}
+                />
+                <Text size="2">Show all media (disable instance filters)</Text>
+                <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
+                  <InfoCircledIcon style={{ cursor: 'help' }} />
+                </Tooltip>
+              </Flex>
+            </>
+          )}
         </Flex>
       </Card>
 
@@ -435,6 +467,7 @@ function MediaLibrary() {
             {mediaData && (
               <Text size="2" color="gray">
                 {filteredAndSortedMedia.length} of {mediaData.media.length} items ({selectedMediaIds.size} selected)
+                {showAll && ' • Filters disabled'}
               </Text>
             )}
           </Flex>

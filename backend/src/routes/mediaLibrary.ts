@@ -20,6 +20,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
   try {
     const { appType, instanceId } = req.params;
     const shouldSync = req.query.sync === 'true';
+    const shouldSkipFilters = req.query.skipFilters === 'true';
 
     // Validate appType
     if (!APP_TYPES.includes(appType as AppType)) {
@@ -93,13 +94,18 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       await statsService.syncMediaToDatabase(instanceId, mediaWithProfileNames);
       logger.debug('✅ [Scoutarr DB] Synced media to database');
 
-      // Apply instance filter settings
-      logger.debug('🔽 [Scoutarr] Applying instance filters');
-      filteredMedia = await service.filterMedia(instance, allMedia);
-      logger.debug('✅ [Scoutarr] Applied instance filters', {
-        total: allMedia.length,
-        filtered: filteredMedia.length
-      });
+      // Apply instance filter settings (unless skipFilters is true)
+      if (shouldSkipFilters) {
+        logger.debug('⏭️  [Scoutarr] Skipping instance filters (showAll=true)');
+        filteredMedia = allMedia;
+      } else {
+        logger.debug('🔽 [Scoutarr] Applying instance filters');
+        filteredMedia = await service.filterMedia(instance, allMedia);
+        logger.debug('✅ [Scoutarr] Applied instance filters', {
+          total: allMedia.length,
+          filtered: filteredMedia.length
+        });
+      }
     } else {
       // Try to get from database first
       logger.debug('💾 [Scoutarr DB] Attempting to load from cache');
@@ -129,13 +135,18 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
           } : undefined,
         }));
 
-        // Re-apply instance filters (settings may have changed since sync)
-        logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
-        filteredMedia = await service.filterMedia(instance, mediaFromDb);
-        logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
-          total: mediaFromDb.length,
-          filtered: filteredMedia.length
-        });
+        // Re-apply instance filters (settings may have changed since sync, unless skipFilters is true)
+        if (shouldSkipFilters) {
+          logger.debug('⏭️  [Scoutarr] Skipping instance filters for cached data (showAll=true)');
+          filteredMedia = mediaFromDb;
+        } else {
+          logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
+          filteredMedia = await service.filterMedia(instance, mediaFromDb);
+          logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
+            total: mediaFromDb.length,
+            filtered: filteredMedia.length
+          });
+        }
       } else {
         // No data in database, fetch from API
         logger.debug('📡 [Scoutarr DB] No cached data, fetching from *arr API', { appType });
@@ -170,13 +181,18 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         await statsService.syncMediaToDatabase(instanceId, mediaWithProfileNames2);
         logger.debug('✅ [Scoutarr DB] Synced media to database');
 
-        // Apply instance filter settings
-        logger.debug('🔽 [Scoutarr] Applying instance filters');
-        filteredMedia = await service.filterMedia(instance, allMedia);
-        logger.debug('✅ [Scoutarr] Applied instance filters', {
-          total: allMedia.length,
-          filtered: filteredMedia.length
-        });
+        // Apply instance filter settings (unless skipFilters is true)
+        if (shouldSkipFilters) {
+          logger.debug('⏭️  [Scoutarr] Skipping instance filters (showAll=true)');
+          filteredMedia = allMedia;
+        } else {
+          logger.debug('🔽 [Scoutarr] Applying instance filters');
+          filteredMedia = await service.filterMedia(instance, allMedia);
+          logger.debug('✅ [Scoutarr] Applied instance filters', {
+            total: allMedia.length,
+            filtered: filteredMedia.length
+          });
+        }
       }
     }
 
