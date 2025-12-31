@@ -50,9 +50,10 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
 
       // Sonarr's /api/v3/series endpoint doesn't include customFormatScore in episodeFile
       // We need to fetch episode files separately to get custom format scores
-      const episodeFileIds = series
+      // Deduplicate file IDs in case multiple series share the same file
+      const episodeFileIds = [...new Set(series
         .map(s => (s as { episodeFile?: { id?: number } }).episodeFile?.id)
-        .filter((id): id is number => id !== undefined && id > 0);
+        .filter((id): id is number => id !== undefined && id > 0))];
 
       const fileScoresMap = await fetchCustomFormatScores({
         client,
@@ -127,9 +128,10 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
         const episodesWithFiles = episodesResponse.data.filter(ep => ep.hasFile);
 
         // Fetch custom format scores for this series' episode files
-        const episodeFileIds = episodesWithFiles
+        // Deduplicate file IDs (multiple episodes can share the same file, e.g., season packs)
+        const episodeFileIds = [...new Set(episodesWithFiles
           .map(ep => ep.episodeFileId)
-          .filter((id): id is number => id !== undefined && id > 0);
+          .filter((id): id is number => id !== undefined && id > 0))];
 
         const fileScoresMap = await fetchCustomFormatScores({
           client,
