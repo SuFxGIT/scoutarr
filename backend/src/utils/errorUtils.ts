@@ -26,6 +26,28 @@ export function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Extracts error details (message, stack, name) for logging
+ * Reduces boilerplate in error handlers
+ */
+export function getErrorDetails(error: unknown): {
+  message: string;
+  stack?: string;
+  name: string;
+} {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    };
+  }
+  return {
+    message: typeof error === 'string' ? error : 'Unknown error occurred',
+    name: 'Error'
+  };
+}
+
+/**
  * Logs error and sends standardized error response
  */
 export function handleRouteError(

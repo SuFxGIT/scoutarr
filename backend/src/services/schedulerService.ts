@@ -4,7 +4,7 @@ import { notificationService } from './notificationService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { executeSearchRun } from '../routes/search.js';
 import { SearchResults, Config } from '@scoutarr/shared';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
 
 /**
  * Import CommonJS modules using createRequire
@@ -72,17 +72,15 @@ class SchedulerService {
     try {
       CronExpressionParser.parse(schedule);
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      const errorName = error instanceof Error ? error.name : 'Error';
+      const { message, stack, name } = getErrorDetails(error);
       
       logger.error('❌ Invalid cron schedule', { 
         schedule,
-        error: errorMessage,
-        errorName,
-        stack: errorStack
+        error: message,
+        errorName: name,
+        stack
       });
-      throw new Error(`Invalid scheduler cron expression "${schedule}": ${errorMessage}`);
+      throw new Error(`Invalid scheduler cron expression "${schedule}": ${message}`);
     }
 
     this.globalCurrentSchedule = schedule;
@@ -153,18 +151,17 @@ class SchedulerService {
       await this.sendNotifications(results, true);
       endOp({ totalSearched: Object.values(results).reduce((s, r) => s + (r.searched || 0), 0) }, true);
     } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
+      const { message, stack } = getErrorDetails(error);
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
         results: {},
         success: false,
-        error: errorMessage
+        error: message
       };
       this.addToHistory(historyEntry);
 
-      logger.error('❌ Global scheduled search failed', { error: errorMessage, stack: errorStack });
-      await this.sendNotifications({}, false, errorMessage);
+      logger.error('❌ Global scheduled search failed', { error: message, stack });
+      await this.sendNotifications({}, false, message);
     } finally {
       this.globalIsRunning = false;
     }

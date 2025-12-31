@@ -3,6 +3,7 @@ import { syncSchedulerService } from '../services/syncSchedulerService.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export const syncRouter = express.Router();
 
@@ -20,9 +21,7 @@ syncRouter.post('/all', asyncHandler(async (req, res) => {
 
   // Trigger sync in background
   syncSchedulerService.syncAllInstances().catch((error: unknown) => {
-    logger.error('❌ Background sync failed', {
-      error: error instanceof Error ? error.message : error
-    });
+    logger.error('❌ Background sync failed', { error: getErrorMessage(error) });
   });
 
   res.json({

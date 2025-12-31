@@ -13,7 +13,7 @@ import { syncRouter } from './routes/sync.js';
 import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
-import { getErrorMessage } from './utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails } from './utils/errorUtils.js';
 import logger, { startOperation } from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -100,23 +100,21 @@ Promise.all([
   });
   initOp({}, true);
 }).catch((error: unknown) => {
-  const errorMessage = getErrorMessage(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
-  const errorName = error instanceof Error ? error.name : 'Error';
+  const { message, stack, name } = getErrorDetails(error);
   
   logger.error('❌ Failed to initialize services', { 
-    error: errorMessage,
-    errorName,
-    stack: errorStack,
+    error: message,
+    errorName: name,
+    stack,
     port: PORT,
     nodeVersion: process.version
   });
   
   console.error('\n=== INITIALIZATION ERROR ===');
-  console.error('Message:', errorMessage);
-  console.error('Type:', errorName);
-  if (errorStack) {
-    console.error('Stack trace:', errorStack);
+  console.error('Message:', message);
+  console.error('Type:', name);
+  if (stack) {
+    console.error('Stack trace:', stack);
   }
   console.error('===========================\n');
   

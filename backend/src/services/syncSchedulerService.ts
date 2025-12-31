@@ -4,7 +4,7 @@ import { configService } from './configService.js';
 import { statsService } from './statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
 
 /**
  * Import CommonJS modules using createRequire
@@ -40,17 +40,15 @@ class SyncSchedulerService {
     try {
       CronExpressionParser.parse(schedule);
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      const errorName = error instanceof Error ? error.name : 'Error';
+      const { message, stack, name } = getErrorDetails(error);
       
       logger.error('❌ Invalid cron expression for sync schedule', { 
         schedule,
-        error: errorMessage,
-        errorName,
-        stack: errorStack
+        error: message,
+        errorName: name,
+        stack
       });
-      throw new Error(`Invalid sync schedule cron expression "${schedule}": ${errorMessage}`);
+      throw new Error(`Invalid sync schedule cron expression "${schedule}": ${message}`);
     }
 
     logger.info('▶️  Starting sync scheduler', {

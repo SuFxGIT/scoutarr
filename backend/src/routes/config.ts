@@ -201,14 +201,8 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
 
     // Fetch all media from API to find items with tags
     logger.debug(`📋 Fetching all media from ${app}`);
-    let allMedia: any[];
-    try {
-      allMedia = await service.getMedia(instanceConfig);
-      logger.debug(`📋 Fetched ${allMedia.length} total media items from ${app}`);
-    } catch (error: unknown) {
-      logger.error(`❌ Failed to fetch media from ${app}`, { error: getErrorMessage(error) });
-      return res.status(400).json({ error: `Failed to fetch media: ${getErrorMessage(error)}` });
-    }
+    const allMedia = await service.getMedia(instanceConfig);
+    logger.debug(`📋 Fetched ${allMedia.length} total media items from ${app}`);
 
     // Convert tag IDs in media to tag names
     const mediaWithTagNames = await Promise.all(

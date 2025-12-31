@@ -3,7 +3,7 @@ import { BaseStarrInstance, StarrQualityProfile } from '@scoutarr/shared';
 import { createStarrClient, getOrCreateTagId } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
 
 /**
  * Base class for Starr application services
@@ -28,14 +28,12 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Helper for consistent error logging
    */
   protected logError(operation: string, error: unknown, context?: Record<string, unknown>): void {
-    const errorMessage = getErrorMessage(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    const errorName = error instanceof Error ? error.name : 'Error';
+    const { message, stack, name } = getErrorDetails(error);
     
     logger.error(`❌ ${operation} failed for ${this.appName}`, {
-      error: errorMessage,
-      errorName,
-      stack: errorStack,
+      error: message,
+      errorName: name,
+      stack,
       appName: this.appName,
       ...context
     });
@@ -203,7 +201,8 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Gets media title from media object
    */
   getMediaTitle(media: TMedia): string {
-    return (media as any).title || (media as any).artistName || (media as any).authorName || 'Unknown';
+    const item = media as any;
+    return item.title || item.artistName || item.authorName || 'Unknown';
   }
 
   /**
@@ -372,8 +371,8 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
       logger.info(`✅ [${this.appName}] Filtering completed`, {
         initial: initialCount,
         final: filtered.length,
-        totalRemoved: initialCount - filtered.length,
-        filterEfficiency: `${((1 - filtered.length / initialCount) * 100).toFixed(1)}%`
+        removed: initialCount - filtered.length,
+        efficiency: `${((1 - filtered.length / initialCount) * 100).toFixed(1)}%`
       });
 
       return filtered;

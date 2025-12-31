@@ -12,7 +12,7 @@ import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractIte
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
 import { FilterableMedia } from '../utils/filterUtils.js';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
 
 export const searchRouter = express.Router();
 
@@ -278,19 +278,16 @@ export async function processApplication<TMedia extends FilterableMedia>(
       items
     };
   } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error(`❌ ${processor.name} search failed`, {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    const { message, stack } = getErrorDetails(error);
+    logger.error(`❌ ${processor.name} search failed`, { error: message, stack });
     
-    endOp({ error: errorMessage }, false);
+    endOp({ error: message }, false);
     
     return {
       success: false,
       searched: 0,
       items: [],
-      error: errorMessage
+      error: message
     };
   }
 }
