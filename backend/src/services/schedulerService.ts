@@ -1,7 +1,7 @@
 import { createRequire } from 'module';
 import { configService } from './configService.js';
 import { notificationService } from './notificationService.js';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { executeSearchRun } from '../routes/search.js';
 import { SearchResults, Config } from '@scoutarr/shared';
 import { getErrorMessage } from '../utils/errorUtils.js';
@@ -133,6 +133,7 @@ class SchedulerService {
     logger.info('⏰ Global scheduled search started', { schedule });
 
     try {
+      const endOp = startOperation('SchedulerService.runGlobalScheduledSearch', { schedule });
       const results = await executeSearchRun();
       const historyEntry: SchedulerRunHistory = {
         timestamp: new Date().toISOString(),
@@ -150,6 +151,7 @@ class SchedulerService {
       });
 
       await this.sendNotificationsWithLogging(results, true);
+      endOp({ totalSearched: Object.values(results).reduce((s, r) => s + (r.searched || 0), 0) }, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;

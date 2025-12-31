@@ -1,5 +1,5 @@
 import { createRequire } from 'module';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
@@ -96,41 +96,50 @@ class SyncSchedulerService {
     appType: AppType,
     instance: { id: string; name?: string; [key: string]: any }
   ): Promise<number> {
-    logger.info(`🔄 Syncing ${appType} instance: ${instance.name || instance.id}`);
+    const endOp = startOperation('SyncScheduler.syncSingleInstance', { appType, instanceId: instance.id, instanceName: instance.name });
+    try {
+      logger.info(`🔄 Syncing ${appType} instance: ${instance.name || instance.id}`);
 
-    const service = getServiceForApp(appType as AppType);
+      const service = getServiceForApp(appType as AppType);
 
-    // Upsert instance record
-    await statsService.upsertInstance(instance.id, appType, instance.name);
+      // Upsert instance record
+      await statsService.upsertInstance(instance.id, appType, instance.name);
 
-    // Fetch quality profiles from API
-    logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
-    const profiles = await service.getQualityProfiles(instance);
+      // Fetch quality profiles from API
+      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
+      const profiles = await service.getQualityProfiles(instance);
 
-    // Sync quality profiles to database
-    logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-    await statsService.syncQualityProfiles(instance.id, profiles);
-    logger.debug('✅ [Scoutarr DB] Quality profiles synced');
+      // Sync quality profiles to database
+      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
+      await statsService.syncQualityProfiles(instance.id, profiles);
+      logger.debug('✅ [Scoutarr DB] Quality profiles synced');
 
-    // Fetch all media from API
-    const allMedia = await service.getMedia(instance);
-    logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+      // Fetch all media from API
+      const allMedia = await service.getMedia(instance);
+      logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
 
-    // Convert tag IDs to names before syncing
-    logger.debug('🏷️  Converting tag IDs to names');
-    const mediaWithTagNames = await Promise.all(
-      allMedia.map(async (item) => {
-        const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-        return { ...item, tags: tagNames };
-      })
-    );
-    logger.debug('✅ Tag IDs converted to names');
+      // Convert tag IDs to names before syncing
+      logger.debug('🏷️  Converting tag IDs to names');
+      const mediaWithTagNames = await Promise.all(
+        allMedia.map(async (item) => {
+          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+          return { ...item, tags: tagNames };
+        })
+      );
+      logger.debug('✅ Tag IDs converted to names');
 
-    // Sync to database
-    await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
-    logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
+      // Sync to database
+      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
+      logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
-    return allMedia.length;
+      endOp({ syncedCount: allMedia.length }, true);
+      return allMedia.length;
+    } catch (error: unknown) {
+      const errMsg = getErrorMessage(error);
+      logger.error(`❌ syncSingleInstance failed for ${appType} ${instance.id}`, { error: errMsg });
+      endOp({ error: errMsg }, false);
+      throw error;
+    }
   }
 
   async syncAllInstances(): Promise<void> {
@@ -139,6 +148,7 @@ class SyncSchedulerService {
       return;
     }
 
+    const endOp = startOperation('SyncScheduler.syncAllInstances', {});
     this.isRunning = true;
     logger.info('🔄 Starting sync of all instances');
 
@@ -165,16 +175,19 @@ class SyncSchedulerService {
       }
 
       logger.info(`✅ Sync completed. Total items synced: ${totalSynced}`);
+      endOp({ totalSynced }, true);
     } catch (error: unknown) {
       logger.error('❌ Error during sync', {
         error: getErrorMessage(error)
       });
+      endOp({ error: getErrorMessage(error) }, false);
     } finally {
       this.isRunning = false;
     }
   }
 
   async syncInstance(appType: AppType, instanceId: string): Promise<void> {
+    const endOp = startOperation('SyncScheduler.syncInstance', { appType, instanceId });
     try {
       logger.info(`🔄 Manually syncing ${appType} instance: ${instanceId}`);
 
@@ -187,10 +200,12 @@ class SyncSchedulerService {
       }
 
       await this.syncSingleInstance(appType, instance);
+      endOp({}, true);
     } catch (error: unknown) {
       logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {
         error: getErrorMessage(error)
       });
+      endOp({ error: getErrorMessage(error) }, false);
       throw error;
     }
   }

@@ -11,7 +11,7 @@ import { configService } from './services/configService.js';
 import { statsService } from './services/statsService.js';
 import { schedulerService } from './services/schedulerService.js';
 import { getErrorMessage } from './utils/errorUtils.js';
-import logger from './utils/logger.js';
+import logger, { startOperation } from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -62,6 +62,7 @@ Promise.all([
   statsService.initialize()
 ]).then(async () => {
   logger.debug('✅ Core services initialized, initializing schedulers');
+  const initOp = startOperation('App.initializeServices', {});
   await schedulerService.initialize();
 
   // Initialize sync scheduler (skip initial sync, only run on scheduled intervals)
@@ -76,6 +77,7 @@ Promise.all([
       pid: process.pid
     });
   });
+  initOp({}, true);
 }).catch((error: unknown) => {
   const errorMessage = getErrorMessage(error);
   const errorStack = error instanceof Error ? error.stack : undefined;

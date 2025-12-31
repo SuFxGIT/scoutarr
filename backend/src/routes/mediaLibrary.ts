@@ -5,7 +5,7 @@ import { sonarrService } from '../services/sonarrService.js';
 import { lidarrService } from '../services/lidarrService.js';
 import { readarrService } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
@@ -17,8 +17,9 @@ export const mediaLibraryRouter = express.Router();
 // Fetch all media for an instance with last searched dates
 // Query param: sync=true to force sync from API to database
 mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
+  const { appType, instanceId } = req.params;
+  const endOp = startOperation('MediaLibrary.get', { appType, instanceId });
   try {
-    const { appType, instanceId } = req.params;
     const shouldSync = req.query.sync === 'true';
     const shouldSkipFilters = req.query.skipFilters === 'true';
 
@@ -207,6 +208,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       appType,
       fromCache
     });
+    endOp({ total: mediaWithDates.length }, true);
 
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
@@ -227,6 +229,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 mediaLibraryRouter.post('/search', async (req, res) => {
   try {
     const { appType, instanceId, mediaIds } = req.body;
+    const endOp = startOperation('MediaLibrary.search', { appType, instanceId, count: Array.isArray(mediaIds) ? mediaIds.length : 0 });
 
     // Validate inputs
     if (!appType || !instanceId || !Array.isArray(mediaIds) || mediaIds.length === 0) {
@@ -304,6 +307,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       searched: mediaIds.length,
       message: `Successfully searched ${mediaIds.length} item${mediaIds.length === 1 ? '' : 's'}`
     });
+    endOp({ searched: mediaIds.length }, true);
 
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
@@ -312,6 +316,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       appType: req.body.appType,
       instanceId: req.body.instanceId
     });
+    endOp({ error: errorMessage }, false);
     res.status(500).json({
       success: false,
       error: 'Search failed',

@@ -7,7 +7,7 @@ import { readarrService, ReadarrAuthor } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { notificationService } from '../services/notificationService.js';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
@@ -221,6 +221,7 @@ export async function processApplication<TMedia extends FilterableMedia>(
   processor: ApplicationProcessor<TMedia>,
   preloadedMedia?: TMedia[]
 ): Promise<SearchResult> {
+  const endOp = startOperation('Search.processApplication', { processor: processor.name, instanceId: processor.instanceId, appType: processor.appType });
   try {
     logger.info(`Processing ${processor.name} search`, {
       count: processor.config.count,
@@ -309,34 +310,32 @@ export async function processApplication<TMedia extends FilterableMedia>(
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined
     });
-    return {
-      success: false,
-      searched: 0,
-      items: [],
-      error: errorMessage
-    };
-  }
-}
+    
+    const items = toSearch.map(m => ({
+      id: processor.getMediaId(m),
+      title: processor.getMediaTitle(m)
+    }));
 
-// Run search for all configured applications
-searchRouter.post('/run', async (req, res) => {
-  const startTime = Date.now();
-  logger.info('🔍 Starting manual search operation');
-  try {
-    const results = await executeSearchRun();
-    const duration = Date.now() - startTime;
+    endOp({ searched: toSearch.length }, true);
+
+    return {
+      success: true,
+      searched: toSearch.length,
+      items
+    };
 
     const summary = Object.keys(results).map(app => ({
       app,
       success: results[app].success,
       count: results[app].searched || 0
     }));
-    
-    logger.info('🎉 Search operation completed', {
-      duration: `${duration}ms`,
-      results: summary,
-      totalSearched: summary.reduce((sum, r) => sum + r.count, 0),
-      successCount: summary.filter(r => r.success).length,
+    endOp({ error: errorMessage }, false);
+    return {
+      success: false,
+      searched: 0,
+      items: [],
+      error: errorMessage
+    };
       failureCount: summary.filter(r => !r.success).length
     });
 

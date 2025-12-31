@@ -101,3 +101,28 @@ if (!existsSync(logsDir)) {
 
 export default logger;
 
+// Helper utilities for consistent structured logging across the app
+export function startOperation(name: string, meta: Record<string, unknown> = {}) {
+  const startTime = Date.now();
+  logger.info(`▶️ START ${name}`, { ...meta, operation: name, phase: 'start', ts: new Date().toISOString() });
+  return (resultMeta: Record<string, unknown> = {}, success = true) => {
+    const duration = Date.now() - startTime;
+    const level = success ? 'info' : 'error';
+    logger.log(level, `◀️ END ${name}`, { ...meta, ...resultMeta, operation: name, phase: 'end', durationMs: duration, ts: new Date().toISOString() });
+  };
+}
+
+export function logStep(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta: Record<string, unknown> = {}) {
+  logger.log(level, message, meta);
+}
+
+export function childLogger(context: Record<string, unknown>) {
+  return {
+    debug: (msg: string, meta: Record<string, unknown> = {}) => logger.debug(msg, { ...context, ...meta }),
+    info: (msg: string, meta: Record<string, unknown> = {}) => logger.info(msg, { ...context, ...meta }),
+    warn: (msg: string, meta: Record<string, unknown> = {}) => logger.warn(msg, { ...context, ...meta }),
+    error: (msg: string, meta: Record<string, unknown> = {}) => logger.error(msg, { ...context, ...meta }),
+    start: (name: string, meta: Record<string, unknown> = {}) => startOperation(name, { ...context, ...meta })
+  };
+}
+

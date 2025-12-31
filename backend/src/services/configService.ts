@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Config } from '@scoutarr/shared';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { getConfigDir } from '../utils/paths.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
@@ -19,6 +19,7 @@ class ConfigService {
   private config: Config | null = null;
 
   async initialize(): Promise<void> {
+    const endOp = startOperation('ConfigService.initialize', { configDir: CONFIG_DIR, configFile: CONFIG_FILE });
     logger.debug('⚙️  Initializing configuration service', { configDir: CONFIG_DIR, configFile: CONFIG_FILE });
     try {
       // Ensure config directory exists
@@ -46,6 +47,7 @@ class ConfigService {
 
       await this.loadConfig();
       logger.info('✅ Configuration initialized successfully', { configFile: CONFIG_FILE });
+      endOp();
     } catch (error: unknown) {
       logger.warn('⚠️  Error initializing config, creating default config', {
         error: getErrorMessage(error),
@@ -54,10 +56,12 @@ class ConfigService {
       await this.createDefaultConfig();
       await this.loadConfig();
       logger.info('✅ Default configuration created and loaded');
+      endOp({}, true);
     }
   }
 
   private async createDefaultConfig(): Promise<void> {
+    const endOp = startOperation('ConfigService.createDefaultConfig', { configFile: CONFIG_FILE });
     logger.debug('Creating default configuration file', { configFile: CONFIG_FILE });
     const defaultConfig: Config = {
       notifications: {
@@ -86,9 +90,11 @@ class ConfigService {
 
     await fs.writeFile(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
     logger.debug('Default configuration file created', { configFile: CONFIG_FILE });
+    endOp();
   }
 
   async loadConfig(): Promise<Config> {
+    const endOp = startOperation('ConfigService.loadConfig', { configFile: CONFIG_FILE });
     logger.debug('📖 Loading configuration', { configFile: CONFIG_FILE });
     try {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
@@ -154,6 +160,7 @@ class ConfigService {
         schedulerEnabled: parsed.scheduler?.enabled || false,
         schedulerSchedule: parsed.scheduler?.schedule || 'not set'
       });
+      endOp({ instanceCounts }, true);
       return this.config;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -163,11 +170,13 @@ class ConfigService {
         stack: errorStack,
         configFile: CONFIG_FILE 
       });
+      endOp({ error: errorMessage }, false);
       throw error;
     }
   }
 
   async resetToDefault(): Promise<Config> {
+    const endOp = startOperation('ConfigService.resetToDefault', { configFile: CONFIG_FILE });
     try {
       await this.createDefaultConfig();
       const config = await this.loadConfig();
@@ -179,6 +188,7 @@ class ConfigService {
       const { syncSchedulerService } = await import('./syncSchedulerService.js');
       syncSchedulerService.restart(true); // Skip initial sync on reset
 
+      endOp({}, true);
       return config;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -188,11 +198,13 @@ class ConfigService {
         stack: errorStack,
         configFile: CONFIG_FILE
       });
+      endOp({ error: errorMessage }, false);
       throw error;
     }
   }
 
   async saveConfig(config: Config): Promise<void> {
+    const endOp = startOperation('ConfigService.saveConfig', { configFile: CONFIG_FILE });
     logger.debug('💾 Saving configuration', { configFile: CONFIG_FILE });
     try {
       const configJson = JSON.stringify(config, null, 2);
@@ -222,6 +234,7 @@ class ConfigService {
       const { syncSchedulerService } = await import('./syncSchedulerService.js');
       syncSchedulerService.restart(true); // Skip initial sync on config save
       logger.debug('✅ Schedulers restarted');
+      endOp({ instanceCounts }, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -234,6 +247,7 @@ class ConfigService {
         configFile: CONFIG_FILE,
         operation: 'saveConfig'
       });
+      endOp({ error: errorMessage }, false);
       throw error;
     }
   }
@@ -243,10 +257,12 @@ class ConfigService {
       logger.error('❌ Attempted to get config before initialization');
       throw new Error('Config not loaded');
     }
+    const endOp = startOperation('ConfigService.getConfig', {});
     logger.debug('📋 Config retrieved', { 
       hasScheduler: !!this.config.scheduler,
       schedulerEnabled: this.config.scheduler?.enabled || false
     });
+    endOp({}, true);
     return this.config;
   }
 }

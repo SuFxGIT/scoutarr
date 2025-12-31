@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { configService } from './configService.js';
-import logger from '../utils/logger.js';
+import logger, { startOperation } from '../utils/logger.js';
 import { extractItemsFromResult } from '../utils/starrUtils.js';
 import { SearchResults } from '@scoutarr/shared';
 import { getErrorMessage } from '../utils/errorUtils.js';
@@ -21,6 +21,7 @@ import { getErrorMessage } from '../utils/errorUtils.js';
  */
 class NotificationService {
   async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {
+    const endOp = startOperation('NotificationService.sendNotifications', { success, hasError: !!error, resultCount: Object.keys(results).length });
     logger.debug('📤 Preparing to send notifications', { 
       success, 
       hasError: !!error,
@@ -102,6 +103,7 @@ class NotificationService {
                        (notificationConfig.notifiarrPassthroughWebhook ? 1 : 0) + 
                        (notificationConfig.pushoverUserKey && notificationConfig.pushoverApiToken ? 1 : 0)
     });
+    endOp({ sent: notificationsSent, failed: notificationsFailed }, true);
   }
 
   private async sendDiscordNotification(
@@ -110,6 +112,7 @@ class NotificationService {
     success: boolean,
     error?: string
   ): Promise<void> {
+    const endOp = startOperation('NotificationService.sendDiscordNotification', { webhookUrl: webhookUrl ? webhookUrl.substring(0,50) + '...' : '' });
     try {
       const totalSearched = Object.values(results).reduce((sum, result) => sum + (result.searched || 0), 0);
       
@@ -144,11 +147,13 @@ class NotificationService {
       });
 
       logger.debug('✅ Discord notification sent successfully');
+      endOp({}, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Discord notification', {
         error: errorMessage
       });
+      endOp({ error: errorMessage }, false);
     }
   }
 
@@ -159,6 +164,7 @@ class NotificationService {
     success: boolean,
     error?: string
   ): Promise<void> {
+    const endOp = startOperation('NotificationService.sendNotifiarrNotification', { webhookUrl: webhookUrl ? webhookUrl.substring(0,50) + '...' : '', channelId });
     try {
       const totalSearched = Object.values(results).reduce((sum, result) => sum + (result.searched || 0), 0);
       
@@ -188,11 +194,13 @@ class NotificationService {
       await axios.post(webhookUrl, payload);
 
       logger.debug('✅ Notifiarr notification sent successfully');
+      endOp({}, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Notifiarr notification', {
         error: errorMessage
       });
+      endOp({ error: errorMessage }, false);
     }
   }
 
@@ -203,6 +211,7 @@ class NotificationService {
     success: boolean,
     error?: string
   ): Promise<void> {
+    const endOp = startOperation('NotificationService.sendPushoverNotification', { userKey: userKey ? userKey.substring(0,8) + '...' : '' });
     try {
       const totalSearched = Object.values(results).reduce((sum, result) => sum + (result.searched || 0), 0);
       
@@ -241,11 +250,13 @@ class NotificationService {
       });
 
       logger.debug('✅ Pushover notification sent successfully');
+      endOp({}, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       logger.error('❌ Failed to send Pushover notification', {
         error: errorMessage
       });
+      endOp({ error: errorMessage }, false);
     }
   }
 
