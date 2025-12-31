@@ -115,10 +115,12 @@ statusRouter.get('/scheduler', async (req, res) => {
       : null;
 
     res.json({
-      enabled: config.scheduler?.enabled || false,
-      running: schedulerStatus.running,
-      schedule: schedulerStatus.schedule,
-      nextRun: schedulerStatus.nextRun,
+      scheduler: {
+        enabled: config.scheduler?.enabled || false,
+        running: schedulerStatus.running,
+        schedule: schedulerStatus.schedule,
+        nextRun: schedulerStatus.nextRun
+      },
       sync: {
         enabled: syncConfig?.syncEnabled || false,
         schedule: syncSchedule,

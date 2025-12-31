@@ -72,7 +72,7 @@ function Settings() {
   });
 
   // Load scheduler status for Tasks tab
-  const { data: schedulerStatus } = useQuery({
+  const { data: schedulerStatus, refetch: refetchSchedulerStatus } = useQuery({
     queryKey: ['scheduler-status'],
     queryFn: async () => {
       const response = await axios.get('/api/status/scheduler');
@@ -1265,6 +1265,7 @@ function Settings() {
                 onConfigChange={setConfig}
                 onSaveConfig={saveConfigWithData}
                 schedulerStatus={schedulerStatus}
+                onRefreshStatus={refetchSchedulerStatus}
               />
             )}
           </Tabs.Content>
