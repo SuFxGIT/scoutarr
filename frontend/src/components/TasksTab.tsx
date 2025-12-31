@@ -5,10 +5,10 @@ import {
   Card,
   Text,
   Switch,
-  Separator,
   Badge,
   Tooltip,
-  Link
+  Link,
+  Table
 } from '@radix-ui/themes';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import type { Config } from '../types/config';
@@ -36,43 +36,40 @@ interface TaskRowProps {
 
 function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle, countdown }: TaskRowProps) {
   return (
-    <Flex direction="column" gap="3" style={{
-      padding: '12px 16px',
-      borderRadius: '8px',
-      background: 'var(--gray-2)',
-      border: '1px solid var(--gray-4)'
-    }}>
-      <Flex direction="column" gap="1">
-        <Text size="3" weight="medium">{name}</Text>
-        <Text size="1" color="gray">{description}</Text>
-      </Flex>
-
-      <Flex direction="row" align="center" justify="between" wrap="wrap" gap="3">
+    <Table.Row>
+      <Table.Cell>
         <Flex align="center" gap="2">
-          <Text size="2" color="gray">Cron:</Text>
-          <Tooltip content="Click to understand this cron expression">
-            <Link
-              href={`https://crontab.guru/#${cronExpression.replace(/ /g, '_')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <code style={{
-                fontSize: '12px',
-                padding: '2px 6px',
-                background: 'var(--gray-4)',
-                borderRadius: '4px',
-                fontFamily: 'monospace'
-              }}>
-                {cronExpression}
-              </code>
-            </Link>
+          <Text size="2" weight="medium">{name}</Text>
+          <Tooltip content={description}>
+            <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
           </Tooltip>
         </Flex>
-
-        <Flex align="center" gap="3">
+      </Table.Cell>
+      <Table.Cell>
+        <Tooltip content="Click to understand this cron expression">
+          <Link
+            href={`https://crontab.guru/#${cronExpression.replace(/ /g, '_')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <code style={{
+              fontSize: '12px',
+              padding: '2px 6px',
+              background: 'var(--gray-4)',
+              borderRadius: '4px',
+              fontFamily: 'monospace'
+            }}>
+              {cronExpression}
+            </code>
+          </Link>
+        </Tooltip>
+      </Table.Cell>
+      <Table.Cell>
+        <Flex align="center" gap="2" justify="end">
           <Switch
             checked={enabled}
             onCheckedChange={onToggle}
+            size="1"
           />
           <Badge color={enabled ? 'green' : 'gray'} size="1">
             {enabled ? 'Enabled' : 'Disabled'}
@@ -93,8 +90,8 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
             </Text>
           )}
         </Flex>
-      </Flex>
-    </Flex>
+      </Table.Cell>
+    </Table.Row>
   );
 }
 
@@ -139,56 +136,43 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
 
   return (
     <Flex direction="column" gap="4" style={{ paddingTop: '1rem' }}>
-      {/* Global Scheduler */}
       <Card>
-        <Flex direction="column" gap="4" p="4">
-          <Flex align="center" gap="2">
-            <Heading size="5">Global Scheduler</Heading>
-            <Tooltip content="Runs upgrade searches across all configured applications">
-              <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
-            </Tooltip>
-          </Flex>
-          <Separator size="4" />
+        <Flex direction="column" gap="3" p="4">
+          <Heading size="5">Scheduled Tasks</Heading>
 
-          <TaskRow
-            name="Global Upgrade Search"
-            description="Searches for upgrades across all configured applications"
-            cronExpression={config.scheduler?.schedule || '0 */6 * * *'}
-            enabled={config.scheduler?.enabled || false}
-            nextRun={schedulerStatus?.scheduler?.nextRun || null}
-            onToggle={(enabled) => {
-              if (!config.scheduler) {
-                onConfigChange({
-                  ...config,
-                  scheduler: { enabled, schedule: '0 */6 * * *', unattended: false }
-                });
-              } else {
-                onConfigChange({
-                  ...config,
-                  scheduler: { ...config.scheduler, enabled }
-                });
-              }
-            }}
-            countdown={countdowns['global-scheduler'] || 0}
-          />
-        </Flex>
-      </Card>
+          <Table.Root variant="surface">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeaderCell>Task</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell>Schedule</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell style={{ textAlign: 'right' }}>Next Run</Table.ColumnHeaderCell>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {/* Global Scheduler */}
+              <TaskRow
+                name="Global Upgrade Search"
+                description="Searches for upgrades across all configured applications"
+                cronExpression={config.scheduler?.schedule || '0 */6 * * *'}
+                enabled={config.scheduler?.enabled || false}
+                nextRun={schedulerStatus?.scheduler?.nextRun || null}
+                onToggle={(enabled) => {
+                  if (!config.scheduler) {
+                    onConfigChange({
+                      ...config,
+                      scheduler: { enabled, schedule: '0 */6 * * *', unattended: false }
+                    });
+                  } else {
+                    onConfigChange({
+                      ...config,
+                      scheduler: { ...config.scheduler, enabled }
+                    });
+                  }
+                }}
+                countdown={countdowns['global-scheduler'] || 0}
+              />
 
-      {/* Per-Instance Schedulers */}
-      <Card>
-        <Flex direction="column" gap="4" p="4">
-          <Flex align="center" gap="2">
-            <Heading size="5">Per-Instance Schedulers</Heading>
-            <Tooltip content="Individual schedules for each instance (overrides global schedule)">
-              <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
-            </Tooltip>
-          </Flex>
-          <Separator size="4" />
-
-          {/* Radarr Instances */}
-          {config.applications.radarr.length > 0 && (
-            <Flex direction="column" gap="3">
-              <Text size="3" weight="bold">Radarr</Text>
+              {/* Radarr Instances */}
               {config.applications.radarr.map((instance) => (
                 instance.schedule && (
                   <TaskRow
@@ -213,13 +197,8 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                   />
                 )
               ))}
-            </Flex>
-          )}
 
-          {/* Sonarr Instances */}
-          {config.applications.sonarr.length > 0 && (
-            <Flex direction="column" gap="3">
-              <Text size="3" weight="bold">Sonarr</Text>
+              {/* Sonarr Instances */}
               {config.applications.sonarr.map((instance) => (
                 instance.schedule && (
                   <TaskRow
@@ -244,13 +223,8 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                   />
                 )
               ))}
-            </Flex>
-          )}
 
-          {/* Lidarr Instances */}
-          {config.applications.lidarr.length > 0 && (
-            <Flex direction="column" gap="3">
-              <Text size="3" weight="bold">Lidarr</Text>
+              {/* Lidarr Instances */}
               {config.applications.lidarr.map((instance) => (
                 instance.schedule && (
                   <TaskRow
@@ -275,13 +249,8 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                   />
                 )
               ))}
-            </Flex>
-          )}
 
-          {/* Readarr Instances */}
-          {config.applications.readarr.length > 0 && (
-            <Flex direction="column" gap="3">
-              <Text size="3" weight="bold">Readarr</Text>
+              {/* Readarr Instances */}
               {config.applications.readarr.map((instance) => (
                 instance.schedule && (
                   <TaskRow
@@ -306,46 +275,24 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                   />
                 )
               ))}
-            </Flex>
-          )}
 
-          {/* No instances message */}
-          {!config.applications.radarr.some(i => i.schedule) &&
-           !config.applications.sonarr.some(i => i.schedule) &&
-           !config.applications.lidarr.some(i => i.schedule) &&
-           !config.applications.readarr.some(i => i.schedule) && (
-            <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-              No per-instance schedules configured. Configure schedules in the Applications tab.
-            </Text>
-          )}
-        </Flex>
-      </Card>
-
-      {/* Sync Scheduler */}
-      <Card>
-        <Flex direction="column" gap="4" p="4">
-          <Flex align="center" gap="2">
-            <Heading size="5">Media Library Sync</Heading>
-            <Tooltip content="Syncs media library data from *arr applications to local database">
-              <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
-            </Tooltip>
-          </Flex>
-          <Separator size="4" />
-
-          <TaskRow
-            name="Media Library Sync"
-            description="Syncs all media from configured *arr instances to the local database"
-            cronExpression={config.tasks.syncSchedule}
-            enabled={config.tasks.syncEnabled}
-            nextRun={schedulerStatus?.sync?.nextRun || null}
-            onToggle={(enabled) => {
-              onConfigChange({
-                ...config,
-                tasks: { ...config.tasks, syncEnabled: enabled }
-              });
-            }}
-            countdown={countdowns['sync-scheduler'] || 0}
-          />
+              {/* Media Library Sync */}
+              <TaskRow
+                name="Media Library Sync"
+                description="Syncs all media from configured *arr instances to the local database"
+                cronExpression={config.tasks.syncSchedule}
+                enabled={config.tasks.syncEnabled}
+                nextRun={schedulerStatus?.sync?.nextRun || null}
+                onToggle={(enabled) => {
+                  onConfigChange({
+                    ...config,
+                    tasks: { ...config.tasks, syncEnabled: enabled }
+                  });
+                }}
+                countdown={countdowns['sync-scheduler'] || 0}
+              />
+            </Table.Body>
+          </Table.Root>
         </Flex>
       </Card>
     </Flex>
