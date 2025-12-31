@@ -16,7 +16,6 @@ import {
   Grid,
   Tooltip,
   AlertDialog,
-  Link,
   Box
 } from '@radix-ui/themes';
 import * as Collapsible from '@radix-ui/react-collapsible';
@@ -30,7 +29,7 @@ import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrIns
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
+import { MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
 import { TasksTab } from '../components/TasksTab';
@@ -42,7 +41,6 @@ function Settings() {
   const { handleNavigation: baseHandleNavigation, registerNavigationGuard, unregisterNavigationGuard } = useNavigation();
   const [config, setConfig] = useState<Config | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { status: boolean | null; testing: boolean; version?: string; appName?: string }>>({});
-  const [schedulerPreset, setSchedulerPreset] = useState<string>('custom');
   const [activeTab, setActiveTab] = useState<string>(() => {
     try {
       const savedTab = localStorage.getItem('scoutarr_settings_active_tab');
@@ -99,9 +97,6 @@ function Settings() {
     if (loadedConfig) {
       setConfig(loadedConfig);
       loadedConfigRef.current = loadedConfig;
-      if (loadedConfig.scheduler?.schedule) {
-        setSchedulerPreset(getPresetFromSchedule(loadedConfig.scheduler.schedule));
-      }
     }
   }, [loadedConfig]);
 
@@ -210,6 +205,10 @@ function Settings() {
   const saveConfig = async () => {
     if (!config) return;
     saveConfigMutation.mutate(config);
+  };
+
+  const saveConfigWithData = async (configToSave: Config) => {
+    saveConfigMutation.mutate(configToSave);
   };
 
   // Reset app mutation (clears config, quality profiles cache, stats, logs, and localStorage)
@@ -701,7 +700,6 @@ function Settings() {
               <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
               <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
-              <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
               <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
               <Tabs.Trigger value="advanced">Advanced</Tabs.Trigger>
             </Tabs.List>
@@ -1260,189 +1258,18 @@ function Settings() {
             </Card>
           </Tabs.Content>
 
-          <Tabs.Content value="scheduler" style={{ paddingTop: '1rem' }}>
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Flex align="center" gap="2">
-                  <Heading size="5">Scheduler</Heading>
-                  <Tooltip content="Schedule for all configured instances.">
-                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
-                  </Tooltip>
-                </Flex>
-                <Separator size="4" />
-
-                <Flex direction="row" align="center" justify="between" gap="2">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Enable Scheduler</Text>
-                    <Tooltip content="Automatically run searches on schedule for all configured instances.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <Switch
-                    checked={config.scheduler?.enabled || false}
-                    onCheckedChange={(checked: boolean) => {
-                      if (!config.scheduler) {
-                        setConfig({
-                          ...config,
-                          scheduler: { enabled: checked, schedule: '0 */6 * * *', unattended: false }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          scheduler: { ...config.scheduler, enabled: checked }
-                        });
-                      }
-                    }}
-                  />
-                </Flex>
-
-                <Flex direction="row" align="center" justify="between" gap="2">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Unattended Mode</Text>
-                    <Tooltip content="Automatically clear tags and re-filter when no media is found.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <Switch
-                    checked={config.scheduler?.unattended || false}
-                    onCheckedChange={(checked: boolean) => {
-                      if (!config.scheduler) {
-                        setConfig({
-                          ...config,
-                          scheduler: { enabled: false, schedule: '0 */6 * * *', unattended: checked }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          scheduler: { ...config.scheduler, unattended: checked }
-                        });
-                      }
-                    }}
-                  />
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Text size="2" weight="medium">Schedule</Text>
-                  <Select.Root
-                    value={schedulerPreset}
-                    onValueChange={(value: string) => {
-                      setSchedulerPreset(value);
-                      const schedule = value === 'custom'
-                        ? (config.scheduler?.schedule || '0 */6 * * *')
-                        : CRON_PRESETS[value];
-                      if (!config.scheduler) {
-                        setConfig({
-                          ...config,
-                          scheduler: { enabled: false, schedule, unattended: false }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          scheduler: { ...config.scheduler, schedule }
-                        });
-                      }
-                    }}
-                  >
-                    <Select.Trigger />
-                    <Select.Content position="popper" sideOffset={5}>
-                      {CRON_PRESET_OPTIONS.map(option => (
-                        <Select.Item key={option.value} value={option.value}>
-                          {option.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                  {schedulerPreset === 'custom' && (
-                    <Flex direction="column" gap="1">
-                      <TextField.Root
-                        value={config.scheduler?.schedule || '0 */6 * * *'}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          if (!config.scheduler) {
-                            setConfig({
-                              ...config,
-                              scheduler: { enabled: false, schedule: e.target.value, unattended: false }
-                            });
-                          } else {
-                            setConfig({
-                              ...config,
-                              scheduler: { ...config.scheduler, schedule: e.target.value }
-                            });
-                          }
-                        }}
-                        placeholder="0 */6 * * *"
-                      />
-                      <Text size="1" color="gray">
-                        Need help?{' '}
-                        <Link href="https://crontab.guru/" target="_blank">
-                          Visit crontab.guru →
-                        </Link>
-                      </Text>
-                    </Flex>
-                  )}
-                </Flex>
-              </Flex>
-            </Card>
-          </Tabs.Content>
-
           <Tabs.Content value="tasks">
             {config && (
               <TasksTab
                 config={config}
                 onConfigChange={setConfig}
+                onSaveConfig={saveConfigWithData}
                 schedulerStatus={schedulerStatus}
               />
             )}
           </Tabs.Content>
 
           <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Tasks</Heading>
-                <Separator size="4" />
-
-                <Flex direction="row" align="center" justify="between" gap="2">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Enable Automatic Sync</Text>
-                    <Tooltip content="Automatically sync media library from *arr apps at the specified interval.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <Switch
-                    checked={config.tasks.syncEnabled}
-                    onCheckedChange={(checked: boolean) => {
-                      setConfig({
-                        ...config,
-                        tasks: { ...config.tasks, syncEnabled: checked }
-                      });
-                    }}
-                  />
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Sync Schedule</Text>
-                    <Tooltip content="Cron expression for when to sync media library from *arr apps. Examples: '0 3 * * *' (3am daily), '0 */6 * * *' (every 6 hours), '0 0 * * 0' (midnight on Sundays).">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <TextField.Root
-                    type="text"
-                    placeholder="0 3 * * *"
-                    value={config.tasks.syncSchedule}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      setConfig({
-                        ...config,
-                        tasks: { ...config.tasks, syncSchedule: e.target.value }
-                      });
-                    }}
-                  />
-                  <Text size="1" color="gray">
-                    Schedule: {config.tasks.syncSchedule}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Card>
-
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>

@@ -1,4 +1,14 @@
 import { z } from 'zod';
+import { CronExpressionParser } from 'cron-parser';
+
+const validateCronExpression = (cron: string) => {
+  try {
+    CronExpressionParser.parse(cron);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const radarrInstanceSchema = z.object({
   id: z.string(),
@@ -118,12 +128,12 @@ export const notificationConfigSchema = z.object({
 
 export const schedulerConfigSchema = z.object({
   enabled: z.boolean(),
-  schedule: z.string().regex(/^(\*|([0-9]|[1-5][0-9])|\*\/[0-9]+)\s+(\*|([0-9]|1[0-9]|2[0-3])|\*\/[0-9]+)\s+(\*|([1-9]|[12][0-9]|3[01])|\*\/[0-9]+)\s+(\*|([1-9]|1[0-2])|\*\/[0-9]+)\s+(\*|([0-6])|\*\/[0-9]+)$/, 'Invalid cron expression'),
+  schedule: z.string().refine(validateCronExpression, 'Invalid cron expression'),
   unattended: z.boolean(),
 });
 
 export const tasksConfigSchema = z.object({
-  syncSchedule: z.string().min(1, 'Sync schedule is required'),
+  syncSchedule: z.string().refine(validateCronExpression, 'Invalid cron expression'),
   syncEnabled: z.boolean(),
 });
 

@@ -9,6 +9,7 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
+    "cron-parser": "^5.4.0",
     "zod": "^4.3.2"
   },
   "devDependencies": {

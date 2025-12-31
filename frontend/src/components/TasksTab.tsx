@@ -7,10 +7,13 @@ import {
   Switch,
   Badge,
   Tooltip,
-  Link,
-  Table
+  Table,
+  Popover,
+  Button,
+  TextField
 } from '@radix-ui/themes';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
+import { CronExpressionParser } from 'cron-parser';
 import type { Config } from '../types/config';
 import type { SchedulerStatus, SyncSchedulerStatus } from '../types/api';
 import { calculateTimeUntil, formatCountdown } from '../utils/helpers';
@@ -18,6 +21,7 @@ import { calculateTimeUntil, formatCountdown } from '../utils/helpers';
 interface TasksTabProps {
   config: Config;
   onConfigChange: (config: Config) => void;
+  onSaveConfig: (config: Config) => void;
   schedulerStatus?: {
     scheduler?: SchedulerStatus;
     sync?: SyncSchedulerStatus;
@@ -31,10 +35,48 @@ interface TaskRowProps {
   enabled: boolean;
   nextRun: string | null;
   onToggle: (enabled: boolean) => void;
+  onEditSchedule: (newSchedule: string) => Config;
+  onSaveConfig: (config: Config) => void;
   countdown: number;
 }
 
-function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle, countdown }: TaskRowProps) {
+function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle, onEditSchedule, onSaveConfig, countdown }: TaskRowProps) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [editedSchedule, setEditedSchedule] = useState(cronExpression);
+  const [error, setError] = useState<string>('');
+
+  // Update local state when cronExpression changes
+  useEffect(() => {
+    setEditedSchedule(cronExpression);
+    setError('');
+  }, [cronExpression]);
+
+  // Cron validation using cron-parser
+  const validateCron = (cron: string): string => {
+    const trimmed = cron.trim();
+    if (!trimmed) return 'Cron expression is required';
+
+    try {
+      CronExpressionParser.parse(trimmed);
+      return '';
+    } catch (err) {
+      return err instanceof Error ? err.message : 'Invalid cron expression';
+    }
+  };
+
+  const handleSave = () => {
+    const validationError = validateCron(editedSchedule);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const updatedConfig = onEditSchedule(editedSchedule);
+    setIsPopoverOpen(false);
+    setError('');
+    onSaveConfig(updatedConfig);
+  };
+
   return (
     <Table.Row>
       <Table.Cell>
@@ -46,23 +88,45 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
         </Flex>
       </Table.Cell>
       <Table.Cell>
-        <Tooltip content="Click to understand this cron expression">
-          <Link
-            href={`https://crontab.guru/#${cronExpression.replace(/ /g, '_')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <code style={{
-              fontSize: '12px',
-              padding: '2px 6px',
-              background: 'var(--gray-4)',
-              borderRadius: '4px',
-              fontFamily: 'monospace'
-            }}>
-              {cronExpression}
-            </code>
-          </Link>
-        </Tooltip>
+        <Popover.Root open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <Tooltip content="Click to edit schedule">
+            <Popover.Trigger>
+              <Button variant="ghost" style={{ padding: '0', height: 'auto', cursor: 'pointer' }}>
+                <code style={{
+                  fontSize: '12px',
+                  padding: '2px 6px',
+                  background: 'var(--gray-4)',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  cursor: 'pointer'
+                }}>
+                  {cronExpression}
+                </code>
+              </Button>
+            </Popover.Trigger>
+          </Tooltip>
+          <Popover.Content size="2" style={{ padding: '8px' }}>
+            <Flex direction="column" gap="2">
+              <Flex gap="2" align="center">
+                <TextField.Root
+                  value={editedSchedule}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedSchedule(e.target.value)}
+                  placeholder="0 */6 * * *"
+                  size="2"
+                  style={{ minWidth: '150px' }}
+                />
+                <Button variant="solid" size="2" onClick={handleSave}>
+                  Save
+                </Button>
+              </Flex>
+              {error && (
+                <Text size="1" color="red">
+                  {error}
+                </Text>
+              )}
+            </Flex>
+          </Popover.Content>
+        </Popover.Root>
       </Table.Cell>
       <Table.Cell>
         <Flex align="center" gap="2" justify="end">
@@ -95,7 +159,7 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
   );
 }
 
-export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabProps) {
+export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus }: TasksTabProps) {
   const [countdowns, setCountdowns] = useState<Record<string, number>>({});
 
   // Update countdowns every second
@@ -160,6 +224,20 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                     });
                   }
                 }}
+                onEditSchedule={(newSchedule) => {
+                  const updatedConfig = !config.scheduler
+                    ? {
+                        ...config,
+                        scheduler: { enabled: false, schedule: newSchedule, unattended: false }
+                      }
+                    : {
+                        ...config,
+                        scheduler: { ...config.scheduler, schedule: newSchedule }
+                      };
+                  onConfigChange(updatedConfig);
+                  return updatedConfig;
+                }}
+                onSaveConfig={onSaveConfig}
                 countdown={countdowns['scheduler'] || 0}
               />
 
@@ -176,6 +254,15 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                     tasks: { ...config.tasks, syncEnabled: enabled }
                   });
                 }}
+                onEditSchedule={(newSchedule) => {
+                  const updatedConfig = {
+                    ...config,
+                    tasks: { ...config.tasks, syncSchedule: newSchedule }
+                  };
+                  onConfigChange(updatedConfig);
+                  return updatedConfig;
+                }}
+                onSaveConfig={onSaveConfig}
                 countdown={countdowns['sync-scheduler'] || 0}
               />
             </Table.Body>

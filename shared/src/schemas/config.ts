@@ -1,4 +1,14 @@
 import { z } from 'zod';
+import { CronExpressionParser } from 'cron-parser';
+
+const validateCronExpression = (cron: string) => {
+  try {
+    CronExpressionParser.parse(cron);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // Reusable URL validation
 const urlValidation = z.string().refine((val) => {
@@ -70,15 +80,15 @@ export const notificationConfigSchema = z.object({
 });
 
 export const schedulerConfigSchema = z.object({
-  radarr: z.string(),
-  sonarr: z.string(),
-  lidarr: z.string(),
-  readarr: z.string(),
+  radarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
+  sonarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
+  lidarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
+  readarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
   unattended: z.boolean(),
 });
 
 export const tasksConfigSchema = z.object({
-  syncSchedule: z.string().min(1, 'Sync schedule is required'),
+  syncSchedule: z.string().refine(validateCronExpression, 'Invalid cron expression'),
   syncEnabled: z.boolean(),
 });
 

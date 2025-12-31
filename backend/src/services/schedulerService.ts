@@ -1,4 +1,3 @@
-import cron, { ScheduledTask } from 'node-cron';
 import { createRequire } from 'module';
 import { configService } from './configService.js';
 import { notificationService } from './notificationService.js';
@@ -7,9 +6,20 @@ import { executeSearchRun } from '../routes/search.js';
 import { SearchResults, Config } from '@scoutarr/shared';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
-// cron-parser is a CommonJS module, use createRequire to import it
+/**
+ * Import CommonJS modules using createRequire
+ * - cron-parser: Used for validation and calculating next run times
+ * - node-cron: Used for actual task scheduling
+ */
 const require = createRequire(import.meta.url);
-const { parseExpression } = require('cron-parser');
+const { CronExpressionParser } = require('cron-parser');
+const cron = require('node-cron');
+
+/** Type for node-cron ScheduledTask */
+interface ScheduledTask {
+  start: () => void;
+  stop: () => void;
+}
 
 interface SchedulerRunHistory {
   timestamp: string;
@@ -58,8 +68,11 @@ class SchedulerService {
   startGlobal(schedule: string): void {
     this.stopGlobal();
 
-    if (!cron.validate(schedule)) {
-      logger.error('❌ Invalid cron schedule', { schedule });
+    // Validate using cron-parser
+    try {
+      CronExpressionParser.parse(schedule);
+    } catch (error) {
+      logger.error('❌ Invalid cron schedule', { schedule, error: getErrorMessage(error) });
       return;
     }
 
@@ -189,7 +202,7 @@ class SchedulerService {
     }
 
     try {
-      const interval = parseExpression(schedule, {
+      const interval = CronExpressionParser.parse(schedule, {
         tz: 'UTC'
       });
       return interval.next().toDate();

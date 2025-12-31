@@ -1,4 +1,3 @@
-import cron, { ScheduledTask } from 'node-cron';
 import { createRequire } from 'module';
 import logger from '../utils/logger.js';
 import { configService } from './configService.js';
@@ -7,9 +6,20 @@ import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
-// cron-parser is a CommonJS module, use createRequire to import it
+/**
+ * Import CommonJS modules using createRequire
+ * - cron-parser: Used for validation and calculating next run times
+ * - node-cron: Used for actual task scheduling
+ */
 const require = createRequire(import.meta.url);
-const { parseExpression } = require('cron-parser');
+const { CronExpressionParser } = require('cron-parser');
+const cron = require('node-cron');
+
+/** Type for node-cron ScheduledTask */
+interface ScheduledTask {
+  start: () => void;
+  stop: () => void;
+}
 
 class SyncSchedulerService {
   private task: ScheduledTask | null = null;
@@ -26,9 +36,11 @@ class SyncSchedulerService {
 
     const schedule = config.tasks.syncSchedule;
 
-    // Validate cron expression
-    if (!cron.validate(schedule)) {
-      logger.error('❌ Invalid cron expression for sync schedule', { schedule });
+    // Validate cron expression using cron-parser
+    try {
+      CronExpressionParser.parse(schedule);
+    } catch (error) {
+      logger.error('❌ Invalid cron expression for sync schedule', { schedule, error: getErrorMessage(error) });
       return;
     }
 
@@ -203,7 +215,7 @@ class SyncSchedulerService {
   getNextRunTime(): Date | null {
     if (!this.currentSchedule) return null;
     try {
-      const interval = parseExpression(this.currentSchedule);
+      const interval = CronExpressionParser.parse(this.currentSchedule);
       return interval.next().toDate();
     } catch (error: unknown) {
       logger.debug('Could not parse sync cron for next run time', {
