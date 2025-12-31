@@ -29,7 +29,7 @@ services:
       - LOG_LEVEL=debug
     networks:
       - scoutarr-network
-    command: sh -c "apk add --no-cache python3 make g++ && npm install && npm run dev"
+    command: sh -c "npm install -g npm@11.7.0 && apk add --no-cache python3 make g++ && npm install && npm run dev"
     stdin_open: true
     tty: true
 

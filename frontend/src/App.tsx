@@ -3,12 +3,12 @@ import { Flex, Heading, Button, Separator, Box } from '@radix-ui/themes';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import MediaLibrary from './pages/MediaLibrary';
-import { GearIcon, HomeIcon, ArchiveIcon } from '@radix-ui/react-icons';
+import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeToggle } from './components/ThemeToggle';
 
 function NavigationLinks() {
-  const { handleNavigation, lastLibraryUrl } = useNavigation();
+  const { handleNavigation } = useNavigation();
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Always intercept navigation to allow guards to check
@@ -32,11 +32,6 @@ function NavigationLinks() {
         <Button variant="ghost" asChild>
           <Link to="/" onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/')}>
             <HomeIcon /> Home
-          </Link>
-        </Button>
-        <Button variant="ghost" asChild>
-          <Link to={lastLibraryUrl} onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, lastLibraryUrl)}>
-            <ArchiveIcon /> Library
           </Link>
         </Button>
         <Button variant="ghost" asChild>

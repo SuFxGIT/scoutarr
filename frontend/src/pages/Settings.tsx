@@ -34,6 +34,8 @@ import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, 
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
 import { TasksTab } from '../components/TasksTab';
+import { SchedulerLogs } from '../components/SchedulerLogs';
+import type { SchedulerHistoryEntry } from '../types/api';
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -79,6 +81,17 @@ function Settings() {
       return response.data;
     },
     refetchInterval: 60000, // Refresh every minute
+  });
+
+  // Load scheduler history for Logs tab
+  const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
+    queryKey: ['schedulerHistory'],
+    queryFn: async () => {
+      const response = await axios.get('/api/status/scheduler/history');
+      return response.data;
+    },
+    enabled: true,
+    staleTime: Infinity,
   });
 
   // Update local config when loaded config changes
@@ -754,6 +767,7 @@ function Settings() {
           <Flex align="center" justify="between" gap="3">
             <Tabs.List>
               <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
+              <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
               <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
@@ -1228,6 +1242,17 @@ function Settings() {
                 })()}
               </Grid>
             </Flex>
+          </Tabs.Content>
+
+          <Tabs.Content value="logs" style={{ paddingTop: '1rem' }}>
+            {config && (
+              <SchedulerLogs
+                schedulerStatus={schedulerStatus?.scheduler}
+                schedulerHistory={schedulerHistory}
+                config={config}
+                onRefreshHistory={refetchHistory}
+              />
+            )}
           </Tabs.Content>
 
           <Tabs.Content value="notifications" style={{ paddingTop: '1rem' }}>
