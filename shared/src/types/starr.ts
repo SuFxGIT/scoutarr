@@ -11,6 +11,7 @@ export interface StarrTag {
 export interface StarrQualityProfile {
   id: number;
   name: string;
+  cutoffFormatScore?: number;
 }
 
 /**

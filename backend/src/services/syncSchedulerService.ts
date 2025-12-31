@@ -97,6 +97,11 @@ class SyncSchedulerService {
             logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
             const profiles = await service.getQualityProfiles(instance);
 
+            // Sync quality profiles to database
+            logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
+            await statsService.syncQualityProfiles(instance.id, profiles);
+            logger.debug('✅ [Scoutarr DB] Quality profiles synced');
+
             // Fetch all media from API
             const allMedia = await service.getMedia(instance);
             logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
@@ -111,17 +116,8 @@ class SyncSchedulerService {
             );
             logger.debug('✅ Tag IDs converted to names');
 
-            // Add quality profile names to media items
-            logger.debug('🔧 Adding quality profile names');
-            const profileMap = new Map(profiles.map(p => [p.id, p.name]));
-            const mediaWithProfileNames = mediaWithTagNames.map(item => ({
-              ...item,
-              qualityProfileName: profileMap.get(item.qualityProfileId) || 'Unknown'
-            }));
-            logger.debug('✅ Quality profile names added');
-
             // Sync to database
-            await statsService.syncMediaToDatabase(instance.id, mediaWithProfileNames);
+            await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
             logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
             totalSynced += allMedia.length;
@@ -166,6 +162,11 @@ class SyncSchedulerService {
       logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
       const profiles = await service.getQualityProfiles(instance);
 
+      // Sync quality profiles to database
+      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
+      await statsService.syncQualityProfiles(instance.id, profiles);
+      logger.debug('✅ [Scoutarr DB] Quality profiles synced');
+
       // Fetch all media from API
       const allMedia = await service.getMedia(instance);
       logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
@@ -180,17 +181,8 @@ class SyncSchedulerService {
       );
       logger.debug('✅ Tag IDs converted to names');
 
-      // Add quality profile names to media items
-      logger.debug('🔧 Adding quality profile names');
-      const profileMap = new Map(profiles.map(p => [p.id, p.name]));
-      const mediaWithProfileNames = mediaWithTagNames.map(item => ({
-        ...item,
-        qualityProfileName: profileMap.get(item.qualityProfileId) || 'Unknown'
-      }));
-      logger.debug('✅ Quality profile names added');
-
       // Sync to database
-      await statsService.syncMediaToDatabase(instance.id, mediaWithProfileNames);
+      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
       logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
     } catch (error: unknown) {
       logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {
