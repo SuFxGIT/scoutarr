@@ -15,11 +15,10 @@ import {
 } from '@radix-ui/themes';
 import { PlayIcon, ChevronLeftIcon, ChevronRightIcon, TrashIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import humanizeDuration from 'humanize-duration';
+import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { formatAppName, getErrorMessage } from '../utils/helpers';
+import { formatAppName, getErrorMessage, calculateTimeUntil, formatSchedulerDuration } from '../utils/helpers';
 import { ITEMS_PER_PAGE, LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import type { SearchResults, Stats, SchedulerHistoryEntry } from '../types/api';
@@ -212,42 +211,24 @@ function Dashboard() {
     
     // Add global scheduler next run time if global scheduler is enabled
     if (schedulerEnabled && nextRun) {
-      const nextRunDate = new Date(nextRun);
-      const now = new Date();
-      const timeUntilNext = nextRunDate.getTime() - now.getTime();
-      
-      const timeString = humanizeDuration(timeUntilNext, {
-        round: true,
-        largest: 2,
-        units: ['d', 'h', 'm'],
-        conjunction: ' and ',
-        serialComma: false,
-      }) || 'less than a minute';
-      
+      const timeUntilNext = calculateTimeUntil(nextRun);
+      const timeString = formatSchedulerDuration(timeUntilNext);
+
       logs.push({
-        timestamp: format(now, 'HH:mm:ss'),
+        timestamp: format(new Date(), 'HH:mm:ss'),
         app: 'Scheduler',
-        message: `Next run (Global): ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
+        message: `Next run (Global): ${format(new Date(nextRun), 'PPpp')} (in ${timeString})`,
         type: 'info'
       });
     }
 
     // Add per-instance next run times
     if (instanceSchedules && Object.keys(instanceSchedules).length > 0) {
-      const now = new Date();
       Object.entries(instanceSchedules).forEach(([instanceKey, instanceStatus]) => {
         if (instanceStatus.nextRun) {
-          const nextRunDate = new Date(instanceStatus.nextRun);
-          const timeUntilNext = nextRunDate.getTime() - now.getTime();
-          
-          const timeString = humanizeDuration(timeUntilNext, {
-            round: true,
-            largest: 2,
-            units: ['d', 'h', 'm'],
-            conjunction: ' and ',
-            serialComma: false,
-          }) || 'less than a minute';
-          
+          const timeUntilNext = calculateTimeUntil(instanceStatus.nextRun);
+          const timeString = formatSchedulerDuration(timeUntilNext);
+
           // Get instance name from config if available, fallback to formatted key
           let instanceName = formatAppName(instanceKey);
           if (config) {
@@ -260,11 +241,11 @@ function Dashboard() {
               }
             }
           }
-          
+
           logs.push({
-            timestamp: format(now, 'HH:mm:ss'),
+            timestamp: format(new Date(), 'HH:mm:ss'),
             app: instanceKey,
-            message: `Next run (${instanceName}): ${format(nextRunDate, 'PPpp')} (in ${timeString})`,
+            message: `Next run (${instanceName}): ${format(new Date(instanceStatus.nextRun), 'PPpp')} (in ${timeString})`,
             type: 'info'
           });
         }
@@ -556,20 +537,15 @@ function Dashboard() {
           const allSearches = stats.recentSearches || [];
 
           // Filter by date
-          const now = new Date();
           const filteredSearches = allSearches.filter(search => {
             const searchDate = new Date(search.timestamp);
             switch (dateFilter) {
               case 'today':
-                return searchDate.toDateString() === now.toDateString();
+                return isToday(searchDate);
               case 'week':
-                const weekAgo = new Date(now);
-                weekAgo.setDate(weekAgo.getDate() - 7);
-                return searchDate >= weekAgo;
+                return isAfter(searchDate, subWeeks(new Date(), 1));
               case 'month':
-                const monthAgo = new Date(now);
-                monthAgo.setMonth(monthAgo.getMonth() - 1);
-                return searchDate >= monthAgo;
+                return isAfter(searchDate, subMonths(new Date(), 1));
               default:
                 return true;
             }

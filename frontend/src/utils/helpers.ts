@@ -1,4 +1,5 @@
 import humanizeDuration from 'humanize-duration';
+import { differenceInMilliseconds } from 'date-fns';
 
 /**
  * Format application name from instance ID or app name
@@ -34,9 +35,7 @@ export const getErrorMessage = (error: unknown): string => {
  * Returns 0 if the timestamp is in the past
  */
 export const calculateTimeUntil = (isoTimestamp: string): number => {
-  const target = new Date(isoTimestamp);
-  const now = new Date();
-  return Math.max(0, target.getTime() - now.getTime());
+  return Math.max(0, differenceInMilliseconds(new Date(isoTimestamp), new Date()));
 };
 
 /**
@@ -50,4 +49,18 @@ export const formatCountdown = (milliseconds: number): string => {
     round: true,
     largest: 2
   });
+};
+
+/**
+ * Format milliseconds into human-readable duration for scheduler messages
+ * Examples: "2 hours and 30 minutes", "3 days and 4 hours"
+ */
+export const formatSchedulerDuration = (milliseconds: number): string => {
+  return humanizeDuration(milliseconds, {
+    round: true,
+    largest: 2,
+    units: ['d', 'h', 'm'],
+    conjunction: ' and ',
+    serialComma: false,
+  }) || 'less than a minute';
 };

@@ -31,7 +31,7 @@ import {
   BadgeIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
@@ -332,13 +332,13 @@ function MediaLibrary() {
           const bProfile = b.qualityProfileName || '';
           comparison = aProfile.localeCompare(bProfile);
         } else if (columnKey === 'lastSearched') {
-          const aDate = a.lastSearched ? new Date(a.lastSearched).getTime() : 0;
-          const bDate = b.lastSearched ? new Date(b.lastSearched).getTime() : 0;
-          comparison = aDate - bDate;
+          const aDate = a.lastSearched ? new Date(a.lastSearched) : new Date(0);
+          const bDate = b.lastSearched ? new Date(b.lastSearched) : new Date(0);
+          comparison = compareAsc(aDate, bDate);
         } else if (columnKey === 'dateImported') {
-          const aDate = a.dateImported ? new Date(a.dateImported).getTime() : 0;
-          const bDate = b.dateImported ? new Date(b.dateImported).getTime() : 0;
-          comparison = aDate - bDate;
+          const aDate = a.dateImported ? new Date(a.dateImported) : new Date(0);
+          const bDate = b.dateImported ? new Date(b.dateImported) : new Date(0);
+          comparison = compareAsc(aDate, bDate);
         } else if (columnKey === 'customFormatScore') {
           const aScore = a.customFormatScore ?? -Infinity;
           const bScore = b.customFormatScore ?? -Infinity;
