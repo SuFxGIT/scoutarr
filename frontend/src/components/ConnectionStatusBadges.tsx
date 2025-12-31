@@ -22,7 +22,7 @@ export function ConnectionStatusBadges({ connectionStatus }: ConnectionStatusBad
     // Type guard to check if status has configured property
     const statusObj = status as Record<string, unknown>;
 
-    // Check if it's an app type directly (for backward compatibility or "not configured" case)
+    // Check if it's an app type directly (indicates "not configured" status)
     if (APP_TYPES.includes(key as typeof APP_TYPES[number])) {
       if (statusObj.configured === false) {
         groupedStatus[key].configured = false;

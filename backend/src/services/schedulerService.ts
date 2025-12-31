@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import cron, { ScheduledTask } from 'node-cron';
 import { createRequire } from 'module';
 import { configService } from './configService.js';
 import { notificationService } from './notificationService.js';
@@ -21,12 +21,12 @@ interface SchedulerRunHistory {
 }
 
 interface InstanceSchedulerTask {
-  task: cron.ScheduledTask;
+  task: ScheduledTask;
   schedule: string;
 }
 
 class SchedulerService {
-  private globalTask: cron.ScheduledTask | null = null;
+  private globalTask: ScheduledTask | null = null;
   private globalIsRunning = false;
   private globalCurrentSchedule: string | null = null;
 
@@ -126,7 +126,6 @@ class SchedulerService {
         await this.runGlobalScheduledSearch(schedule);
       },
       {
-        scheduled: true,
         timezone: 'UTC'
       }
     );
@@ -156,7 +155,6 @@ class SchedulerService {
         await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
       },
       {
-        scheduled: true,
         timezone: 'UTC'
       }
     );

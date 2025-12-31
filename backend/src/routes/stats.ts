@@ -5,7 +5,7 @@ import logger from '../utils/logger.js';
 
 export const statsRouter = express.Router();
 
-// Get stats (backward compatible - returns first 100 recent searches)
+// Get stats with recent searches (default limit: 100)
 statsRouter.get('/', async (req, res) => {
   logger.debug('📊 Stats requested', { limit: req.query.limit });
   try {

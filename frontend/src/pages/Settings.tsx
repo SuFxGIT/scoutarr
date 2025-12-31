@@ -683,7 +683,7 @@ function Settings() {
               <Text size="2">Enable Schedule</Text>
               <Switch
                 checked={instance.scheduleEnabled || false}
-                onCheckedChange={(checked) => {
+                onCheckedChange={(checked: boolean) => {
                   updateInstanceConfig(appType, instance.id, 'scheduleEnabled', checked);
                   if (checked && !instance.schedule) {
                     updateInstanceConfig(appType, instance.id, 'schedule', '0 */6 * * *');
@@ -697,8 +697,8 @@ function Settings() {
               <Text size="2" weight="medium">Schedule</Text>
               <Select.Root
                 value={instanceSchedulePreset}
-                onValueChange={(value) => {
-                  const schedule = value === 'custom' 
+                onValueChange={(value: string) => {
+                  const schedule = value === 'custom'
                     ? (instance.schedule || '0 */6 * * *')
                     : CRON_PRESETS[value];
                   updateInstanceConfig(appType, instance.id, 'schedule', schedule);
@@ -717,7 +717,7 @@ function Settings() {
                 <Flex direction="column" gap="1">
                   <TextField.Root
                     value={instance.schedule || '0 */6 * * *'}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       updateInstanceConfig(appType, instance.id, 'schedule', e.target.value);
                     }}
                     placeholder="0 */6 * * *"
@@ -777,7 +777,7 @@ function Settings() {
                 <Heading size="5">Applications</Heading>
                 <Flex gap="2" align="center">
                   <Text size="2" weight="medium">Application Type</Text>
-                  <Select.Root value={selectedAppType} onValueChange={(value) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
+                  <Select.Root value={selectedAppType} onValueChange={(value: string) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
                     <Select.Trigger style={{ minWidth: '120px' }} />
                     <Select.Content position="popper" sideOffset={5}>
                       <Select.Item value="radarr">
@@ -818,7 +818,7 @@ function Settings() {
                     return (
                     <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
                       <Flex direction="column" gap="2">
-                        <Collapsible.Root open={isExpanded} onOpenChange={(open) => {
+                        <Collapsible.Root open={isExpanded} onOpenChange={(open: boolean) => {
                           const newExpanded = new Set(expandedInstances);
                           if (open) {
                             newExpanded.add(instanceKey);
@@ -833,7 +833,7 @@ function Settings() {
                               p="3"
                               mb="0"
                               style={{ cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
                             >
                               <Flex align="center" gap="2" width="100%" justify="between">
                                 <Flex align="center" gap="2">
@@ -844,21 +844,21 @@ function Settings() {
                                   {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
                                     <Flex gap="1" align="center">
                                       <Text size="1" color="gray">Delete?</Text>
-                                      <Button 
-                                        variant="solid" 
-                                        color="red" 
+                                      <Button
+                                        variant="solid"
+                                        color="red"
                                         size="1"
-                                        onClick={(e) => {
+                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                           e.stopPropagation();
                                           removeInstance(selectedAppType, instance.id);
                                         }}
                                       >
                                         Yes
                                       </Button>
-                                      <Button 
-                                        variant="outline" 
+                                      <Button
+                                        variant="outline"
                                         size="1"
-                                        onClick={(e) => {
+                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                           e.stopPropagation();
                                           setConfirmingDeleteInstance(null);
                                         }}
@@ -868,11 +868,11 @@ function Settings() {
                                     </Flex>
                                   ) : (
                                     <Tooltip content="Delete this instance">
-                                      <Button 
-                                        variant="soft" 
-                                        color="red" 
+                                      <Button
+                                        variant="soft"
+                                        color="red"
                                         size="1"
-                                        onClick={(e) => {
+                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                           e.stopPropagation();
                                           setConfirmingDeleteInstance(`${selectedAppType}-${instance.id}`);
                                         }}
@@ -898,7 +898,7 @@ function Settings() {
                                 </Flex>
                                 <Switch
                                   checked={instance.enabled !== false}
-                                  onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
+                                  onCheckedChange={(checked: boolean) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
                                 />
                               </Flex>
                               <Separator />
@@ -911,7 +911,7 @@ function Settings() {
                                 </Flex>
                                 <TextField.Root
                                   value={instance.name || ''}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
                                   placeholder={`${appInfo.name} ${index + 1}`}
                                 />
                               </Flex>
@@ -926,7 +926,7 @@ function Settings() {
                                 <TextField.Root
                                   placeholder={`http://localhost:${appInfo.defaultPort}`}
                                   value={instance.url || ''}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
                                 />
                               </Flex>
 
@@ -941,7 +941,7 @@ function Settings() {
                                   type="password"
                                   placeholder="API Key"
                                   value={instance.apiKey || ''}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
                                 />
                               </Flex>
 
@@ -957,7 +957,7 @@ function Settings() {
                                 <TextField.Root
                                   type="number"
                                   value={(instance.count || 5).toString()}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
                                 />
                               </Flex>
 
@@ -970,7 +970,7 @@ function Settings() {
                                 </Flex>
                                 <TextField.Root
                                   value={instance.tagName || ''}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
                                 />
                               </Flex>
 
@@ -983,7 +983,7 @@ function Settings() {
                                 </Flex>
                                 <TextField.Root
                                   value={instance.ignoreTag || ''}
-                                  onChange={(e) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
                                 />
                               </Flex>
 
@@ -996,7 +996,7 @@ function Settings() {
                                 </Flex>
                                 <Switch
                                   checked={instance.monitored ?? true}
-                                  onCheckedChange={(checked) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
+                                  onCheckedChange={(checked: boolean) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
                                 />
                               </Flex>
 
@@ -1010,7 +1010,7 @@ function Settings() {
                                   </Flex>
                                   <Select.Root
                                     value={(instance as RadarrInstance).movieStatus || 'any'}
-                                    onValueChange={(value) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
+                                    onValueChange={(value: string) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
                                   >
                                     <Select.Trigger />
                                     <Select.Content position="popper" sideOffset={5}>
@@ -1033,7 +1033,7 @@ function Settings() {
                                   </Flex>
                                   <Select.Root
                                     value={(instance as SonarrInstance).seriesStatus || 'any'}
-                                    onValueChange={(value) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
+                                    onValueChange={(value: string) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
                                   >
                                     <Select.Trigger />
                                     <Select.Content position="popper" sideOffset={5}>
@@ -1056,7 +1056,7 @@ function Settings() {
                                   </Flex>
                                   <Select.Root
                                     value={selectedAppType === 'lidarr' ? ((instance as LidarrInstance).artistStatus || 'any') : ((instance as ReadarrInstance).authorStatus || 'any')}
-                                    onValueChange={(value) => {
+                                    onValueChange={(value: string) => {
                                       const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
                                       updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);
                                     }}
@@ -1090,7 +1090,7 @@ function Settings() {
                                           return (
                                             <Select.Root
                                               value={undefined}
-                                              onValueChange={() => {}}
+                                              onValueChange={(_value: string) => {}}
                                               disabled
                                             >
                                               <Select.Trigger placeholder="Configure URL and API Key first" style={{ width: '100%' }} />
@@ -1114,7 +1114,7 @@ function Settings() {
                                             return (
                                               <Select.Root
                                                 value={savedProfileName}
-                                                onValueChange={() => {}}
+                                                onValueChange={(_value: string) => {}}
                                                 disabled
                                               >
                                                 <Select.Trigger style={{ width: '100%' }} />
@@ -1127,7 +1127,7 @@ function Settings() {
                                           return (
                                             <Select.Root
                                               value={undefined}
-                                              onValueChange={() => {}}
+                                              onValueChange={(_value: string) => {}}
                                               disabled
                                             >
                                               <Select.Trigger placeholder="Click 'Test Connection' to load profiles" style={{ width: '100%' }} />
@@ -1143,7 +1143,7 @@ function Settings() {
                                         return (
                                           <Select.Root
                                             value={selectValue}
-                                            onValueChange={(value) => {
+                                            onValueChange={(value: string) => {
                                               // Save quality profile name only when a profile is selected (not "__all__")
                                               // Empty string means "all profiles" - backend will skip quality profile filtering
                                               // This matches upgradinatorr script behavior: empty/null/whitespace = no filtering
@@ -1234,7 +1234,7 @@ function Settings() {
                   </Flex>
                   <TextField.Root
                     value={config.notifications.discordWebhook}
-                    onChange={(e) => updateNotificationConfig('discordWebhook', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('discordWebhook', e.target.value)}
                   />
                 </Flex>
 
@@ -1247,7 +1247,7 @@ function Settings() {
                   </Flex>
                   <TextField.Root
                     value={config.notifications.notifiarrPassthroughWebhook}
-                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
                   />
                 </Flex>
 
@@ -1260,7 +1260,7 @@ function Settings() {
                   </Flex>
                   <TextField.Root
                     value={config.notifications.notifiarrPassthroughDiscordChannelId}
-                    onChange={(e) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
                   />
                 </Flex>
 
@@ -1273,7 +1273,7 @@ function Settings() {
                   </Flex>
                   <TextField.Root
                     value={config.notifications.pushoverUserKey}
-                    onChange={(e) => updateNotificationConfig('pushoverUserKey', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverUserKey', e.target.value)}
                   />
                 </Flex>
 
@@ -1286,7 +1286,7 @@ function Settings() {
                   </Flex>
                   <TextField.Root
                     value={config.notifications.pushoverApiToken}
-                    onChange={(e) => updateNotificationConfig('pushoverApiToken', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverApiToken', e.target.value)}
                   />
                 </Flex>
               </Flex>
@@ -1313,7 +1313,7 @@ function Settings() {
                   </Flex>
                   <Switch
                     checked={config.scheduler?.enabled || false}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       if (!config.scheduler) {
                         setConfig({
                           ...config,
@@ -1338,7 +1338,7 @@ function Settings() {
                   </Flex>
                   <Switch
                     checked={config.scheduler?.unattended || false}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       if (!config.scheduler) {
                         setConfig({
                           ...config,
@@ -1358,9 +1358,9 @@ function Settings() {
                   <Text size="2" weight="medium">Schedule</Text>
                   <Select.Root
                     value={schedulerPreset}
-                    onValueChange={(value) => {
+                    onValueChange={(value: string) => {
                       setSchedulerPreset(value);
-                      const schedule = value === 'custom' 
+                      const schedule = value === 'custom'
                         ? (config.scheduler?.schedule || '0 */6 * * *')
                         : CRON_PRESETS[value];
                       if (!config.scheduler) {
@@ -1389,7 +1389,7 @@ function Settings() {
                     <Flex direction="column" gap="1">
                       <TextField.Root
                         value={config.scheduler?.schedule || '0 */6 * * *'}
-                        onChange={(e) => {
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           if (!config.scheduler) {
                             setConfig({
                               ...config,
@@ -1465,7 +1465,7 @@ function Settings() {
                   </Flex>
                   <Switch
                     checked={config.tasks?.syncEnabled ?? true}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean) => {
                       if (!config.tasks) {
                         setConfig({
                           ...config,
@@ -1493,7 +1493,7 @@ function Settings() {
                     min="1"
                     max="168"
                     value={(config.tasks?.syncInterval ?? 24).toString()}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const value = parseInt(e.target.value) || 24;
                       if (!config.tasks) {
                         setConfig({
@@ -1567,7 +1567,7 @@ function Settings() {
       </Flex>
 
       {/* Unsaved Changes Dialog */}
-      <AlertDialog.Root open={showUnsavedDialog} onOpenChange={(open) => {
+      <AlertDialog.Root open={showUnsavedDialog} onOpenChange={(open: boolean) => {
         if (!open) {
           cancelDiscardChanges();
         }

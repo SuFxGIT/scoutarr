@@ -91,13 +91,12 @@ class StatsService {
         title TEXT NOT NULL,
         monitored INTEGER NOT NULL,
         tags TEXT NOT NULL,
-        quality_profile_id INTEGER NOT NULL,
+        quality_profile_name TEXT,
         status TEXT NOT NULL,
         last_search_time TEXT,
         added TEXT,
         date_imported TEXT,
         has_file INTEGER NOT NULL DEFAULT 0,
-        custom_score REAL,
         custom_format_score INTEGER,
         raw_data TEXT,
         synced_at TEXT NOT NULL,
@@ -120,94 +119,6 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_media_library_status ON media_library(status);
       CREATE INDEX IF NOT EXISTS idx_media_library_synced_at ON media_library(synced_at DESC);
     `);
-
-    // Migration: Add custom_format_score column if it doesn't exist
-    try {
-      // Check if column exists
-      const columns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
-      const hasCustomFormatScore = columns.some(col => col.name === 'custom_format_score');
-
-      if (!hasCustomFormatScore) {
-        logger.info('📦 Adding custom_format_score column to media_library table');
-        this.db.exec('ALTER TABLE media_library ADD COLUMN custom_format_score INTEGER');
-        logger.info('✅ custom_format_score column added successfully');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error checking/adding custom_format_score column', {
-        error: getErrorMessage(error)
-      });
-    }
-
-    // Migration: Remove redundant columns from media_library
-    // Note: SQLite doesn't support DROP COLUMN in older versions, so we'll recreate the table
-    try {
-      const columns = this.db.pragma('table_info(media_library)') as Array<{ name: string }>;
-      const hasQualityProfileId = columns.some(col => col.name === 'quality_profile_id');
-      const hasCustomScore = columns.some(col => col.name === 'custom_score');
-
-      if (hasQualityProfileId || hasCustomScore) {
-        logger.info('🔄 Migrating media_library table to remove redundant columns');
-
-        // Create new table without quality_profile_id and custom_score
-        this.db.exec(`
-          CREATE TABLE media_library_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            instance_id TEXT NOT NULL,
-            media_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            monitored INTEGER NOT NULL,
-            tags TEXT NOT NULL,
-            quality_profile_name TEXT,
-            status TEXT NOT NULL,
-            last_search_time TEXT,
-            added TEXT,
-            date_imported TEXT,
-            has_file INTEGER NOT NULL DEFAULT 0,
-            custom_format_score INTEGER,
-            raw_data TEXT,
-            synced_at TEXT NOT NULL,
-            UNIQUE(instance_id, media_id),
-            FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
-          )
-        `);
-
-        // Copy data from old table to new table
-        this.db.exec(`
-          INSERT INTO media_library_new (
-            id, instance_id, media_id, title, monitored, tags, quality_profile_name,
-            status, last_search_time, added, date_imported, has_file,
-            custom_format_score, raw_data, synced_at
-          )
-          SELECT
-            id, instance_id, media_id, title, monitored, tags, quality_profile_name,
-            status, last_search_time, added, date_imported, has_file,
-            custom_format_score, raw_data, synced_at
-          FROM media_library
-        `);
-
-        // Drop old table
-        this.db.exec('DROP TABLE media_library');
-
-        // Rename new table
-        this.db.exec('ALTER TABLE media_library_new RENAME TO media_library');
-
-        // Recreate indexes
-        this.db.exec(`
-          CREATE INDEX IF NOT EXISTS idx_media_library_instance ON media_library(instance_id);
-          CREATE INDEX IF NOT EXISTS idx_media_library_media_id ON media_library(media_id);
-          CREATE INDEX IF NOT EXISTS idx_media_library_monitored ON media_library(monitored);
-          CREATE INDEX IF NOT EXISTS idx_media_library_has_file ON media_library(has_file);
-          CREATE INDEX IF NOT EXISTS idx_media_library_status ON media_library(status);
-          CREATE INDEX IF NOT EXISTS idx_media_library_synced_at ON media_library(synced_at DESC);
-        `);
-
-        logger.info('✅ media_library table migrated successfully (removed quality_profile_id and custom_score)');
-      }
-    } catch (error: unknown) {
-      logger.warn('⚠️  Error migrating media_library table', {
-        error: getErrorMessage(error)
-      });
-    }
 
   }
 

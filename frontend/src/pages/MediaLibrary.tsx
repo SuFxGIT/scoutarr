@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import DataGrid, { Column, SelectColumn, SortColumn } from 'react-data-grid';
+import { DataGrid, Column, SelectColumn, SortColumn } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
 import {
@@ -487,7 +487,7 @@ function MediaLibrary() {
             <TextField.Root
               placeholder="Search by title, status, quality profile, last searched, or date imported..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               size="2"
             >
               <TextField.Slot>
@@ -535,7 +535,7 @@ function MediaLibrary() {
                   className="media-library-grid"
                   columns={columns}
                   rows={filteredAndSortedMedia}
-                  rowKeyGetter={(row) => row.id}
+                  rowKeyGetter={(row: MediaLibraryItem & { formattedLastSearched: string; formattedDateImported: string }) => row.id}
                   selectedRows={selectedMediaIds}
                   onSelectedRowsChange={setSelectedMediaIds}
                   sortColumns={sortColumns}

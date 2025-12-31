@@ -43,8 +43,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Serve frontend for all other routes
-app.get('*', (req, res) => {
+// Serve frontend for all other routes (SPA fallback)
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 });
 

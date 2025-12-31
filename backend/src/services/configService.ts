@@ -97,7 +97,7 @@ class ConfigService {
       const parsed = JSON.parse(content) as ParsedConfig;
       logger.debug('✅ Config JSON parsed successfully');
       
-      // Normalize config: ensure lidarr and readarr arrays exist for backward compatibility
+      // Normalize config: ensure all application arrays exist
       if (!parsed.applications) {
         logger.debug('⚠️  No applications in config, initializing empty object');
         parsed.applications = {
@@ -122,7 +122,7 @@ class ConfigService {
         parsed.applications.readarr = [];
       }
 
-      // Normalize tasks config for backward compatibility
+      // Normalize tasks config with defaults if missing
       if (!parsed.tasks) {
         logger.debug('⚠️  No tasks config found, initializing with defaults');
         parsed.tasks = {

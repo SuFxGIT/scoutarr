@@ -589,7 +589,7 @@ function Dashboard() {
                   <Flex align="center" gap="3">
                     <Flex align="center" gap="2">
                       <Text size="2" weight="medium">Filter:</Text>
-                      <Select.Root value={dateFilter} onValueChange={(value) => {
+                      <Select.Root value={dateFilter} onValueChange={(value: string) => {
                         setDateFilter(value as typeof dateFilter);
                         setCurrentPage(1);
                       }}>
@@ -639,8 +639,8 @@ function Dashboard() {
                               transition: 'background-color 0.15s'
                             }}
                             onClick={() => setSelectedSearch(search)}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-2)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => e.currentTarget.style.backgroundColor = 'var(--gray-2)'}
+                            onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
                             <Flex align="center" gap="3" justify="between">
                               <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0 }}>
@@ -752,7 +752,7 @@ function Dashboard() {
         {/* Dialog for viewing all items in a recent search entry */}
         <Dialog.Root
           open={!!selectedSearch}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             if (!open) {
               setSelectedSearch(null);
             }

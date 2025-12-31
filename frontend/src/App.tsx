@@ -21,7 +21,7 @@ function NavigationLinks() {
       <Link
         to="/"
         style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }}
-        onClick={(e) => handleLinkClick(e, '/')}
+        onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/')}
       >
         <Flex align="center" gap="3">
           <img src="/headerlogo.png" alt="scoutarr" style={{ height: '2.5rem' }} />
@@ -30,17 +30,17 @@ function NavigationLinks() {
       </Link>
       <Flex gap="3" align="center">
         <Button variant="ghost" asChild>
-          <Link to="/" onClick={(e) => handleLinkClick(e, '/')}>
+          <Link to="/" onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/')}>
             <HomeIcon /> Home
           </Link>
         </Button>
         <Button variant="ghost" asChild>
-          <Link to={lastLibraryUrl} onClick={(e) => handleLinkClick(e, lastLibraryUrl)}>
+          <Link to={lastLibraryUrl} onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, lastLibraryUrl)}>
             <ArchiveIcon /> Library
           </Link>
         </Button>
         <Button variant="ghost" asChild>
-          <Link to="/settings" onClick={(e) => handleLinkClick(e, '/settings')}>
+          <Link to="/settings" onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/settings')}>
             <GearIcon /> Settings
           </Link>
         </Button>
@@ -73,12 +73,7 @@ function AppContent() {
 
 function App() {
   return (
-    <Router
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
+    <Router>
       <NavigationProvider>
         <AppContent />
       </NavigationProvider>
