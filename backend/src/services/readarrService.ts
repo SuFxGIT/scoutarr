@@ -6,7 +6,6 @@ import { fetchCustomFormatScores } from '../utils/customFormatUtils.js';
 
 export interface ReadarrAuthor extends FilterableMedia {
   authorName: string;
-  title?: string; // Alias for authorName for consistency
 }
 
 class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
@@ -26,10 +25,7 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
       const client = this.createClient(config);
       logger.debug('📡 [Readarr API] Fetching authors', { url: config.url });
       const response = await client.get<ReadarrAuthor[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      const authors = response.data.map(author => ({
-        ...author,
-        title: author.authorName || author.title
-      }));
+      const authors = response.data;
       logger.debug('📡 [Readarr API] Fetched authors', { count: authors.length });
 
       // Readarr's /api/v1/author endpoint doesn't include customFormatScore in bookFiles

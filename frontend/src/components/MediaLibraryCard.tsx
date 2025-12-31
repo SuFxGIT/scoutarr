@@ -40,9 +40,7 @@ import { fetchMediaLibrary, searchMedia } from '../services/mediaLibraryService'
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
-
-const APP_TYPES = ['radarr', 'sonarr', 'lidarr', 'readarr'] as const;
-type AppType = typeof APP_TYPES[number];
+import { APP_TYPES, AppType } from '../utils/constants';
 
 // Helper functions for status icons
 function getStatusIcon(status: string) {

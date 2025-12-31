@@ -88,6 +88,51 @@ class SyncSchedulerService {
     this.start(skipInitialSync);
   }
 
+  /**
+   * Sync a single instance with all its media and profiles
+   * This is the core sync logic used by both syncAllInstances and syncInstance
+   */
+  private async syncSingleInstance(
+    appType: AppType,
+    instance: { id: string; name?: string; [key: string]: any }
+  ): Promise<number> {
+    logger.info(`🔄 Syncing ${appType} instance: ${instance.name || instance.id}`);
+
+    const service = getServiceForApp(appType as AppType);
+
+    // Upsert instance record
+    await statsService.upsertInstance(instance.id, appType, instance.name);
+
+    // Fetch quality profiles from API
+    logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
+    const profiles = await service.getQualityProfiles(instance);
+
+    // Sync quality profiles to database
+    logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
+    await statsService.syncQualityProfiles(instance.id, profiles);
+    logger.debug('✅ [Scoutarr DB] Quality profiles synced');
+
+    // Fetch all media from API
+    const allMedia = await service.getMedia(instance);
+    logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
+
+    // Convert tag IDs to names before syncing
+    logger.debug('🏷️  Converting tag IDs to names');
+    const mediaWithTagNames = await Promise.all(
+      allMedia.map(async (item) => {
+        const tagNames = await service.convertTagIdsToNames(instance, item.tags);
+        return { ...item, tags: tagNames };
+      })
+    );
+    logger.debug('✅ Tag IDs converted to names');
+
+    // Sync to database
+    await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
+    logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
+
+    return allMedia.length;
+  }
+
   async syncAllInstances(): Promise<void> {
     if (this.isRunning) {
       logger.warn('⚠️  Sync already in progress, skipping');
@@ -107,41 +152,8 @@ class SyncSchedulerService {
 
         for (const instance of instances) {
           try {
-            logger.info(`🔄 Syncing ${appType} instance: ${instance.name || instance.id}`);
-
-            const service = getServiceForApp(appType as AppType);
-
-            // Upsert instance record
-            await statsService.upsertInstance(instance.id, appType, instance.name);
-
-            // Fetch quality profiles from API
-            logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
-            const profiles = await service.getQualityProfiles(instance);
-
-            // Sync quality profiles to database
-            logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-            await statsService.syncQualityProfiles(instance.id, profiles);
-            logger.debug('✅ [Scoutarr DB] Quality profiles synced');
-
-            // Fetch all media from API
-            const allMedia = await service.getMedia(instance);
-            logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
-
-            // Convert tag IDs to names before syncing
-            logger.debug('🏷️  Converting tag IDs to names');
-            const mediaWithTagNames = await Promise.all(
-              allMedia.map(async (item) => {
-                const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-                return { ...item, tags: tagNames };
-              })
-            );
-            logger.debug('✅ Tag IDs converted to names');
-
-            // Sync to database
-            await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
-            logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
-
-            totalSynced += allMedia.length;
+            const synced = await this.syncSingleInstance(appType as AppType, instance);
+            totalSynced += synced;
           } catch (error: unknown) {
             logger.error(`❌ Error syncing ${appType} instance ${instance.id}`, {
               error: getErrorMessage(error),
@@ -174,37 +186,7 @@ class SyncSchedulerService {
         throw new Error(`Instance ${instanceId} not found for ${appType}`);
       }
 
-      const service = getServiceForApp(appType);
-
-      // Upsert instance record
-      await statsService.upsertInstance(instance.id, appType, instance.name);
-
-      // Fetch quality profiles from API
-      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
-      const profiles = await service.getQualityProfiles(instance);
-
-      // Sync quality profiles to database
-      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-      await statsService.syncQualityProfiles(instance.id, profiles);
-      logger.debug('✅ [Scoutarr DB] Quality profiles synced');
-
-      // Fetch all media from API
-      const allMedia = await service.getMedia(instance);
-      logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
-
-      // Convert tag IDs to names before syncing
-      logger.debug('🏷️  Converting tag IDs to names');
-      const mediaWithTagNames = await Promise.all(
-        allMedia.map(async (item) => {
-          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-          return { ...item, tags: tagNames };
-        })
-      );
-      logger.debug('✅ Tag IDs converted to names');
-
-      // Sync to database
-      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
-      logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
+      await this.syncSingleInstance(appType, instance);
     } catch (error: unknown) {
       logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {
         error: getErrorMessage(error)

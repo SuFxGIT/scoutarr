@@ -9,7 +9,7 @@ import logger from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
-import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig } from '@scoutarr/shared';
+import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig } from '@scoutarr/shared';
 
 export const mediaLibraryRouter = express.Router();
 
@@ -261,29 +261,23 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     // Get service for this app type
     const service = getServiceForApp(appType as AppType);
 
-    // Search based on app type
+    // Search media using the appropriate method for this app type
+    // Radarr supports bulk search, others require sequential
     if (appType === 'radarr') {
-      // Radarr supports bulk search
       await radarrService.searchMovies(instance as RadarrInstance, mediaIds);
-      logger.debug('✅ [Scoutarr] Bulk search started for Radarr', { count: mediaIds.length });
-    } else if (appType === 'sonarr') {
-      // Sonarr requires one-by-one
+      logger.debug('✅ [Scoutarr] Bulk search started', { appType, count: mediaIds.length });
+    } else {
+      // Sonarr, Lidarr, and Readarr require one-by-one search
       for (const mediaId of mediaIds) {
-        await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
+        if (appType === 'sonarr') {
+          await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
+        } else if (appType === 'lidarr') {
+          await lidarrService.searchArtists(instance as LidarrInstance, mediaId);
+        } else if (appType === 'readarr') {
+          await readarrService.searchAuthors(instance as ReadarrInstance, mediaId);
+        }
       }
-      logger.debug('✅ [Scoutarr] Sequential search started for Sonarr', { count: mediaIds.length });
-    } else if (appType === 'lidarr') {
-      // Lidarr requires one-by-one
-      for (const mediaId of mediaIds) {
-        await lidarrService.searchArtists(instance as LidarrInstance, mediaId);
-      }
-      logger.debug('✅ [Scoutarr] Sequential search started for Lidarr', { count: mediaIds.length });
-    } else if (appType === 'readarr') {
-      // Readarr requires one-by-one
-      for (const mediaId of mediaIds) {
-        await readarrService.searchAuthors(instance as ReadarrInstance, mediaId);
-      }
-      logger.debug('✅ [Scoutarr] Sequential search started for Readarr', { count: mediaIds.length });
+      logger.debug('✅ [Scoutarr] Sequential search started', { appType, count: mediaIds.length });
     }
 
     // Add tag to searched items
@@ -325,5 +319,3 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     });
   }
 });
-
-export default mediaLibraryRouter;

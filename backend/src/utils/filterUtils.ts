@@ -51,6 +51,11 @@ export async function applyCommonFilters<T extends FilterableMedia>(
   if (config.monitored !== undefined) {
     const before = filtered.length;
     filtered = filtered.filter(m => m.monitored === config.monitored);
+    logger.debug('🔽 Filtered by monitored status', {
+      before,
+      after: filtered.length,
+      monitored: config.monitored
+    });
   }
 
   // Filter by tag name - always only include media WITHOUT the tag for primary selection.
@@ -58,18 +63,39 @@ export async function applyCommonFilters<T extends FilterableMedia>(
   // is found) is handled at the scheduler layer, not here.
   const tagName = config.tagName;
   if (tagName) {
+    const before = filtered.length;
     filtered = filtered.filter(m => !m.tags.includes(tagName));
+    logger.debug('🔽 Filtered by tag exclusion', {
+      before,
+      after: filtered.length,
+      tagName,
+      appName
+    });
   }
 
   // Filter by quality profile name
   if (config.qualityProfileName) {
+    const before = filtered.length;
     filtered = filtered.filter(m => m.qualityProfileName === config.qualityProfileName);
+    logger.debug('🔽 Filtered by quality profile', {
+      before,
+      after: filtered.length,
+      profileName: config.qualityProfileName,
+      appName
+    });
   }
 
   // Filter out media with ignore tag (by name)
   if (config.ignoreTag) {
     const ignoreTag = config.ignoreTag;
+    const before = filtered.length;
     filtered = filtered.filter(m => !m.tags.includes(ignoreTag));
+    logger.debug('🔽 Filtered by ignore tag', {
+      before,
+      after: filtered.length,
+      ignoreTag,
+      appName
+    });
   }
 
   return filtered;

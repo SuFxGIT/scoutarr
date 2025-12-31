@@ -6,7 +6,6 @@ import { fetchCustomFormatScores } from '../utils/customFormatUtils.js';
 
 export interface LidarrArtist extends FilterableMedia {
   artistName: string;
-  title?: string; // Alias for artistName for consistency
 }
 
 class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
@@ -26,10 +25,7 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
       const client = this.createClient(config);
       logger.debug('📡 [Lidarr API] Fetching artists', { url: config.url });
       const response = await client.get<LidarrArtist[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
-      const artists = response.data.map(artist => ({
-        ...artist,
-        title: artist.artistName || artist.title
-      }));
+      const artists = response.data;
       logger.debug('📡 [Lidarr API] Fetched artists', { count: artists.length });
 
       // Lidarr's /api/v1/artist endpoint doesn't include customFormatScore in trackFiles
