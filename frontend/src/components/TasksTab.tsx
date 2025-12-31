@@ -108,15 +108,6 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
         newCountdowns['global-scheduler'] = calculateTimeUntil(schedulerStatus.scheduler.nextRun);
       }
 
-      // Per-instance schedulers
-      if (schedulerStatus?.scheduler?.instances) {
-        Object.entries(schedulerStatus.scheduler.instances).forEach(([instanceId, instance]) => {
-          if (instance.nextRun) {
-            newCountdowns[`instance-${instanceId}`] = calculateTimeUntil(instance.nextRun);
-          }
-        });
-      }
-
       // Sync scheduler
       if (schedulerStatus?.sync?.nextRun) {
         newCountdowns['sync-scheduler'] = calculateTimeUntil(schedulerStatus.sync.nextRun);
@@ -171,110 +162,6 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                 }}
                 countdown={countdowns['global-scheduler'] || 0}
               />
-
-              {/* Radarr Instances */}
-              {config.applications.radarr.map((instance) => (
-                instance.schedule && (
-                  <TaskRow
-                    key={instance.id}
-                    name={`${instance.name || instance.id} - Upgrade Search`}
-                    description={`Searches for movie upgrades in ${instance.name || instance.id}`}
-                    cronExpression={instance.schedule}
-                    enabled={instance.scheduleEnabled || false}
-                    nextRun={schedulerStatus?.scheduler?.instances?.[instance.id]?.nextRun || null}
-                    onToggle={(enabled) => {
-                      onConfigChange({
-                        ...config,
-                        applications: {
-                          ...config.applications,
-                          radarr: config.applications.radarr.map((inst) =>
-                            inst.id === instance.id ? { ...inst, scheduleEnabled: enabled } : inst
-                          )
-                        }
-                      });
-                    }}
-                    countdown={countdowns[`instance-${instance.id}`] || 0}
-                  />
-                )
-              ))}
-
-              {/* Sonarr Instances */}
-              {config.applications.sonarr.map((instance) => (
-                instance.schedule && (
-                  <TaskRow
-                    key={instance.id}
-                    name={`${instance.name || instance.id} - Upgrade Search`}
-                    description={`Searches for series upgrades in ${instance.name || instance.id}`}
-                    cronExpression={instance.schedule}
-                    enabled={instance.scheduleEnabled || false}
-                    nextRun={schedulerStatus?.scheduler?.instances?.[instance.id]?.nextRun || null}
-                    onToggle={(enabled) => {
-                      onConfigChange({
-                        ...config,
-                        applications: {
-                          ...config.applications,
-                          sonarr: config.applications.sonarr.map((inst) =>
-                            inst.id === instance.id ? { ...inst, scheduleEnabled: enabled } : inst
-                          )
-                        }
-                      });
-                    }}
-                    countdown={countdowns[`instance-${instance.id}`] || 0}
-                  />
-                )
-              ))}
-
-              {/* Lidarr Instances */}
-              {config.applications.lidarr.map((instance) => (
-                instance.schedule && (
-                  <TaskRow
-                    key={instance.id}
-                    name={`${instance.name || instance.id} - Upgrade Search`}
-                    description={`Searches for artist upgrades in ${instance.name || instance.id}`}
-                    cronExpression={instance.schedule}
-                    enabled={instance.scheduleEnabled || false}
-                    nextRun={schedulerStatus?.scheduler?.instances?.[instance.id]?.nextRun || null}
-                    onToggle={(enabled) => {
-                      onConfigChange({
-                        ...config,
-                        applications: {
-                          ...config.applications,
-                          lidarr: config.applications.lidarr.map((inst) =>
-                            inst.id === instance.id ? { ...inst, scheduleEnabled: enabled } : inst
-                          )
-                        }
-                      });
-                    }}
-                    countdown={countdowns[`instance-${instance.id}`] || 0}
-                  />
-                )
-              ))}
-
-              {/* Readarr Instances */}
-              {config.applications.readarr.map((instance) => (
-                instance.schedule && (
-                  <TaskRow
-                    key={instance.id}
-                    name={`${instance.name || instance.id} - Upgrade Search`}
-                    description={`Searches for author upgrades in ${instance.name || instance.id}`}
-                    cronExpression={instance.schedule}
-                    enabled={instance.scheduleEnabled || false}
-                    nextRun={schedulerStatus?.scheduler?.instances?.[instance.id]?.nextRun || null}
-                    onToggle={(enabled) => {
-                      onConfigChange({
-                        ...config,
-                        applications: {
-                          ...config.applications,
-                          readarr: config.applications.readarr.map((inst) =>
-                            inst.id === instance.id ? { ...inst, scheduleEnabled: enabled } : inst
-                          )
-                        }
-                      });
-                    }}
-                    countdown={countdowns[`instance-${instance.id}`] || 0}
-                  />
-                )
-              ))}
 
               {/* Media Library Sync */}
               <TaskRow

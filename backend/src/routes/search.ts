@@ -182,11 +182,8 @@ export async function executeSearchRun(): Promise<SearchResults> {
 
   // Process all app types
   for (const appType of APP_TYPES) {
-    // Get all configured instances, then filter out those with per-instance scheduling enabled
-    // Global scheduler should only process instances without per-instance schedules
-    const allInstances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-    const instances = allInstances.filter((instance: StarrInstanceConfig) => !instance.scheduleEnabled);
-    
+    const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
+
     await processAppInstances(instances, appType, results, unattended);
   }
 
@@ -194,45 +191,6 @@ export async function executeSearchRun(): Promise<SearchResults> {
   await saveStatsForResults(results);
 
   logger.info('✅ Search run execution completed', {
-    resultCount: Object.keys(results).length,
-    totalSearched: Object.values(results).reduce((sum, r) => sum + (r.searched || 0), 0)
-  });
-
-  return results;
-}
-
-// Execute search run for a single instance
-export async function executeSearchRunForInstance(appType: AppType, instanceId: string): Promise<SearchResults> {
-  logger.info('🔍 Starting search run for single instance', { appType, instanceId });
-  const config = configService.getConfig();
-  const results: SearchResults = {};
-  
-  // Use scheduler's unattended mode setting (per-instance scheduling still uses global unattended mode)
-  const unattended = config.scheduler?.unattended || false;
-  logger.debug('⚙️  Instance search configuration', { unattended });
-
-  // Get instances for the app type
-  const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-  logger.debug(`📋 Found ${instances.length} configured ${appType} instances`);
-  
-  const instance = instances.find(inst => inst.id === instanceId);
-  if (!instance) {
-    logger.error('❌ Instance not found', { appType, instanceId, availableInstances: instances.map(i => i.id) });
-    throw new Error(`Instance ${instanceId} not found for ${appType}`);
-  }
-
-  logger.debug('✅ Instance found, processing', { instanceName: instance.name || instanceId });
-  // Process the single instance
-  await processAppInstances([instance], appType, results, unattended);
-
-  // Save stats for successful searches
-  logger.debug('💾 Saving stats for instance search results');
-  await saveStatsForResults(results);
-  logger.debug('✅ Stats saved');
-
-  logger.info('✅ Instance search run completed', {
-    appType,
-    instanceId,
     resultCount: Object.keys(results).length,
     totalSearched: Object.values(results).reduce((sum, r) => sum + (r.searched || 0), 0)
   });

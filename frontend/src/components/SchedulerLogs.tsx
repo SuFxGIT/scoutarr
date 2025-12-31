@@ -23,15 +23,9 @@ import type { Config } from '../types/config';
 interface SchedulerLogsProps {
   schedulerStatus?: {
     enabled: boolean;
-    globalEnabled: boolean;
     running: boolean;
     schedule: string | null;
     nextRun: string | null;
-    instances: Record<string, {
-      schedule: string;
-      nextRun: string | null;
-      running: boolean
-    }>;
   };
   schedulerHistory: SchedulerHistoryEntry[];
   config?: Config;
@@ -90,12 +84,11 @@ export function SchedulerLogs({ schedulerStatus, schedulerHistory, config, onRef
   const convertHistoryToLogs = (
     history: SchedulerHistoryEntry[],
     nextRun: string | null,
-    schedulerEnabled: boolean,
-    instanceSchedules?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>
+    schedulerEnabled: boolean
   ): Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> => {
     const logs: Array<{ timestamp: string; app: string; message: string; type: 'success' | 'error' | 'info' }> = [];
 
-    // Add global scheduler next run time if global scheduler is enabled
+    // Add scheduler next run time if scheduler is enabled
     if (schedulerEnabled && nextRun) {
       const timeUntilNext = calculateTimeUntil(nextRun);
       const timeString = formatSchedulerDuration(timeUntilNext);
@@ -103,38 +96,8 @@ export function SchedulerLogs({ schedulerStatus, schedulerHistory, config, onRef
       logs.push({
         timestamp: format(new Date(), 'HH:mm:ss'),
         app: 'Scheduler',
-        message: `Next run (Global): ${format(new Date(nextRun), 'PPpp')} (in ${timeString})`,
+        message: `Next run: ${format(new Date(nextRun), 'PPpp')} (in ${timeString})`,
         type: 'info'
-      });
-    }
-
-    // Add per-instance next run times
-    if (instanceSchedules && Object.keys(instanceSchedules).length > 0) {
-      Object.entries(instanceSchedules).forEach(([instanceKey, instanceStatus]) => {
-        if (instanceStatus.nextRun) {
-          const timeUntilNext = calculateTimeUntil(instanceStatus.nextRun);
-          const timeString = formatSchedulerDuration(timeUntilNext);
-
-          // Get instance name from config if available, fallback to formatted key
-          let instanceName = formatAppName(instanceKey);
-          if (config) {
-            const [appType, instanceId] = instanceKey.split('-');
-            const appConfigs = config.applications[appType as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'];
-            if (Array.isArray(appConfigs)) {
-              const instance = appConfigs.find(inst => inst.id === instanceId);
-              if (instance?.name) {
-                instanceName = instance.name;
-              }
-            }
-          }
-
-          logs.push({
-            timestamp: format(new Date(), 'HH:mm:ss'),
-            app: instanceKey,
-            message: `Next run (${instanceName}): ${format(new Date(instanceStatus.nextRun), 'PPpp')} (in ${timeString})`,
-            type: 'info'
-          });
-        }
       });
     }
 
@@ -198,8 +161,7 @@ export function SchedulerLogs({ schedulerStatus, schedulerHistory, config, onRef
   const logs = convertHistoryToLogs(
     schedulerHistory,
     scheduler?.nextRun || null,
-    scheduler?.globalEnabled || false,
-    scheduler?.instances
+    scheduler?.enabled || false
   );
 
   return (

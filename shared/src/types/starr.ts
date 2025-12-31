@@ -29,8 +29,6 @@ export interface BaseStarrInstance {
   monitored: boolean;
   qualityProfileName: string;
   enabled?: boolean;
-  schedule?: string;
-  scheduleEnabled?: boolean;
 }
 
 /**

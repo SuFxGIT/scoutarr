@@ -37,8 +37,6 @@ function createInstanceSchema<T extends string>(
     [statusField]: z.enum(statusEnum),
     qualityProfileName: z.string(),
     enabled: z.boolean().optional(),
-    schedule: z.string().optional(),
-    scheduleEnabled: z.boolean().optional(),
   });
 }
 

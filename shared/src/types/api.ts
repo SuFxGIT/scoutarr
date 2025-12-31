@@ -35,11 +35,9 @@ export interface InstanceStatus {
 
 export interface SchedulerStatus {
   enabled: boolean;
-  globalEnabled?: boolean;
   running: boolean;
   schedule: string | null;
   nextRun: string | null;
-  instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
 }
 
 export interface SyncSchedulerStatus {

@@ -692,74 +692,6 @@ function Settings() {
     return appNames[appType];
   };
 
-  // Helper to render instance schedule configuration
-  const renderInstanceSchedule = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instance: StarrInstanceConfig, index: number) => {
-    const instanceSchedulePreset = instance.schedule ? getPresetFromSchedule(instance.schedule) : 'custom';
-    const appInfo = getAppInfo(appType);
-    
-    return (
-      <Card key={instance.id} variant="surface">
-        <Flex direction="column" gap="3" p="3">
-          <Flex direction="row" align="center" justify="between">
-            <Text size="3" weight="medium">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
-            <Flex direction="row" align="center" gap="2">
-              <Text size="2">Enable Schedule</Text>
-              <Switch
-                checked={instance.scheduleEnabled || false}
-                onCheckedChange={(checked: boolean) => {
-                  updateInstanceConfig(appType, instance.id, 'scheduleEnabled', checked);
-                  if (checked && !instance.schedule) {
-                    updateInstanceConfig(appType, instance.id, 'schedule', '0 */6 * * *');
-                  }
-                }}
-              />
-            </Flex>
-          </Flex>
-          {instance.scheduleEnabled && (
-            <Flex direction="column" gap="2">
-              <Text size="2" weight="medium">Schedule</Text>
-              <Select.Root
-                value={instanceSchedulePreset}
-                onValueChange={(value: string) => {
-                  const schedule = value === 'custom'
-                    ? (instance.schedule || '0 */6 * * *')
-                    : CRON_PRESETS[value];
-                  updateInstanceConfig(appType, instance.id, 'schedule', schedule);
-                }}
-              >
-                <Select.Trigger />
-                <Select.Content position="popper" sideOffset={5}>
-                  {CRON_PRESET_OPTIONS.map(option => (
-                    <Select.Item key={option.value} value={option.value}>
-                      {option.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-              {instanceSchedulePreset === 'custom' && (
-                <Flex direction="column" gap="1">
-                  <TextField.Root
-                    value={instance.schedule || '0 */6 * * *'}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      updateInstanceConfig(appType, instance.id, 'schedule', e.target.value);
-                    }}
-                    placeholder="0 */6 * * *"
-                  />
-                  <Text size="1" color="gray">
-                    Need help?{' '}
-                    <Link href="https://crontab.guru/" target="_blank">
-                      Visit crontab.guru →
-                    </Link>
-                  </Text>
-                </Flex>
-              )}
-            </Flex>
-          )}
-        </Flex>
-      </Card>
-    );
-  };
-
   return (
     <Box width="100%" pt="0" mt="0">
       <Flex direction="column" gap="3">
@@ -1449,39 +1381,6 @@ function Settings() {
                     </Flex>
                   )}
                 </Flex>
-              </Flex>
-            </Card>
-
-            {/* Per-Instance Scheduling */}
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Flex align="center" gap="2">
-                  <Heading size="5">Per-Instance Schedule</Heading>
-                  <Tooltip content="Set individual schedules per instance. Overrides global schedule when enabled.">
-                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
-                  </Tooltip>
-                </Flex>
-                <Separator size="4" />
-
-                {/* Render instances for each app type */}
-                {APP_TYPES.map(appType => {
-                  const instances = getInstances(appType);
-                  if (instances.length === 0) return null;
-                  
-                  const appInfo = getAppInfo(appType);
-                  return (
-                    <Flex key={appType} direction="column" gap="3">
-                      <Heading size="4">{appInfo.name} Instances</Heading>
-                      {instances.map((instance, index) => renderInstanceSchedule(appType, instance, index))}
-                    </Flex>
-                  );
-                })}
-
-                {getInstances('radarr').length === 0 && getInstances('sonarr').length === 0 && getInstances('lidarr').length === 0 && getInstances('readarr').length === 0 && (
-                  <Text size="2" color="gray" style={{ fontStyle: 'italic' }}>
-                    No instances configured. Add instances in the Applications tab to configure per-instance scheduling.
-                  </Text>
-                )}
               </Flex>
             </Card>
           </Tabs.Content>

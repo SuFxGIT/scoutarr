@@ -3,9 +3,8 @@ import { createRequire } from 'module';
 import { configService } from './configService.js';
 import { notificationService } from './notificationService.js';
 import logger from '../utils/logger.js';
-import { executeSearchRun, executeSearchRunForInstance } from '../routes/search.js';
-import { getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
-import { StarrInstanceConfig, SearchResults, Config } from '@scoutarr/shared';
+import { executeSearchRun } from '../routes/search.js';
+import { SearchResults, Config } from '@scoutarr/shared';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
 // cron-parser is a CommonJS module, use createRequire to import it
@@ -17,21 +16,12 @@ interface SchedulerRunHistory {
   results: SearchResults;
   success: boolean;
   error?: string;
-  instanceKey?: string;
-}
-
-interface InstanceSchedulerTask {
-  task: ScheduledTask;
-  schedule: string;
 }
 
 class SchedulerService {
   private globalTask: ScheduledTask | null = null;
   private globalIsRunning = false;
   private globalCurrentSchedule: string | null = null;
-
-  private instanceTasks: Map<string, InstanceSchedulerTask> = new Map();
-  private instanceIsRunning: Map<string, boolean> = new Map();
 
   private runHistory: SchedulerRunHistory[] = [];
   private maxHistorySize = 100;
@@ -56,58 +46,13 @@ class SchedulerService {
       this.startGlobal(config.scheduler.schedule);
       logger.info('✅ Global scheduler initialized', { schedule: config.scheduler.schedule });
     } else {
-      logger.info('ℹ️  Global scheduler disabled', { 
+      logger.info('ℹ️  Global scheduler disabled', {
         enabled: config.scheduler?.enabled || false,
         hasSchedule: !!config.scheduler?.schedule
       });
     }
 
-    logger.debug('🕐 Initializing per-instance schedulers');
-    this.initializeInstanceSchedulers();
     logger.debug('✅ Scheduler service initialization complete');
-  }
-
-  private initializeInstanceSchedulers(): void {
-    logger.debug('🕐 Initializing per-instance schedulers');
-    const config = configService.getConfig();
-    
-    logger.debug('🔄 Stopping all existing instance schedulers');
-    this.stopAllInstanceSchedulers();
-
-    let totalFound = 0;
-    let totalStarted = 0;
-    
-    for (const appType of APP_TYPES) {
-      const instances = getConfiguredInstances(config.applications[appType] as StarrInstanceConfig[]);
-      logger.debug(`📋 Checking ${appType} instances for scheduling`, { instanceCount: instances.length });
-      
-      for (const instance of instances) {
-        totalFound++;
-        if (instance.scheduleEnabled && instance.schedule) {
-          const instanceKey = `${appType}-${instance.id}`;
-          logger.debug(`🕐 Starting scheduler for instance`, { instanceKey, schedule: instance.schedule });
-          this.startInstance(instanceKey, appType, instance.id, instance.schedule);
-          totalStarted++;
-        } else {
-          logger.debug(`⏸️  Instance scheduler disabled or no schedule`, { 
-            instanceId: instance.id,
-            scheduleEnabled: instance.scheduleEnabled || false,
-            hasSchedule: !!instance.schedule
-          });
-        }
-      }
-    }
-
-    const instanceCount = this.instanceTasks.size;
-    if (instanceCount > 0) {
-      logger.info(`✅ Per-instance schedulers initialized: ${instanceCount} instance(s)`, { 
-        totalFound,
-        totalStarted,
-        totalSkipped: totalFound - totalStarted
-      });
-    } else {
-      logger.debug('ℹ️  No per-instance schedulers configured', { totalFound });
-    }
   }
 
   startGlobal(schedule: string): void {
@@ -141,52 +86,10 @@ class SchedulerService {
     this.globalCurrentSchedule = null;
   }
 
-  startInstance(instanceKey: string, appType: AppType, instanceId: string, schedule: string): void {
-    this.stopInstance(instanceKey);
-
-    if (!cron.validate(schedule)) {
-      logger.error('❌ Invalid cron schedule for instance', { instanceKey, schedule });
-      return;
-    }
-
-    const task = cron.schedule(
-      schedule,
-      async () => {
-        await this.runInstanceScheduledSearch(instanceKey, appType, instanceId, schedule);
-      },
-      {
-        timezone: 'UTC'
-      }
-    );
-
-    const taskInfo: InstanceSchedulerTask = {
-      task,
-      schedule
-    };
-
-    this.instanceTasks.set(instanceKey, taskInfo);
-    logger.info('🕐 Instance scheduler started', { instanceKey, schedule });
-  }
-
-  stopInstance(instanceKey: string): void {
-    const taskInfo = this.instanceTasks.get(instanceKey);
-    if (!taskInfo) return;
-
-    taskInfo.task.stop();
-    this.instanceTasks.delete(instanceKey);
-    this.instanceIsRunning.delete(instanceKey);
-  }
-
-  stopAllInstanceSchedulers(): void {
-    for (const instanceKey of this.instanceTasks.keys()) {
-      this.stopInstance(instanceKey);
-    }
-  }
-
   restart(): void {
     logger.info('🔄 Restarting scheduler service');
     const config = configService.getConfig();
-    
+
     if (config.scheduler?.enabled && config.scheduler?.schedule) {
       logger.debug('🕐 Global scheduler enabled, restarting', { schedule: config.scheduler.schedule });
       this.startGlobal(config.scheduler.schedule);
@@ -195,8 +98,6 @@ class SchedulerService {
       this.stopGlobal();
     }
 
-    logger.debug('🔄 Restarting per-instance schedulers');
-    this.initializeInstanceSchedulers();
     logger.info('✅ Scheduler service restarted');
   }
 
@@ -256,71 +157,9 @@ class SchedulerService {
     }
   }
 
-  private async runInstanceScheduledSearch(instanceKey: string, appType: AppType, instanceId: string, schedule: string): Promise<void> {
-    const isRunning = this.instanceIsRunning.get(instanceKey);
-    if (isRunning) {
-      logger.warn('⏸️  Previous instance search still running, skipping scheduled run', { instanceKey });
-      return;
-    }
-
-    this.instanceIsRunning.set(instanceKey, true);
-    logger.info('⏰ Instance scheduled search started', { instanceKey, schedule });
-
-    try {
-      const results = await executeSearchRunForInstance(appType, instanceId);
-      const historyEntry: SchedulerRunHistory = {
-        timestamp: new Date().toISOString(),
-        results,
-        success: true,
-        instanceKey
-      };
-      this.addToHistory(historyEntry);
-
-      logger.info('✅ Instance scheduled search completed', {
-        instanceKey,
-        results: Object.keys(results).map(app => ({
-          app,
-          success: results[app].success,
-          count: results[app].searched || 0
-        }))
-      });
-
-      await this.sendNotificationsWithLogging(results, true);
-    } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      const historyEntry: SchedulerRunHistory = {
-        timestamp: new Date().toISOString(),
-        results: {},
-        success: false,
-        error: errorMessage,
-        instanceKey
-      };
-      this.addToHistory(historyEntry);
-
-      logger.error('❌ Instance scheduled search failed', {
-        instanceKey,
-        error: errorMessage,
-        stack: errorStack
-      });
-
-      try {
-        await notificationService.sendNotifications({}, false, errorMessage);
-      } catch (notificationError: unknown) {
-        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-        logger.debug('Failed to send failure notifications', {
-          error: errorMessage
-        });
-      }
-    } finally {
-      this.instanceIsRunning.set(instanceKey, false);
-    }
-  }
-
   addToHistory(entry: SchedulerRunHistory): void {
-    logger.debug('📝 Adding entry to scheduler history', { 
+    logger.debug('📝 Adding entry to scheduler history', {
       success: entry.success,
-      instanceKey: entry.instanceKey || 'global',
       timestamp: entry.timestamp,
       resultCount: Object.keys(entry.results).length
     });
@@ -360,37 +199,21 @@ class SchedulerService {
     }
   }
 
-  getStatus(config?: Config): { 
-    running: boolean; 
-    schedule: string | null; 
+  getStatus(config?: Config): {
+    running: boolean;
+    schedule: string | null;
     nextRun: string | null;
-    instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
   } {
     const configToUse = config || configService.getConfig();
     const globalSchedule = this.globalCurrentSchedule || configToUse.scheduler?.schedule || null;
     const globalNextRun = globalSchedule ? this.getNextRunTime(globalSchedule) : null;
-    
-    const instances: Record<string, { schedule: string; nextRun: string | null; running: boolean }> = {};
-    let anyInstanceRunning = false;
-    for (const [instanceKey, taskInfo] of this.instanceTasks.entries()) {
-      const isRunning = this.instanceIsRunning.get(instanceKey) || false;
-      instances[instanceKey] = {
-        schedule: taskInfo.schedule,
-        nextRun: this.getNextRunTime(taskInfo.schedule)?.toISOString() || null,
-        running: isRunning
-      };
-      if (isRunning) {
-        anyInstanceRunning = true;
-      }
-    }
-    
+
     const globalRunning = !!this.globalTask;
-    
+
     return {
-      running: globalRunning || anyInstanceRunning,
+      running: globalRunning,
       schedule: globalSchedule,
-      nextRun: globalNextRun ? globalNextRun.toISOString() : null,
-      instances
+      nextRun: globalNextRun ? globalNextRun.toISOString() : null
     };
   }
 }
