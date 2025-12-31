@@ -18,7 +18,6 @@ import { formatAppName, getErrorMessage, calculateTimeUntil, formatSchedulerDura
 import { LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD } from '../utils/constants';
 import { AppIcon } from './icons/AppIcon';
 import type { SearchResults, SchedulerHistoryEntry } from '../types/api';
-import type { Config } from '../types/config';
 
 interface SchedulerLogsProps {
   schedulerStatus?: {
@@ -28,11 +27,10 @@ interface SchedulerLogsProps {
     nextRun: string | null;
   };
   schedulerHistory: SchedulerHistoryEntry[];
-  config?: Config;
   onRefreshHistory: () => void;
 }
 
-export function SchedulerLogs({ schedulerStatus, schedulerHistory, config, onRefreshHistory }: SchedulerLogsProps) {
+export function SchedulerLogs({ schedulerStatus, schedulerHistory, onRefreshHistory }: SchedulerLogsProps) {
   const queryClient = useQueryClient();
   const logContainerRef = useRef<HTMLDivElement>(null);
 

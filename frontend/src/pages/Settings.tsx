@@ -1181,7 +1181,6 @@ function Settings() {
               <SchedulerLogs
                 schedulerStatus={schedulerStatus?.scheduler}
                 schedulerHistory={schedulerHistory}
-                config={config}
                 onRefreshHistory={refetchHistory}
               />
             )}
@@ -1265,8 +1264,8 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Flex align="center" gap="2">
-                  <Heading size="5">Global Schedule</Heading>
-                  <Tooltip content="Schedule for all instances. Per-instance schedules override this.">
+                  <Heading size="5">Scheduler</Heading>
+                  <Tooltip content="Schedule for all configured instances.">
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
                   </Tooltip>
                 </Flex>
@@ -1275,7 +1274,7 @@ function Settings() {
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
                     <Text size="2" weight="medium">Enable Scheduler</Text>
-                    <Tooltip content="Automatically run searches on schedule for instances without per-instance schedules.">
+                    <Tooltip content="Automatically run searches on schedule for all configured instances.">
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>

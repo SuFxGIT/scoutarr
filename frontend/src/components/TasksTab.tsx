@@ -103,9 +103,9 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
     const updateCountdowns = () => {
       const newCountdowns: Record<string, number> = {};
 
-      // Global scheduler
+      // Scheduler
       if (schedulerStatus?.scheduler?.nextRun) {
-        newCountdowns['global-scheduler'] = calculateTimeUntil(schedulerStatus.scheduler.nextRun);
+        newCountdowns['scheduler'] = calculateTimeUntil(schedulerStatus.scheduler.nextRun);
       }
 
       // Sync scheduler
@@ -140,9 +140,9 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {/* Global Scheduler */}
+              {/* Scheduler */}
               <TaskRow
-                name="Global Upgrade Search"
+                name="Upgrade Search"
                 description="Searches for upgrades across all configured applications"
                 cronExpression={config.scheduler?.schedule || '0 */6 * * *'}
                 enabled={config.scheduler?.enabled || false}
@@ -160,7 +160,7 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
                     });
                   }
                 }}
-                countdown={countdowns['global-scheduler'] || 0}
+                countdown={countdowns['scheduler'] || 0}
               />
 
               {/* Media Library Sync */}
