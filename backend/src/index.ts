@@ -79,7 +79,24 @@ Promise.all([
 }).catch((error: unknown) => {
   const errorMessage = getErrorMessage(error);
   const errorStack = error instanceof Error ? error.stack : undefined;
-  logger.error('❌ Failed to initialize services', { error: errorMessage, stack: errorStack });
+  const errorName = error instanceof Error ? error.name : 'Error';
+  
+  logger.error('❌ Failed to initialize services', { 
+    error: errorMessage,
+    errorName,
+    stack: errorStack,
+    port: PORT,
+    nodeVersion: process.version
+  });
+  
+  console.error('\n=== INITIALIZATION ERROR ===');
+  console.error('Message:', errorMessage);
+  console.error('Type:', errorName);
+  if (errorStack) {
+    console.error('Stack trace:', errorStack);
+  }
+  console.error('===========================\n');
+  
   process.exit(1);
 });
 

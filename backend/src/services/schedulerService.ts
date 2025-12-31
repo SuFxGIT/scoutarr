@@ -72,8 +72,17 @@ class SchedulerService {
     try {
       CronExpressionParser.parse(schedule);
     } catch (error) {
-      logger.error('❌ Invalid cron schedule', { schedule, error: getErrorMessage(error) });
-      return;
+      const errorMessage = getErrorMessage(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      const errorName = error instanceof Error ? error.name : 'Error';
+      
+      logger.error('❌ Invalid cron schedule', { 
+        schedule,
+        error: errorMessage,
+        errorName,
+        stack: errorStack
+      });
+      throw new Error(`Invalid scheduler cron expression "${schedule}": ${errorMessage}`);
     }
 
     this.globalCurrentSchedule = schedule;

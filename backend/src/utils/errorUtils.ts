@@ -35,7 +35,16 @@ export function handleRouteError(
   statusCode: number = 500
 ): void {
   const errorMessage = getErrorMessage(error);
-  logger.error(`❌ ${context}`, { error: errorMessage });
+  const errorStack = error instanceof Error ? error.stack : undefined;
+  const errorName = error instanceof Error ? error.name : 'Error';
+  
+  logger.error(`❌ ${context}`, { 
+    error: errorMessage,
+    errorName,
+    stack: errorStack,
+    statusCode
+  });
+  
   res.status(statusCode).json({
     error: context,
     message: errorMessage

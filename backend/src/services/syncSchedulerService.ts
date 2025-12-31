@@ -40,8 +40,17 @@ class SyncSchedulerService {
     try {
       CronExpressionParser.parse(schedule);
     } catch (error) {
-      logger.error('❌ Invalid cron expression for sync schedule', { schedule, error: getErrorMessage(error) });
-      return;
+      const errorMessage = getErrorMessage(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      const errorName = error instanceof Error ? error.name : 'Error';
+      
+      logger.error('❌ Invalid cron expression for sync schedule', { 
+        schedule,
+        error: errorMessage,
+        errorName,
+        stack: errorStack
+      });
+      throw new Error(`Invalid sync schedule cron expression "${schedule}": ${errorMessage}`);
     }
 
     logger.info('▶️  Starting sync scheduler', {

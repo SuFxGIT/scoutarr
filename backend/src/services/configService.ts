@@ -225,10 +225,14 @@ class ConfigService {
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
+      const errorName = error instanceof Error ? error.name : 'Error';
+      
       logger.error('❌ Error saving configuration', { 
         error: errorMessage,
+        errorName,
         stack: errorStack,
-        configFile: CONFIG_FILE 
+        configFile: CONFIG_FILE,
+        operation: 'saveConfig'
       });
       throw error;
     }
