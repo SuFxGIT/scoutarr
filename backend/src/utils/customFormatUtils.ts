@@ -27,19 +27,30 @@ export async function fetchCustomFormatScores(
   const { client, apiVersion, endpoint, paramName, fileIds, appName } = options;
 
   if (fileIds.length === 0) {
+    logger.debug(`⏭️  [${appName}] No file IDs provided, skipping custom format score fetch`);
     return new Map();
   }
 
+  logger.info(`📡 [${appName} API] Starting custom format score fetch`, {
+    endpoint,
+    totalFiles: fileIds.length,
+    apiVersion
+  });
+
   try {
-    logger.debug(`📡 [${appName} API] Fetching ${endpoint} for custom format scores`, {
-      fileCount: fileIds.length
+    const batchSize = 100;
+    const batchCount = Math.ceil(fileIds.length / batchSize);
+    logger.debug(`📦 [${appName} API] Processing in ${batchCount} batches`, { 
+      batchSize,
+      batchCount,
+      totalFiles: fileIds.length
     });
 
-    const batchSize = 100;
     const allFiles: FileWithScore[] = [];
 
     for (let i = 0; i < fileIds.length; i += batchSize) {
       const batch = fileIds.slice(i, i + batchSize);
+      
       const filesResponse = await client.get<FileWithScore[]>(
         `/api/${apiVersion}/${endpoint}`,
         {
@@ -47,16 +58,33 @@ export async function fetchCustomFormatScores(
           paramsSerializer: { indexes: null }
         }
       );
-      allFiles.push(...filesResponse.data);
+      
+      const batchFiles = filesResponse.data;
+      allFiles.push(...batchFiles);
     }
 
-    logger.debug(`📡 [${appName} API] Fetched ${endpoint}`, { count: allFiles.length });
+    const scoreMap = new Map(allFiles.map(f => [f.id, f.customFormatScore]));
+    const filesWithScores = allFiles.filter(f => f.customFormatScore !== undefined).length;
 
-    return new Map(allFiles.map(f => [f.id, f.customFormatScore]));
+    logger.info(`✅ [${appName} API] Custom format score fetch completed`, { 
+      totalFilesFetched: allFiles.length,
+      filesWithScores,
+      filesWithoutScores: allFiles.length - filesWithScores,
+      endpoint
+    });
+
+    return scoreMap;
   } catch (error: unknown) {
-    logger.warn(
-      `⚠️  [${appName} API] Failed to fetch ${endpoint} for custom format scores`,
-      { error: getErrorMessage(error) }
+    const errorMessage = getErrorMessage(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error(
+      `❌ [${appName} API] Failed to fetch ${endpoint} for custom format scores`,
+      { 
+        error: errorMessage,
+        stack: errorStack,
+        endpoint,
+        fileCount: fileIds.length
+      }
     );
     return new Map();
   }

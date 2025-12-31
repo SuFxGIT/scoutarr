@@ -257,12 +257,6 @@ class ConfigService {
       logger.error('❌ Attempted to get config before initialization');
       throw new Error('Config not loaded');
     }
-    const endOp = startOperation('ConfigService.getConfig', {});
-    logger.debug('📋 Config retrieved', { 
-      hasScheduler: !!this.config.scheduler,
-      schedulerEnabled: this.config.scheduler?.enabled || false
-    });
-    endOp({}, true);
     return this.config;
   }
 }

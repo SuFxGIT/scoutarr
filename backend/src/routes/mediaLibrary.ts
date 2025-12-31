@@ -227,16 +227,23 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 // POST /api/media-library/search
 // Search selected media manually
 mediaLibraryRouter.post('/search', async (req, res) => {
+  const endOp = startOperation('MediaLibrary.search', { 
+    appType: req.body.appType, 
+    instanceId: req.body.instanceId, 
+    count: Array.isArray(req.body.mediaIds) ? req.body.mediaIds.length : 0 
+  });
+  
   try {
     const { appType, instanceId, mediaIds } = req.body;
-    const endOp = startOperation('MediaLibrary.search', { appType, instanceId, count: Array.isArray(mediaIds) ? mediaIds.length : 0 });
 
     // Validate inputs
     if (!appType || !instanceId || !Array.isArray(mediaIds) || mediaIds.length === 0) {
+      endOp({ error: 'Invalid request' }, false);
       return res.status(400).json({ error: 'Invalid request. Required: appType, instanceId, mediaIds (non-empty array)' });
     }
 
     if (!APP_TYPES.includes(appType as AppType)) {
+      endOp({ error: 'Invalid app type' }, false);
       return res.status(400).json({ error: 'Invalid app type' });
     }
 
@@ -245,12 +252,14 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     const instances = config.applications[appType as AppType];
 
     if (!instances || !Array.isArray(instances)) {
+      endOp({ error: 'No instances configured' }, false);
       return res.status(404).json({ error: 'No instances configured for this app type' });
     }
 
     const instance = instances.find((inst: StarrInstanceConfig) => inst.id === instanceId);
 
     if (!instance) {
+      endOp({ error: 'Instance not found' }, false);
       return res.status(404).json({ error: 'Instance not found' });
     }
 

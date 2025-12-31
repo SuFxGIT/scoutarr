@@ -299,6 +299,8 @@ export async function processApplication<TMedia extends FilterableMedia>(
       items: toSearch.map(processor.getMediaTitle)
     });
 
+    endOp({ searched: toSearch.length }, true);
+
     return {
       success: true,
       searched: toSearch.length,
@@ -311,92 +313,13 @@ export async function processApplication<TMedia extends FilterableMedia>(
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    const items = toSearch.map(m => ({
-      id: processor.getMediaId(m),
-      title: processor.getMediaTitle(m)
-    }));
-
-    endOp({ searched: toSearch.length }, true);
-
-    return {
-      success: true,
-      searched: toSearch.length,
-      items
-    };
-
-    const summary = Object.keys(results).map(app => ({
-      app,
-      success: results[app].success,
-      count: results[app].searched || 0
-    }));
     endOp({ error: errorMessage }, false);
+    
     return {
       success: false,
       searched: 0,
       items: [],
       error: errorMessage
     };
-      failureCount: summary.filter(r => !r.success).length
-    });
-
-    // Record this run in the scheduler history so it appears in the dashboard logs
-    logger.debug('📝 Recording run in scheduler history');
-    try {
-      schedulerService.addToHistory({
-        timestamp: new Date().toISOString(),
-        results,
-        success: true
-      });
-    } catch (historyError: unknown) {
-      logger.warn('⚠️  Failed to record run in scheduler history', {
-        error: getErrorMessage(historyError)
-      });
-    }
-
-    // Send notifications
-    logger.debug('📤 Sending notifications for run');
-    try {
-      await notificationService.sendNotifications(results, true);
-    } catch (notificationError: unknown) {
-      logger.warn('⚠️  Failed to send notifications', {
-        error: getErrorMessage(notificationError)
-      });
-    }
-
-    res.json(results);
-  } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error('❌ Search operation failed', {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    });
-
-    // Record failed run in scheduler history
-    try {
-      schedulerService.addToHistory({
-        timestamp: new Date().toISOString(),
-        results: {},
-        success: false,
-        error: errorMessage
-      });
-    } catch (historyError: unknown) {
-      logger.warn('⚠️  Failed to record failed run in scheduler history', {
-        error: getErrorMessage(historyError)
-      });
-    }
-
-    // Send failure notifications
-    try {
-      await notificationService.sendNotifications({}, false, errorMessage);
-    } catch (notificationError: unknown) {
-      logger.warn('⚠️  Failed to send failure notifications', {
-        error: getErrorMessage(notificationError)
-      });
-    }
-
-    res.status(500).json({
-      error: 'Search operation failed',
-      message: errorMessage
-    });
   }
-});
+}

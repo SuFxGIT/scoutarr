@@ -70,12 +70,11 @@ export async function testStarrConnection(
   apiKey: string, 
   expectedApp: string
 ): Promise<{ success: boolean; version?: string; appName?: string; error?: string }> {
+  logger.info(`🔌 [${expectedApp}] Testing connection`, { url });
   try {
     const client = createStarrClient(url, apiKey);
-    // Lidarr and Readarr use v1 API, Radarr and Sonarr use v3
     const apiVersion = expectedApp.toLowerCase().includes('lidarr') || expectedApp.toLowerCase().includes('readarr') ? 'v1' : 'v3';
     
-    // Fetch system status to get app information
     const response = await client.get<{
       appName?: string;
       version?: string;
@@ -86,23 +85,18 @@ export async function testStarrConnection(
     const systemData = response.data;
     const actualAppName = systemData.appName;
     const version = systemData.version;
-    
-    // Verify the app name matches the expected app type
-    // Expected app names: "Radarr", "Sonarr", "Readarr", "Lidarr"
     const expectedAppName = expectedApp.charAt(0).toUpperCase() + expectedApp.slice(1).toLowerCase();
     
     if (!actualAppName) {
-      logger.debug(`❌ ${expectedApp} connection test failed: No appName in response`, { url });
+      logger.warn(`⚠️  [${expectedApp}] No appName in response`, { url });
       return {
         success: false,
         error: 'Unable to determine application type from server response'
       };
     }
     
-    // Case-insensitive comparison
     if (actualAppName.toLowerCase() !== expectedAppName.toLowerCase()) {
-      logger.debug(`❌ ${expectedApp} connection test failed: App mismatch`, { 
-        url, 
+      logger.warn(`⚠️  [${expectedApp}] App type mismatch`, { 
         expected: expectedAppName, 
         actual: actualAppName 
       });
@@ -114,11 +108,7 @@ export async function testStarrConnection(
       };
     }
     
-    logger.debug(`✅ ${expectedApp} connection test successful`, { 
-      url, 
-      appName: actualAppName, 
-      version 
-    });
+    logger.info(`✅ [${expectedApp}] Connected`, { version });
     
     return {
       success: true,
@@ -127,7 +117,12 @@ export async function testStarrConnection(
     };
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
-    logger.debug(`❌ ${expectedApp} connection test failed`, { url, error: errorMessage });
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error(`❌ [${expectedApp}] Connection test failed`, { 
+      url, 
+      error: errorMessage,
+      stack: errorStack
+    });
     return {
       success: false,
       error: errorMessage || 'Connection test failed'
@@ -145,23 +140,30 @@ export async function getOrCreateTagId(
   appName: string
 ): Promise<number | null> {
   try {
-    // Determine API version based on app name
     const apiVersion = appName.toLowerCase().includes('lidarr') || appName.toLowerCase().includes('readarr') ? 'v1' : 'v3';
     
-    // Get all tags
     const tagsResponse = await client.get<Array<{ id: number; label: string }>>(`/api/${apiVersion}/tag`);
+    const allTags = tagsResponse.data;
     
-    const tag = tagsResponse.data.find(t => t.label === tagName);
+    const tag = allTags.find(t => t.label === tagName);
     
     if (tag) {
       return tag.id;
     }
 
-    // Create tag if it doesn't exist
+    logger.info(`🏷️  [${appName}] Creating new tag`, { tagName });
     const newTagResponse = await client.post<{ id: number; label: string }>(`/api/${apiVersion}/tag`, { label: tagName });
-    return newTagResponse.data.id;
+    const newTag = newTagResponse.data;
+    logger.info(`✅ [${appName}] Tag created`, { tagName, tagId: newTag.id });
+    return newTag.id;
   } catch (error: unknown) {
-    logger.error(`❌ Failed to get/create tag in ${appName}`, { error: getErrorMessage(error), tagName });
+    const errorMessage = getErrorMessage(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error(`❌ [${appName}] Failed to get/create tag`, { 
+      error: errorMessage,
+      stack: errorStack,
+      tagName 
+    });
     throw error;
   }
 }

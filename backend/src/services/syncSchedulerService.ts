@@ -119,14 +119,26 @@ class SyncSchedulerService {
       logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
 
       // Convert tag IDs to names before syncing
-      logger.debug('🏷️  Converting tag IDs to names');
+      logger.info(`🏷️  Converting tag IDs to names for ${allMedia.length} items`);
       const mediaWithTagNames = await Promise.all(
         allMedia.map(async (item) => {
           const tagNames = await service.convertTagIdsToNames(instance, item.tags);
           return { ...item, tags: tagNames };
         })
       );
-      logger.debug('✅ Tag IDs converted to names');
+      
+      // Count unique tags found
+      const allTagNames = new Set<string>();
+      mediaWithTagNames.forEach(item => {
+        if (Array.isArray(item.tags)) {
+          item.tags.forEach(tag => allTagNames.add(tag));
+        }
+      });
+      logger.info(`✅ Tag conversion completed`, { 
+        mediaItems: mediaWithTagNames.length,
+        uniqueTags: allTagNames.size,
+        tags: Array.from(allTagNames)
+      });
 
       // Sync to database
       await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);

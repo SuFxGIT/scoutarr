@@ -21,24 +21,29 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
   }
 
   async getArtists(config: LidarrInstance): Promise<LidarrArtist[]> {
+    logger.info('📡 [Lidarr API] Fetching artists', { url: config.url, name: config.name });
     try {
       const client = this.createClient(config);
-      logger.debug('📡 [Lidarr API] Fetching artists', { url: config.url });
       const response = await client.get<LidarrArtist[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
       const artists = response.data;
-      logger.debug('📡 [Lidarr API] Fetched artists', { count: artists.length });
 
       // Lidarr's /api/v1/artist endpoint doesn't include customFormatScore in trackFiles
       // We need to fetch track files separately to get custom format scores
       const trackFileIds: number[] = [];
 
       // Collect all track file IDs from all artists
+      logger.debug('🎵 [Lidarr API] Collecting track file IDs from artists');
       for (const artist of artists) {
         const trackFiles = (artist as { trackFiles?: Array<{ id?: number }> }).trackFiles;
         if (trackFiles && Array.isArray(trackFiles)) {
           trackFileIds.push(...trackFiles.map(f => f.id).filter((id): id is number => id !== undefined && id > 0));
         }
       }
+
+      logger.debug('🎵 [Lidarr API] Extracting track file IDs for custom format scores', { 
+        trackFileCount: trackFileIds.length,
+        totalArtists: artists.length
+      });
 
       const fileScoresMap = await fetchCustomFormatScores({
         client,
@@ -49,8 +54,13 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         appName: this.appName
       });
 
+      logger.debug('✅ [Lidarr API] Retrieved custom format scores', { 
+        scoresFound: fileScoresMap.size,
+        fileIdsRequested: trackFileIds.length
+      });
+
       // Add customFormatScore to each artist's trackFiles
-      return artists.map(artist => {
+      const artistsWithScores = artists.map(artist => {
         const trackFiles = (artist as { trackFiles?: Array<{ id?: number }> }).trackFiles;
         if (trackFiles && Array.isArray(trackFiles) && trackFiles.length > 0) {
           const updatedTrackFiles = trackFiles.map(trackFile => {
@@ -69,24 +79,35 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         }
         return artist;
       });
+
+      logger.info('✅ [Lidarr API] Artist fetch completed', { 
+        totalArtists: artistsWithScores.length,
+        totalTrackFiles: trackFileIds.length,
+        withCustomScores: fileScoresMap.size
+      });
+
+      return artistsWithScores;
     } catch (error: unknown) {
-      this.logError('Failed to fetch artists', error, { url: config.url });
+      this.logError('Failed to fetch artists', error, { url: config.url, name: config.name });
       throw error;
     }
   }
 
   async searchArtists(config: LidarrInstance, artistId: number): Promise<void> {
+    logger.info('🔍 [Lidarr API] Searching artist', { name: config.name, artistId });
     try {
       const client = this.createClient(config);
-      // Lidarr only supports searching one artist at a time
-      logger.debug('📡 [Lidarr API] Starting artist search', { artistId });
       await client.post(`/api/${this.apiVersion}/command`, {
         name: 'ArtistSearch',
         artistId
       });
-      logger.debug('📡 [Lidarr API] Artist search command sent', { artistId });
+      logger.debug('✅ [Lidarr API] Search command sent', { artistId });
     } catch (error: unknown) {
-      this.logError('Failed to search artist', error, { artistId });
+      this.logError('Failed to search artist', error, { 
+        artistId,
+        url: config.url,
+        name: config.name
+      });
       throw error;
     }
   }
@@ -104,8 +125,22 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
   }
 
   async filterArtists(config: LidarrInstance, artists: LidarrArtist[]): Promise<LidarrArtist[]> {
+    logger.info('🔽 [Lidarr] Starting artist filtering', { 
+      totalArtists: artists.length,
+      name: config.name,
+      filters: {
+        monitored: config.monitored,
+        tagName: config.tagName,
+        ignoreTag: config.ignoreTag,
+        qualityProfileName: config.qualityProfileName,
+        artistStatus: config.artistStatus
+      }
+    });
     try {
+      const initialCount = artists.length;
+
       // Apply common filters (monitored, tag, quality profile, ignore tag)
+      logger.debug('🔽 [Lidarr] Applying common filters', { count: artists.length });
       let filtered = await applyCommonFilters(
         artists,
         {
@@ -119,19 +154,43 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
         this.appName,
         this.getMediaTypeName()
       );
+      logger.debug('✅ [Lidarr] Common filters applied', { 
+        before: initialCount,
+        after: filtered.length,
+        removed: initialCount - filtered.length
+      });
 
       // Filter by artist status
       if (config.artistStatus) {
-        filtered = filtered.filter(a => a.status === config.artistStatus);
-        logger.debug('🔽 Filtered by artist status', {
-          count: filtered.length,
-          status: config.artistStatus
+        const beforeStatusFilter = filtered.length;
+        logger.debug('🔽 [Lidarr] Applying artist status filter', { 
+          artistStatus: config.artistStatus,
+          count: beforeStatusFilter
         });
+        filtered = filtered.filter(a => a.status === config.artistStatus);
+        logger.debug('✅ [Lidarr] Artist status filter applied', {
+          status: config.artistStatus,
+          before: beforeStatusFilter,
+          after: filtered.length,
+          removed: beforeStatusFilter - filtered.length
+        });
+      } else {
+        logger.debug('⏭️  [Lidarr] Skipping artist status filter (not configured)');
       }
+
+      logger.info('✅ [Lidarr] Artist filtering completed', {
+        initial: initialCount,
+        final: filtered.length,
+        totalRemoved: initialCount - filtered.length,
+        filterEfficiency: `${((1 - filtered.length / initialCount) * 100).toFixed(1)}%`
+      });
 
       return filtered;
     } catch (error: unknown) {
-      this.logError('Failed to filter artists', error);
+      this.logError('Failed to filter artists', error, { 
+        artistCount: artists.length,
+        name: config.name
+      });
       throw error;
     }
   }

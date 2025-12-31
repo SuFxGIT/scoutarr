@@ -28,8 +28,15 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Helper for consistent error logging
    */
   protected logError(operation: string, error: unknown, context?: Record<string, unknown>): void {
+    const errorMessage = getErrorMessage(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorName = error instanceof Error ? error.name : 'Error';
+    
     logger.error(`❌ ${operation} failed for ${this.appName}`, {
-      error: getErrorMessage(error),
+      error: errorMessage,
+      errorName,
+      stack: errorStack,
+      appName: this.appName,
       ...context
     });
   }
@@ -41,9 +48,11 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
     try {
       const client = this.createClient(config);
       const response = await client.get<StarrQualityProfile[]>(`/api/${this.apiVersion}/${this.qualityProfileEndpoint}`);
-      return response.data;
+      const profiles = response.data;
+      logger.debug(`✅ [${this.appName}] Fetched ${profiles.length} quality profiles`);
+      return profiles;
     } catch (error: unknown) {
-      this.logError('Failed to fetch quality profiles', error, { url: config.url });
+      this.logError('Failed to fetch quality profiles', error, { url: config.url, endpoint: this.qualityProfileEndpoint });
       throw error;
     }
   }
@@ -54,6 +63,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
   async getTagId(config: TConfig, tagName: string): Promise<number | null> {
     const client = this.createClient(config);
     const tagId = await getOrCreateTagId(client, tagName, this.appName);
+    if (!tagId) {
+      logger.warn(`⚠️  [${this.appName}] Failed to get/create tag`, { tagName });
+    }
     return tagId;
   }
 
@@ -75,16 +87,23 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Converts tag IDs to tag names
    */
   async convertTagIdsToNames(config: TConfig, tagIds: number[]): Promise<string[]> {
-    if (tagIds.length === 0) return [];
+    if (tagIds.length === 0) {
+      return [];
+    }
 
     try {
       const allTags = await this.getAllTags(config);
       const tagMap = new Map(allTags.map(t => [t.id, t.label]));
 
-      return tagIds.map(id => {
+      const tagNames = tagIds.map(id => {
         const tagName = tagMap.get(id);
+        if (!tagName) {
+          logger.warn(`⚠️  [${this.appName}] Unknown tag ID`, { tagId: id });
+        }
         return tagName || `unknown-tag-${id}`;
       });
+      
+      return tagNames;
     } catch (error: unknown) {
       this.logError('Failed to convert tag IDs to names', error, { tagIds });
       // Return unknown tags as fallback
@@ -103,8 +122,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tags: [tagId],
         applyTags: 'add'
       });
+      logger.info(`✅ [${this.appName}] Added tag to ${mediaIds.length} ${this.getMediaTypeName()}`, { tagId, count: mediaIds.length });
     } catch (error: unknown) {
-      this.logError(`Failed to add tag to ${this.getMediaTypeName()}`, error, { mediaIds, tagId });
+      this.logError(`Failed to add tag to ${this.getMediaTypeName()}`, error, { mediaIds, tagId, count: mediaIds.length });
       throw error;
     }
   }
@@ -120,13 +140,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tags: [tagId],
         applyTags: 'remove'
       });
-      logger.debug(`🏷️  Removed tag from ${this.getMediaTypeName()}`, {
-        mediaIds,
-        tagId,
-        count: mediaIds.length
-      });
+      logger.info(`✅ [${this.appName}] Removed tag from ${mediaIds.length} ${this.getMediaTypeName()}`, { tagId, count: mediaIds.length });
     } catch (error: unknown) {
-      this.logError(`Failed to remove tag from ${this.getMediaTypeName()}`, error, { mediaIds, tagId });
+      this.logError(`Failed to remove tag from ${this.getMediaTypeName()}`, error, { mediaIds, tagId, count: mediaIds.length });
       throw error;
     }
   }
