@@ -1,0 +1,39 @@
+{
+  "notifications": {
+    "discordWebhook": "",
+    "notifiarrPassthroughWebhook": "",
+    "notifiarrPassthroughDiscordChannelId": "",
+    "pushoverUserKey": "",
+    "pushoverApiToken": ""
+  },
+  "applications": {
+    "radarr": [
+      {
+        "id": "radarr-1",
+        "instanceId": 1,
+        "name": "Radarr HD",
+        "url": "http://192.168.1.8:7878/",
+        "apiKey": "b13a695ff3404124902221cba827d977",
+        "count": 1,
+        "tagName": "upgradinatorr",
+        "ignoreTag": "",
+        "monitored": true,
+        "movieStatus": "released",
+        "qualityProfileName": "SQP-1 (1080p)",
+        "enabled": true
+      }
+    ],
+    "sonarr": [],
+    "lidarr": [],
+    "readarr": []
+  },
+  "scheduler": {
+    "enabled": false,
+    "schedule": "0 */6 * * *",
+    "unattended": false
+  },
+  "tasks": {
+    "syncInterval": 24,
+    "syncEnabled": true
+  }
+}

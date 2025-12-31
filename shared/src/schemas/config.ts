@@ -79,6 +79,11 @@ export const schedulerConfigSchema = z.object({
   unattended: z.boolean(),
 });
 
+export const tasksConfigSchema = z.object({
+  syncSchedule: z.string().min(1, 'Sync schedule is required'),
+  syncEnabled: z.boolean(),
+});
+
 export const configSchema = z.object({
   applications: z.object({
     radarr: z.array(radarrInstanceSchema),
@@ -88,4 +93,5 @@ export const configSchema = z.object({
   }),
   notifications: notificationConfigSchema,
   scheduler: schedulerConfigSchema,
+  tasks: tasksConfigSchema,
 });

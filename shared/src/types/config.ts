@@ -92,7 +92,7 @@ export interface SchedulerConfig {
 }
 
 export interface TasksConfig {
-  syncInterval: number; // Hours between syncs (default: 24)
+  syncSchedule: string; // Cron expression for sync schedule (e.g., "0 3 * * *" for 3am daily)
   syncEnabled: boolean; // Enable/disable automatic syncing
 }
 

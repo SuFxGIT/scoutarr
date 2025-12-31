@@ -64,9 +64,9 @@ Promise.all([
   logger.debug('✅ Core services initialized, initializing schedulers');
   await schedulerService.initialize();
 
-  // Initialize sync scheduler
+  // Initialize sync scheduler (skip initial sync, only run on scheduled intervals)
   const { syncSchedulerService } = await import('./services/syncSchedulerService.js');
-  syncSchedulerService.start();
+  syncSchedulerService.start(true); // Skip initial sync on startup
 
   logger.debug('📡 Starting HTTP server', { port: PORT });
   server = app.listen(PORT, () => {

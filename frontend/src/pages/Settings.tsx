@@ -1464,52 +1464,36 @@ function Settings() {
                     </Tooltip>
                   </Flex>
                   <Switch
-                    checked={config.tasks?.syncEnabled ?? true}
+                    checked={config.tasks.syncEnabled}
                     onCheckedChange={(checked: boolean) => {
-                      if (!config.tasks) {
-                        setConfig({
-                          ...config,
-                          tasks: { syncInterval: 24, syncEnabled: checked }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          tasks: { ...config.tasks, syncEnabled: checked }
-                        });
-                      }
+                      setConfig({
+                        ...config,
+                        tasks: { ...config.tasks, syncEnabled: checked }
+                      });
                     }}
                   />
                 </Flex>
 
                 <Flex direction="column" gap="1">
                   <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Sync Interval (hours)</Text>
-                    <Tooltip content="How often to sync media library from *arr apps. Minimum: 1 hour, Maximum: 168 hours (1 week).">
+                    <Text size="2" weight="medium">Sync Schedule</Text>
+                    <Tooltip content="Cron expression for when to sync media library from *arr apps. Examples: '0 3 * * *' (3am daily), '0 */6 * * *' (every 6 hours), '0 0 * * 0' (midnight on Sundays).">
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
                   <TextField.Root
-                    type="number"
-                    min="1"
-                    max="168"
-                    value={(config.tasks?.syncInterval ?? 24).toString()}
+                    type="text"
+                    placeholder="0 3 * * *"
+                    value={config.tasks.syncSchedule}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const value = parseInt(e.target.value) || 24;
-                      if (!config.tasks) {
-                        setConfig({
-                          ...config,
-                          tasks: { syncInterval: value, syncEnabled: true }
-                        });
-                      } else {
-                        setConfig({
-                          ...config,
-                          tasks: { ...config.tasks, syncInterval: value }
-                        });
-                      }
+                      setConfig({
+                        ...config,
+                        tasks: { ...config.tasks, syncSchedule: e.target.value }
+                      });
                     }}
                   />
                   <Text size="1" color="gray">
-                    Media library will be synced from *arr apps every {config.tasks?.syncInterval ?? 24} hours
+                    Schedule: {config.tasks.syncSchedule}
                   </Text>
                 </Flex>
               </Flex>

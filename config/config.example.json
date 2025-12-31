@@ -16,5 +16,9 @@
     "enabled": false,
     "schedule": "0 */6 * * *",
     "unattended": false
+  },
+  "tasks": {
+    "syncSchedule": "0 3 * * *",
+    "syncEnabled": true
   }
 }

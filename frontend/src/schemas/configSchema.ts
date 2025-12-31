@@ -131,7 +131,7 @@ export const schedulerConfigSchema = z.object({
 });
 
 export const tasksConfigSchema = z.object({
-  syncInterval: z.number().int().min(1).max(168),
+  syncSchedule: z.string().min(1, 'Sync schedule is required'),
   syncEnabled: z.boolean(),
 });
 

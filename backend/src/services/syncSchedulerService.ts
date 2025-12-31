@@ -1,3 +1,4 @@
+import cron, { ScheduledTask } from 'node-cron';
 import logger from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
@@ -6,10 +7,11 @@ import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
 
 class SyncSchedulerService {
-  private intervalId: NodeJS.Timeout | null = null;
+  private task: ScheduledTask | null = null;
   private isRunning = false;
+  private currentSchedule: string | null = null;
 
-  start(): void {
+  start(skipInitialSync = false): void {
     const config = configService.getConfig();
 
     if (!config.tasks?.syncEnabled) {
@@ -17,37 +19,47 @@ class SyncSchedulerService {
       return;
     }
 
-    const intervalMs = (config.tasks.syncInterval || 24) * 60 * 60 * 1000; // Convert hours to ms
+    const schedule = config.tasks.syncSchedule;
+
+    // Validate cron expression
+    if (!cron.validate(schedule)) {
+      logger.error('❌ Invalid cron expression for sync schedule', { schedule });
+      return;
+    }
 
     logger.info('▶️  Starting sync scheduler', {
-      intervalHours: config.tasks.syncInterval,
-      intervalMs,
-      enabled: config.tasks.syncEnabled
+      schedule,
+      enabled: config.tasks.syncEnabled,
+      skipInitialSync
     });
 
-    // Run initial sync
-    this.syncAllInstances();
-
-    // Set up interval
-    this.intervalId = setInterval(() => {
+    // Run initial sync unless explicitly skipped
+    if (!skipInitialSync) {
       this.syncAllInstances();
-    }, intervalMs);
+    }
 
+    // Set up cron task
+    this.task = cron.schedule(schedule, () => {
+      this.syncAllInstances();
+    });
+
+    this.currentSchedule = schedule;
     logger.info('✅ Sync scheduler started');
   }
 
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+    if (this.task) {
+      this.task.stop();
+      this.task = null;
+      this.currentSchedule = null;
       logger.info('⏹️  Sync scheduler stopped');
     }
   }
 
-  restart(): void {
-    logger.info('🔄 Restarting sync scheduler');
+  restart(skipInitialSync = false): void {
+    logger.info('🔄 Restarting sync scheduler', { skipInitialSync });
     this.stop();
-    this.start();
+    this.start(skipInitialSync);
   }
 
   async syncAllInstances(): Promise<void> {
@@ -185,6 +197,10 @@ class SyncSchedulerService {
 
   isSyncRunning(): boolean {
     return this.isRunning;
+  }
+
+  getCurrentSchedule(): string | null {
+    return this.currentSchedule;
   }
 }
 

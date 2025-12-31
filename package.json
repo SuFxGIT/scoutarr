@@ -17,6 +17,10 @@
     "build:backend": "cd backend && npm run build",
     "start": "cd backend && npm start"
   },
+  "overrides": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }

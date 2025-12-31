@@ -79,7 +79,7 @@ class ConfigService {
         unattended: false
       },
       tasks: {
-        syncInterval: 24, // Default: sync every 24 hours
+        syncSchedule: '0 3 * * *', // Default: 3am daily
         syncEnabled: true
       }
     };
@@ -126,7 +126,7 @@ class ConfigService {
       if (!parsed.tasks) {
         logger.debug('⚠️  No tasks config found, initializing with defaults');
         parsed.tasks = {
-          syncInterval: 24,
+          syncSchedule: '0 3 * * *',
           syncEnabled: true
         };
       }
@@ -173,11 +173,11 @@ class ConfigService {
       const config = await this.loadConfig();
       logger.info('🔄 Configuration reset to default', { configFile: CONFIG_FILE });
 
-      // Restart schedulers after reset
+      // Restart schedulers after reset (skip initial sync since config is empty)
       const { schedulerService } = await import('./schedulerService.js');
       schedulerService.restart();
       const { syncSchedulerService } = await import('./syncSchedulerService.js');
-      syncSchedulerService.restart();
+      syncSchedulerService.restart(true); // Skip initial sync on reset
 
       return config;
     } catch (error: unknown) {
@@ -215,12 +215,12 @@ class ConfigService {
         schedulerEnabled: config.scheduler?.enabled || false
       });
       
-      // Restart schedulers if config changed
+      // Restart schedulers if config changed (skip initial sync to avoid unnecessary API calls)
       logger.debug('🔄 Restarting schedulers due to config change');
       const { schedulerService } = await import('./schedulerService.js');
       schedulerService.restart();
       const { syncSchedulerService } = await import('./syncSchedulerService.js');
-      syncSchedulerService.restart();
+      syncSchedulerService.restart(true); // Skip initial sync on config save
       logger.debug('✅ Schedulers restarted');
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
