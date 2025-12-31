@@ -153,6 +153,46 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
   protected abstract getMediaTypeName(): string;
 
   /**
+   * Gets the file ID field name(s) for the specific media type
+   */
+  protected abstract getFileIdField(): string | string[];
+
+  /**
+   * Gets the file endpoint for custom format scores
+   */
+  protected abstract getFileEndpoint(): string;
+
+  /**
+   * Gets the file param name for batch fetching
+   */
+  protected abstract getFileParamName(): string;
+
+  /**
+   * Gets the search command name for the API
+   */
+  protected abstract getSearchCommandName(): string;
+
+  /**
+   * Extracts file IDs from media items
+   */
+  protected abstract extractFileIds(media: TMedia[]): number[];
+
+  /**
+   * Applies custom format scores to media items
+   */
+  protected abstract applyCustomFormatScores(media: TMedia[], scoresMap: Map<number, number | undefined>): TMedia[];
+
+  /**
+   * Gets status filter config key name
+   */
+  protected abstract getStatusFilterKey(): string | undefined;
+
+  /**
+   * Applies status filter to media
+   */
+  protected abstract applyStatusFilter(media: TMedia[], statusValue: string): TMedia[];
+
+  /**
    * Gets media ID from media object
    */
   getMediaId(media: TMedia): number {
@@ -164,6 +204,186 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    */
   getMediaTitle(media: TMedia): string {
     return (media as any).title || (media as any).artistName || (media as any).authorName || 'Unknown';
+  }
+
+  /**
+   * Generic method to fetch media with custom format scores
+   * Eliminates duplication across all services
+   */
+  protected async fetchMediaWithScores(config: TConfig): Promise<TMedia[]> {
+    logger.info(`📡 [${this.appName} API] Fetching ${this.getMediaTypeName()}`, { url: config.url, name: config.name });
+    try {
+      const client = this.createClient(config);
+      const response = await client.get<TMedia[]>(`/api/${this.apiVersion}/${this.mediaEndpoint}`);
+      const media = response.data;
+
+      // Extract file IDs for custom format score fetching
+      const fileIds = this.extractFileIds(media);
+      
+      if (fileIds.length > 0) {
+        logger.debug(`📦 [${this.appName} API] Extracting file IDs for custom format scores`, {
+          fileCount: fileIds.length,
+          totalMedia: media.length
+        });
+
+        const { fetchCustomFormatScores } = await import('../utils/customFormatUtils.js');
+        const fileScoresMap = await fetchCustomFormatScores({
+          client,
+          apiVersion: this.apiVersion,
+          endpoint: this.getFileEndpoint(),
+          paramName: this.getFileParamName(),
+          fileIds,
+          appName: this.appName
+        });
+
+        logger.debug(`✅ [${this.appName} API] Retrieved custom format scores`, {
+          scoresFound: fileScoresMap.size,
+          fileIdsRequested: fileIds.length
+        });
+
+        const mediaWithScores = this.applyCustomFormatScores(media, fileScoresMap);
+
+        logger.info(`✅ [${this.appName} API] Media fetch completed`, {
+          total: mediaWithScores.length,
+          withCustomScores: fileIds.length
+        });
+
+        return mediaWithScores;
+      }
+
+      logger.info(`✅ [${this.appName} API] Media fetch completed`, { total: media.length });
+      return media;
+    } catch (error: unknown) {
+      this.logError(`Failed to fetch ${this.getMediaTypeName()}`, error, { url: config.url, name: config.name });
+      throw error;
+    }
+  }
+
+  /**
+   * Generic method to search media
+   * Handles both single and batch search commands
+   */
+  protected async searchMediaItems(config: TConfig, mediaIds: number[], searchOneByOne: boolean = false): Promise<void> {
+    const commandName = this.getSearchCommandName();
+    logger.info(`🔍 [${this.appName} API] Searching ${this.getMediaTypeName()}`, {
+      name: config.name,
+      count: mediaIds.length
+    });
+    
+    try {
+      const client = this.createClient(config);
+      
+      if (searchOneByOne) {
+        // For apps that only support one-at-a-time search
+        for (const mediaId of mediaIds) {
+          await client.post(`/api/${this.apiVersion}/command`, {
+            name: commandName,
+            [this.mediaIdField.slice(0, -1)]: mediaId // Remove 's' from field name for single item
+          });
+        }
+      } else {
+        // For apps that support batch search (e.g., Radarr)
+        await client.post(`/api/${this.apiVersion}/command`, {
+          name: commandName,
+          [this.mediaIdField]: mediaIds
+        });
+      }
+      
+      logger.info(`✅ [${this.appName} API] Search command sent`, { count: mediaIds.length });
+    } catch (error: unknown) {
+      this.logError(`Failed to search ${this.getMediaTypeName()}`, error, {
+        mediaIds,
+        mediaCount: mediaIds.length,
+        url: config.url,
+        name: config.name
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Generic method to filter media
+   * Applies common filters and optional status filter
+   */
+  protected async filterMediaItems(config: TConfig, media: TMedia[]): Promise<TMedia[]> {
+    logger.info(`🔽 [${this.appName}] Starting ${this.getMediaTypeName()} filtering`, {
+      totalMedia: media.length,
+      name: config.name,
+      filters: {
+        monitored: (config as any).monitored,
+        tagName: (config as any).tagName,
+        ignoreTag: (config as any).ignoreTag,
+        qualityProfileName: (config as any).qualityProfileName,
+        statusFilter: (config as any)[this.getStatusFilterKey() || '']
+      }
+    });
+    
+    try {
+      const initialCount = media.length;
+      const { applyCommonFilters } = await import('../utils/filterUtils.js');
+
+      // Apply common filters (monitored, tag, quality profile, ignore tag)
+      logger.debug(`🔽 [${this.appName}] Applying common filters`, { count: media.length });
+      let filtered = await applyCommonFilters(
+        media,
+        {
+          monitored: (config as any).monitored,
+          tagName: (config as any).tagName,
+          ignoreTag: (config as any).ignoreTag,
+          qualityProfileName: (config as any).qualityProfileName,
+          getQualityProfiles: () => this.getQualityProfiles(config),
+          getTagId: (tagName: string) => this.getTagId(config, tagName)
+        },
+        this.appName,
+        this.getMediaTypeName()
+      );
+      
+      logger.debug(`✅ [${this.appName}] Common filters applied`, {
+        before: initialCount,
+        after: filtered.length,
+        removed: initialCount - filtered.length
+      });
+
+      // Apply status filter if configured
+      const statusFilterKey = this.getStatusFilterKey();
+      if (statusFilterKey) {
+        const statusValue = (config as any)[statusFilterKey];
+        if (statusValue && statusValue !== 'any') {
+          const beforeStatusFilter = filtered.length;
+          logger.debug(`🔽 [${this.appName}] Applying status filter`, {
+            statusKey: statusFilterKey,
+            statusValue,
+            count: beforeStatusFilter
+          });
+          
+          filtered = this.applyStatusFilter(filtered, statusValue);
+          
+          logger.debug(`✅ [${this.appName}] Status filter applied`, {
+            status: statusValue,
+            before: beforeStatusFilter,
+            after: filtered.length,
+            removed: beforeStatusFilter - filtered.length
+          });
+        } else {
+          logger.debug(`⏭️  [${this.appName}] Skipping status filter (set to any or undefined)`);
+        }
+      }
+
+      logger.info(`✅ [${this.appName}] Filtering completed`, {
+        initial: initialCount,
+        final: filtered.length,
+        totalRemoved: initialCount - filtered.length,
+        filterEfficiency: `${((1 - filtered.length / initialCount) * 100).toFixed(1)}%`
+      });
+
+      return filtered;
+    } catch (error: unknown) {
+      this.logError(`Failed to filter ${this.getMediaTypeName()}`, error, {
+        mediaCount: media.length,
+        name: config.name
+      });
+      throw error;
+    }
   }
 
   /**

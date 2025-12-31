@@ -131,7 +131,7 @@ class SyncSchedulerService {
       const allTagNames = new Set<string>();
       mediaWithTagNames.forEach(item => {
         if (Array.isArray(item.tags)) {
-          item.tags.forEach(tag => allTagNames.add(tag));
+          item.tags.forEach((tag: string) => allTagNames.add(tag));
         }
       });
       logger.info(`✅ Tag conversion completed`, { 

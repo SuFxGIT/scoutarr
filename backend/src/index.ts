@@ -13,6 +13,7 @@ import { schedulerService } from './services/schedulerService.js';
 import { getErrorMessage } from './utils/errorUtils.js';
 import logger, { startOperation } from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -44,9 +45,16 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve frontend for all other routes (SPA fallback)
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+app.get('*', (req, res) => {
+  // Only serve index.html for non-API routes
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+  }
 });
+
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Initialize services and start server
 let server: Server | null = null;

@@ -13,8 +13,8 @@ import {
   Tooltip,
   Badge,
 } from '@radix-ui/themes';
-import { ChevronLeftIcon, ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -26,7 +26,6 @@ import type { Stats } from '../types/api';
 import type { Config } from '../types/config';
 
 function Dashboard() {
-  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
   const [selectedSearch, setSelectedSearch] = useState<Stats['recentSearches'][number] | null>(null);

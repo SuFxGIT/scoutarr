@@ -155,7 +155,6 @@ async function processAppInstances<T extends StarrInstanceConfig>(
         qualityProfileName: m.quality_profile_name || undefined,
         status: m.status,
         lastSearchTime: m.last_search_time || undefined,
-        added: m.added || undefined,
       }));
     } else {
       logger.warn('⚠️  No cached media found, will fetch from API', { instanceId, appType });

@@ -5,7 +5,6 @@ import {
   Card,
   Text,
   Switch,
-  Badge,
   Tooltip,
   Table,
   Popover,
