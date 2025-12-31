@@ -37,13 +37,13 @@ class SchedulerService {
   private maxHistorySize = 100;
 
   /**
-   * Helper to send notifications with error logging
+   * Helper to send notifications, swallowing errors
    */
-  private async sendNotificationsWithLogging(results: SearchResults, success: boolean, error?: string): Promise<void> {
+  private async sendNotifications(results: SearchResults, success: boolean, error?: string): Promise<void> {
     try {
       await notificationService.sendNotifications(results, success, error);
-    } catch (notificationError: unknown) {
-      logger.debug('Failed to send notifications', { error: getErrorMessage(notificationError) });
+    } catch (err: unknown) {
+      logger.debug('Failed to send notifications', { error: getErrorMessage(err) });
     }
   }
 
@@ -150,7 +150,7 @@ class SchedulerService {
         }))
       });
 
-      await this.sendNotificationsWithLogging(results, true);
+      await this.sendNotifications(results, true);
       endOp({ totalSearched: Object.values(results).reduce((s, r) => s + (r.searched || 0), 0) }, true);
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -163,19 +163,8 @@ class SchedulerService {
       };
       this.addToHistory(historyEntry);
 
-      logger.error('❌ Global scheduled search failed', {
-        error: errorMessage,
-        stack: errorStack
-      });
-
-      try {
-        await notificationService.sendNotifications({}, false, errorMessage);
-      } catch (notificationError: unknown) {
-        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error';
-        logger.debug('Failed to send failure notifications', {
-          error: errorMessage
-        });
-      }
+      logger.error('❌ Global scheduled search failed', { error: errorMessage, stack: errorStack });
+      await this.sendNotifications({}, false, errorMessage);
     } finally {
       this.globalIsRunning = false;
     }

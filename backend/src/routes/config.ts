@@ -10,6 +10,20 @@ import { Config, StarrInstanceConfig } from '@scoutarr/shared';
 
 export const configRouter = express.Router();
 
+// Helper to get first valid instance config from saved config
+function getFirstValidInstance(app: AppType): { url: string; apiKey: string } | null {
+  const config = configService.getConfig();
+  const savedConfig = config.applications[app] as StarrInstanceConfig[] | undefined;
+  
+  if (!Array.isArray(savedConfig)) return null;
+  
+  const instance = savedConfig.find(
+    (inst: StarrInstanceConfig) => inst?.enabled !== false && inst.url && inst.apiKey
+  );
+  
+  return instance ? { url: instance.url, apiKey: instance.apiKey } : null;
+}
+
 // Get config
 configRouter.get('/', async (req, res) => {
   logger.debug('📋 Config requested');
@@ -45,13 +59,7 @@ configRouter.post('/reset-app', async (_req, res) => {
 configRouter.put('/', async (req, res) => {
   logger.info('💾 Config update requested');
   try {
-    const oldConfig = configService.getConfig();
-    const newConfig = req.body as Config;
-    
-    logger.debug('🔄 Comparing old and new config for cache invalidation');
-    logger.debug('💾 Saving updated configuration');
     await configService.saveConfig(req.body);
-    
     logger.info('✅ Config update completed');
     res.json({ success: true });
   } catch (error: unknown) {
@@ -64,78 +72,30 @@ configRouter.post('/test/:app', async (req, res) => {
   const { app } = req.params;
   logger.info(`🔌 Testing connection for ${app}`);
   try {
-    // Shape used for testing connections
-    let appConfig: { url: string; apiKey: string } | null = null;
-
-    // Use config from request body if provided (for testing unsaved changes)
-    if (req.body && typeof req.body.url === 'string' && typeof req.body.apiKey === 'string') {
-      appConfig = {
-        url: req.body.url,
-        apiKey: req.body.apiKey
-      };
-    } else {
-      // Fallback to saved config
-      const config = configService.getConfig();
-      const savedConfig = config.applications[app as AppType] as StarrInstanceConfig[] | undefined;
-
-      if (Array.isArray(savedConfig)) {
-        // Pick the first enabled instance with URL and API key
-        const instance = savedConfig.find(
-          (inst: StarrInstanceConfig) => inst && inst.enabled !== false && inst.url && inst.apiKey
-        );
-        if (instance) {
-          appConfig = {
-            url: instance.url,
-            apiKey: instance.apiKey
-          };
-        }
-      }
-    }
+    // Use config from request body if provided, otherwise fall back to saved config
+    const appConfig = (req.body?.url && req.body?.apiKey)
+      ? { url: req.body.url, apiKey: req.body.apiKey }
+      : getFirstValidInstance(app as AppType);
 
     if (!appConfig) {
       logger.warn(`⚠️  ${app} is not configured`);
       return res.status(400).json({ error: 'Application URL and API Key are required' });
     }
 
-    // Test connection using utility function
+    // Test connection
     const testResult = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
 
-    // Find instanceId from config by matching URL and API key
-    let instanceId: string | null = null;
-    const config = configService.getConfig();
-    const appConfigs = config.applications[app as AppType] as StarrInstanceConfig[] | undefined;
-    if (Array.isArray(appConfigs)) {
-      const matchingInstance = appConfigs.find(
-        (inst: StarrInstanceConfig) => inst.url === appConfig.url && inst.apiKey === appConfig.apiKey
-      );
-      if (matchingInstance) {
-        instanceId = matchingInstance.id;
-      }
-    }
+    const status = testResult.success ? 200 : 500;
+    const response = testResult.success
+      ? { success: true, appName: testResult.appName, version: testResult.version }
+      : { error: 'Connection test failed', message: testResult.error || 'Unable to connect' };
 
-    if (testResult.success) {
-      logger.info(`✅ Connection test successful for ${app}`, { 
-        url: appConfig.url, 
-        appName: testResult.appName, 
-        version: testResult.version,
-        instanceId
-      });
-      res.json({ 
-        success: true, 
-        appName: testResult.appName,
-        version: testResult.version
-      });
-    } else {
-      logger.error(`❌ Connection test failed for ${app}`, { 
-        url: appConfig.url, 
-        error: testResult.error,
-        instanceId
-      });
-      res.status(500).json({
-        error: 'Connection test failed',
-        message: testResult.error || 'Unable to connect to application or application type mismatch'
-      });
-    }
+    logger[testResult.success ? 'info' : 'error'](
+      `${testResult.success ? '✅' : '❌'} Connection test for ${app}`,
+      { url: appConfig.url, ...testResult }
+    );
+
+    res.status(status).json(response);
   } catch (error: unknown) {
     handleRouteError(res, error, 'Connection test failed');
   }
@@ -153,14 +113,9 @@ configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
       return res.status(400).json({ error: 'Instance not found or not configured' });
     }
 
-    // Fetch quality profiles based on app type using service registry
-    let profiles: Array<{ id: number; name: string }> = [];
-    try {
-      const service = getServiceForApp(app as AppType);
-      profiles = await service.getQualityProfiles(instanceConfig);
-    } catch (error: unknown) {
-      return res.status(400).json({ error: getErrorMessage(error) });
-    }
+    // Fetch quality profiles using service registry
+    const service = getServiceForApp(app as AppType);
+    const profiles = await service.getQualityProfiles(instanceConfig);
 
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
     res.json(profiles);
@@ -183,17 +138,9 @@ configRouter.post('/quality-profiles/:app', async (req, res) => {
       return res.status(400).json({ error: 'URL and API key are required' });
     }
 
-    // Create a temporary config object
-    const tempConfig = { url, apiKey } as StarrInstanceConfig;
-
-    // Fetch quality profiles based on app type using service registry
-    let profiles: Array<{ id: number; name: string }> = [];
-    try {
-      const service = getServiceForApp(app as AppType);
-      profiles = await service.getQualityProfiles(tempConfig);
-    } catch (error: unknown) {
-      return res.status(400).json({ error: getErrorMessage(error) });
-    }
+    // Fetch quality profiles using service registry
+    const service = getServiceForApp(app as AppType);
+    const profiles = await service.getQualityProfiles({ url, apiKey } as StarrInstanceConfig);
 
     logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`);
     res.json(profiles);

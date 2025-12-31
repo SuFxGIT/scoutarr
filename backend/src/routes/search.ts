@@ -16,21 +16,13 @@ import { getErrorMessage } from '../utils/errorUtils.js';
 
 export const searchRouter = express.Router();
 
-// Helper function to randomly select items (matching script behavior)
+// Helper function to randomly select items
 function randomSelect<T>(items: T[], count: number | 'max'): T[] {
-  if (count === 'max') {
-    return items;
-  }
-  const numCount = count;
-  if (numCount >= items.length) {
-    return items;
-  }
-  if (items.length === 0) {
-    return items;
-  }
-  // Shuffle and take first count items (simulating Get-Random behavior)
-  const shuffled = [...items].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, numCount);
+  if (count === 'max' || count >= items.length) return items;
+  if (items.length === 0) return items;
+  
+  // Shuffle and take first count items
+  return [...items].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
 // Helper to generate result key for instances
@@ -48,34 +40,14 @@ function getInstanceInfo(config: StarrInstanceConfig, appType: AppType): { insta
 
 // Helper to save stats for results
 async function saveStatsForResults(results: SearchResults): Promise<void> {
-  for (const [app, result] of Object.entries(results)) {
-    if (result.success && result.searched && result.searched > 0) {
-      // Extract app type from result key (could be "radarr" or "radarr-instance-id")
-      const appType = app.split('-')[0] as AppType;
-      
-      // Get items - check all possible media type keys
-      const items = extractItemsFromResult(result);
-      
-      // Use instanceName from result if available, otherwise undefined
-      const instanceName = result.instanceName;
-      
-      // Debug logging to see what's being saved
-      logger.debug('📊 Saving stats', {
-        app,
-        appType,
-        instanceName,
-        hasInstanceName: 'instanceName' in result,
-        resultKeys: Object.keys(result),
-        resultInstanceName: result.instanceName
-      });
-      
-      await statsService.addSearch(
-        appType,
-        result.searched,
-        items,
-        instanceName
-      );
-    }
+  for (const [resultKey, result] of Object.entries(results)) {
+    if (!result.success || !result.searched || result.searched === 0) continue;
+    
+    // Extract app type from result key (e.g., "radarr" or "radarr-instance-id")
+    const appType = resultKey.split('-')[0] as AppType;
+    const items = extractItemsFromResult(result);
+    
+    await statsService.addSearch(appType, result.searched, items, result.instanceName);
   }
 }
 
