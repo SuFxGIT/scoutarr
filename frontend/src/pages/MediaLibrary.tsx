@@ -415,7 +415,7 @@ function MediaLibrary() {
       <Card>
         <Flex direction="column" gap="3">
           <Heading size="5">Select Instance</Heading>
-          <Separator />
+          <Separator size="4" />
 
           {!config || !hasAnyInstances ? (
             <Callout.Root color="orange">
@@ -466,7 +466,7 @@ function MediaLibrary() {
               </Text>
             )}
           </Flex>
-          <Separator />
+          <Separator size="4" />
 
           {/* Show All Media Toggle */}
           {selectedInstance && (

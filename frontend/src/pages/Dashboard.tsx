@@ -377,7 +377,7 @@ function Dashboard() {
               </Tooltip>
             </Flex>
           </Flex>
-          <Separator />
+          <Separator size="4" />
           <Card variant="surface" style={{ backgroundColor: LOG_BG_COLOR, fontFamily: 'monospace' }}>
           <div
             ref={logContainerRef}
@@ -478,7 +478,7 @@ function Dashboard() {
                     </span>
                   </Tooltip>
                 </Flex>
-                <Separator />
+                <Separator size="4" />
                 <Flex gap="3" wrap="wrap" justify="center">
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
                     <Flex direction="column" gap="2" align="center" justify="center">
@@ -585,7 +585,7 @@ function Dashboard() {
                     )}
                   </Flex>
                 </Flex>
-                <Separator />
+                <Separator size="4" />
                 {totalItems === 0 ? (
                   <Box p="4">
                     <Text size="2" color="gray" align="center">
@@ -746,7 +746,7 @@ function Dashboard() {
                   {selectedSearch.count} {selectedSearch.count === 1 ? 'item' : 'items'} searched on{' '}
                   {format(new Date(selectedSearch.timestamp), 'PPpp')}
                 </Dialog.Description>
-                <Separator />
+                <Separator size="4" />
                 {selectedSearch.items.length === 0 ? (
                   <Text size="2" color="gray">
                     No items recorded for this search.

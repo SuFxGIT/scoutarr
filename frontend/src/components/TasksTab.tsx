@@ -148,7 +148,7 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
               <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
             </Tooltip>
           </Flex>
-          <Separator />
+          <Separator size="4" />
 
           <TaskRow
             name="Global Upgrade Search"
@@ -183,7 +183,7 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
               <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
             </Tooltip>
           </Flex>
-          <Separator />
+          <Separator size="4" />
 
           {/* Radarr Instances */}
           {config.applications.radarr.length > 0 && (
@@ -330,7 +330,7 @@ export function TasksTab({ config, onConfigChange, schedulerStatus }: TasksTabPr
               <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
             </Tooltip>
           </Flex>
-          <Separator />
+          <Separator size="4" />
 
           <TaskRow
             name="Media Library Sync"

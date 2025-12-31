@@ -912,7 +912,7 @@ function Settings() {
                                   onCheckedChange={(checked: boolean) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
                                 />
                               </Flex>
-                              <Separator />
+                              <Separator size="4" />
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
                                   <Text size="2" weight="medium">Name (optional)</Text>
@@ -1178,7 +1178,7 @@ function Settings() {
                                 </Flex>
                               </Flex>
 
-                              <Separator />
+                              <Separator size="4" />
 
                               <Flex direction="row" align="center" justify="between" gap="2">
                                 <Text size="2" weight="medium">Clear Tags</Text>
@@ -1234,7 +1234,7 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Notification Configuration</Heading>
-                <Separator />
+                <Separator size="4" />
 
                 <Flex direction="column" gap="1">
                   <Flex align="center" gap="1">
@@ -1313,7 +1313,7 @@ function Settings() {
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
                   </Tooltip>
                 </Flex>
-                <Separator />
+                <Separator size="4" />
 
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
@@ -1436,7 +1436,7 @@ function Settings() {
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '16px', height: '16px' }} />
                   </Tooltip>
                 </Flex>
-                <Separator />
+                <Separator size="4" />
 
                 {/* Render instances for each app type */}
                 {APP_TYPES.map(appType => {
@@ -1475,7 +1475,7 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Tasks</Heading>
-                <Separator />
+                <Separator size="4" />
 
                 <Flex direction="row" align="center" justify="between" gap="2">
                   <Flex align="center" gap="1">
@@ -1523,7 +1523,7 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>
-                <Separator />
+                <Separator size="4" />
 
                 <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Reset App</Text>
