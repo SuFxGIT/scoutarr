@@ -1,10 +1,15 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { createRequire } from 'module';
 import logger from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
+
+// cron-parser is a CommonJS module, use createRequire to import it
+const require = createRequire(import.meta.url);
+const { parseExpression } = require('cron-parser');
 
 class SyncSchedulerService {
   private task: ScheduledTask | null = null;
@@ -201,6 +206,20 @@ class SyncSchedulerService {
 
   getCurrentSchedule(): string | null {
     return this.currentSchedule;
+  }
+
+  getNextRunTime(): Date | null {
+    if (!this.currentSchedule) return null;
+    try {
+      const interval = parseExpression(this.currentSchedule);
+      return interval.next().toDate();
+    } catch (error: unknown) {
+      logger.debug('Could not parse sync cron for next run time', {
+        schedule: this.currentSchedule,
+        error: getErrorMessage(error)
+      });
+      return null;
+    }
   }
 }
 

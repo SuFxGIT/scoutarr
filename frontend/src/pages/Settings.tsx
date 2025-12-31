@@ -33,6 +33,7 @@ import { getErrorMessage } from '../utils/helpers';
 import { CRON_PRESETS, getPresetFromSchedule, MAX_INSTANCES_PER_APP, APP_TYPES, CRON_PRESET_OPTIONS, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
+import { TasksTab } from '../components/TasksTab';
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -70,6 +71,15 @@ function Settings() {
     refetchOnWindowFocus: true,
   });
 
+  // Load scheduler status for Tasks tab
+  const { data: schedulerStatus } = useQuery({
+    queryKey: ['scheduler-status'],
+    queryFn: async () => {
+      const response = await axios.get('/api/status/scheduler');
+      return response.data;
+    },
+    refetchInterval: 60000, // Refresh every minute
+  });
 
   // Update local config when loaded config changes
   useEffect(() => {
@@ -746,6 +756,7 @@ function Settings() {
               <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="scheduler">Scheduler</Tabs.Trigger>
+              <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
               <Tabs.Trigger value="advanced">Advanced</Tabs.Trigger>
             </Tabs.List>
             <Flex gap="2" align="center">
@@ -1448,6 +1459,16 @@ function Settings() {
                 )}
               </Flex>
             </Card>
+          </Tabs.Content>
+
+          <Tabs.Content value="tasks">
+            {config && (
+              <TasksTab
+                config={config}
+                onConfigChange={setConfig}
+                schedulerStatus={schedulerStatus}
+              />
+            )}
           </Tabs.Content>
 
           <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>

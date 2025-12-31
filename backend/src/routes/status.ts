@@ -1,6 +1,7 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
 import { schedulerService } from '../services/schedulerService.js';
+import { syncSchedulerService } from '../services/syncSchedulerService.js';
 import { testStarrConnection, getConfiguredInstances, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import logger from '../utils/logger.js';
 import { StarrInstanceConfig, StatusResponse, InstanceStatus } from '@scoutarr/shared';
@@ -134,14 +135,26 @@ statusRouter.get('/scheduler', async (req, res) => {
 
     // Enabled if global OR any instance scheduler is enabled
     const globalEnabled = config.scheduler?.enabled || false;
-    
+
+    // Get sync scheduler status
+    const syncConfig = config.tasks;
+    const syncSchedule = syncSchedulerService.getCurrentSchedule();
+    const syncNextRun = syncConfig?.syncEnabled && syncSchedule
+      ? syncSchedulerService.getNextRunTime()
+      : null;
+
     res.json({
       enabled: globalEnabled || anyInstanceEnabled,
       globalEnabled: globalEnabled,
       running: schedulerStatus.running,
       schedule: schedulerStatus.schedule,
       nextRun: schedulerStatus.nextRun,
-      instances: schedulerStatus.instances
+      instances: schedulerStatus.instances,
+      sync: {
+        enabled: syncConfig?.syncEnabled || false,
+        schedule: syncSchedule,
+        nextRun: syncNextRun ? syncNextRun.toISOString() : null
+      }
     });
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to get scheduler status');

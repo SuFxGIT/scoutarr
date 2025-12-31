@@ -33,15 +33,25 @@ export interface InstanceStatus {
   instanceName?: string;
 }
 
+export interface SchedulerStatus {
+  enabled: boolean;
+  globalEnabled?: boolean;
+  running: boolean;
+  schedule: string | null;
+  nextRun: string | null;
+  instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
+}
+
+export interface SyncSchedulerStatus {
+  enabled: boolean;
+  schedule: string | null;
+  nextRun: string | null;
+}
+
 export interface StatusResponse {
-  [key: string]: InstanceStatus | {
-    enabled: boolean;
-    globalEnabled?: boolean;
-    running: boolean;
-    schedule: string | null;
-    nextRun: string | null;
-    instances?: Record<string, { schedule: string; nextRun: string | null; running: boolean }>;
-  };
+  scheduler?: SchedulerStatus;
+  sync?: SyncSchedulerStatus;
+  [key: string]: InstanceStatus | SchedulerStatus | SyncSchedulerStatus | undefined;
 }
 
 export interface SchedulerHistoryEntry {

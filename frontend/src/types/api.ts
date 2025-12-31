@@ -8,5 +8,7 @@ export type {
   Stats,
   InstanceStatus,
   StatusResponse,
+  SchedulerStatus,
+  SyncSchedulerStatus,
   SchedulerHistoryEntry,
 } from '@scoutarr/shared';

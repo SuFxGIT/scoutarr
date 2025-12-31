@@ -1,3 +1,5 @@
+import humanizeDuration from 'humanize-duration';
+
 /**
  * Format application name from instance ID or app name
  * Examples: "radarr-1" -> "Radarr", "sonarr-main" -> "Sonarr"
@@ -27,3 +29,25 @@ export const getErrorMessage = (error: unknown): string => {
   return 'Unknown error';
 };
 
+/**
+ * Calculate milliseconds until a future ISO timestamp
+ * Returns 0 if the timestamp is in the past
+ */
+export const calculateTimeUntil = (isoTimestamp: string): number => {
+  const target = new Date(isoTimestamp);
+  const now = new Date();
+  return Math.max(0, target.getTime() - now.getTime());
+};
+
+/**
+ * Format milliseconds into human-readable countdown string
+ * Examples: "2h 15m", "3d 4h", "45m 30s"
+ */
+export const formatCountdown = (milliseconds: number): string => {
+  if (milliseconds === 0) return 'Now';
+  return humanizeDuration(milliseconds, {
+    units: ['d', 'h', 'm', 's'],
+    round: true,
+    largest: 2
+  });
+};
