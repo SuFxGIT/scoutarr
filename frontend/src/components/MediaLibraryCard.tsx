@@ -346,7 +346,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     return sorted.map(item => ({
       ...item,
       formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
-      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : 'N/A'
+      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : ''
     }));
   }, [mediaData?.media, sortColumns, searchQuery]);
 
@@ -388,7 +388,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     },
     {
       key: 'dateImported',
-      name: 'Last Imported',
+      name: 'Date Imported',
       sortable: true,
       resizable: true,
       renderCell: (props) => <LastImportedCell row={props.row} />

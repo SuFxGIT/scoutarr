@@ -94,7 +94,6 @@ class StatsService {
         quality_profile_name TEXT,
         status TEXT NOT NULL,
         last_search_time TEXT,
-        added TEXT,
         date_imported TEXT,
         has_file INTEGER NOT NULL DEFAULT 0,
         custom_format_score INTEGER,
@@ -573,9 +572,9 @@ class StatsService {
       const insertStmt = this.db.prepare(`
         INSERT INTO media_library (
           instance_id, media_id, title, monitored, tags, quality_profile_name,
-          status, last_search_time, added, date_imported, has_file,
+          status, last_search_time, date_imported, has_file,
           custom_format_score, raw_data, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id, media_id) DO UPDATE SET
           title = excluded.title,
           monitored = excluded.monitored,
@@ -583,7 +582,6 @@ class StatsService {
           quality_profile_name = excluded.quality_profile_name,
           status = excluded.status,
           last_search_time = excluded.last_search_time,
-          added = excluded.added,
           date_imported = excluded.date_imported,
           has_file = excluded.has_file,
           custom_format_score = excluded.custom_format_score,
@@ -639,8 +637,7 @@ class StatsService {
             item.qualityProfileName || null,
             item.status,
             item.lastSearchTime || null,
-            item.added || null,
-            dateImported || item.added || null,
+            dateImported || null,
             hasFile,
             customFormatScore,
             JSON.stringify(item), // Store full raw data for future use
@@ -686,7 +683,6 @@ class StatsService {
     quality_profile_name: string | null; // Profile name
     status: string;
     last_search_time: string | null;
-    added: string | null;
     date_imported: string | null;
     has_file: boolean;
     custom_format_score: number | null;
@@ -726,7 +722,6 @@ class StatsService {
         quality_profile_name: string | null;
         status: string;
         last_search_time: string | null;
-        added: string | null;
         date_imported: string | null;
         has_file: number;
         custom_format_score: number | null;
@@ -743,7 +738,6 @@ class StatsService {
         quality_profile_name: row.quality_profile_name,
         status: row.status,
         last_search_time: row.last_search_time,
-        added: row.added,
         date_imported: row.date_imported,
         has_file: row.has_file === 1,
         custom_format_score: row.custom_format_score,

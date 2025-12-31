@@ -124,7 +124,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
           qualityProfileName: m.quality_profile_name || undefined,
           status: m.status,
           lastSearchTime: m.last_search_time || undefined,
-          added: m.added || undefined,
           movieFile: m.date_imported ? {
             dateAdded: m.date_imported,
             customFormatScore: m.custom_format_score
@@ -240,7 +239,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         qualityProfileName: m.qualityProfileName,
         tags: m.tags,
         lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
-        dateImported: dateImported || m.added, // File import date, fallback to when added to library
+        dateImported: dateImported, // File import date
         customFormatScore,
         hasFile
       };
