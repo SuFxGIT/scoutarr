@@ -103,87 +103,42 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         });
       }
     } else {
-      // Try to get from database first
-      logger.debug('💾 [Scoutarr DB] Attempting to load from cache');
+      // Always use database (no API fallback)
+      logger.debug('💾 [Scoutarr DB] Loading from database');
       const dbMedia = await statsService.getMediaFromDatabase(instanceId);
+      logger.debug('✅ [Scoutarr DB] Loaded media from database', { count: dbMedia.length });
+      fromCache = true;
 
-      if (dbMedia.length > 0) {
-        logger.debug('✅ [Scoutarr DB] Using cached media from database', { count: dbMedia.length });
-        fromCache = true;
+      // Convert database format to API format for filtering
+      const mediaFromDb = dbMedia.map(m => ({
+        id: m.media_id,
+        title: m.title,
+        monitored: m.monitored,
+        tags: m.tags,
+        qualityProfileName: m.quality_profile_name || undefined,
+        status: m.status,
+        lastSearchTime: m.last_search_time || undefined,
+        movieFile: m.date_imported ? {
+          dateAdded: m.date_imported,
+          customFormatScore: m.custom_format_score
+        } : undefined,
+        episodeFile: m.date_imported ? {
+          dateAdded: m.date_imported,
+          customFormatScore: m.custom_format_score
+        } : undefined,
+      }));
 
-        // Convert database format to API format for filtering
-        const mediaFromDb = dbMedia.map(m => ({
-          id: m.media_id,
-          title: m.title,
-          monitored: m.monitored,
-          tags: m.tags,
-          qualityProfileName: m.quality_profile_name || undefined,
-          status: m.status,
-          lastSearchTime: m.last_search_time || undefined,
-          movieFile: m.date_imported ? {
-            dateAdded: m.date_imported,
-            customFormatScore: m.custom_format_score
-          } : undefined,
-          episodeFile: m.date_imported ? {
-            dateAdded: m.date_imported,
-            customFormatScore: m.custom_format_score
-          } : undefined,
-        }));
-
-        // Re-apply instance filters (settings may have changed since sync, unless skipFilters is true)
-        if (shouldSkipFilters) {
-          logger.debug('⏭️  [Scoutarr] Skipping instance filters for cached data (showAll=true)');
-          filteredMedia = mediaFromDb;
-        } else {
-          logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
-          filteredMedia = await service.filterMedia(instance, mediaFromDb);
-          logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
-            total: mediaFromDb.length,
-            filtered: filteredMedia.length
-          });
-        }
+      // Re-apply instance filters (settings may have changed since sync, unless skipFilters is true)
+      if (shouldSkipFilters) {
+        logger.debug('⏭️  [Scoutarr] Skipping instance filters for cached data (showAll=true)');
+        filteredMedia = mediaFromDb;
       } else {
-        // No data in database, fetch from API
-        logger.debug('📡 [Scoutarr DB] No cached data, fetching from *arr API', { appType });
-        const allMedia = await service.getMedia(instance);
-        logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
-
-        // Fetch and sync quality profiles
-        logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
-        const profiles = await service.getQualityProfiles(instance);
-
-        // Sync quality profiles to database
-        logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-        await statsService.syncQualityProfiles(instanceId, profiles);
-        logger.debug('✅ [Scoutarr DB] Quality profiles synced');
-
-        // Convert tag IDs to names before syncing
-        logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
-        const mediaWithTagNames = await Promise.all(
-          allMedia.map(async (item) => {
-            const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-            return { ...item, tags: tagNames };
-          })
-        );
-        logger.debug('✅ [Scoutarr] Tag IDs converted to names');
-
-        // Sync to database
-        logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
-        await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
-        logger.debug('✅ [Scoutarr DB] Synced media to database');
-
-        // Apply instance filter settings (unless skipFilters is true)
-        if (shouldSkipFilters) {
-          logger.debug('⏭️  [Scoutarr] Skipping instance filters (showAll=true)');
-          filteredMedia = allMedia;
-        } else {
-          logger.debug('🔽 [Scoutarr] Applying instance filters');
-          filteredMedia = await service.filterMedia(instance, allMedia);
-          logger.debug('✅ [Scoutarr] Applied instance filters', {
-            total: allMedia.length,
-            filtered: filteredMedia.length
-          });
-        }
+        logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
+        filteredMedia = await service.filterMedia(instance, mediaFromDb);
+        logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
+          total: mediaFromDb.length,
+          filtered: filteredMedia.length
+        });
       }
     }
 
