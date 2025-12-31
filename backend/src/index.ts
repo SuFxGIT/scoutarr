@@ -1,3 +1,6 @@
+// Log startup immediately (before any imports that might fail)
+console.log('🚀 Scoutarr backend starting...');
+
 import express from 'express';
 import cors from 'cors';
 import { Server } from 'http';
@@ -19,6 +22,18 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+console.log('✅ All modules imported successfully');
+
+// Add global error handlers to catch startup errors
+process.on('uncaughtException', (error) => {
+  console.error('💥 UNCAUGHT EXCEPTION:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+  process.exit(1);
+});
 
 const app = express();
 const PORT = process.env.PORT || 5839;
@@ -45,11 +60,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // Error handling middleware for API routes (must be before SPA fallback)
-app.use(notFoundHandler);
-app.use(errorHandler);
+app.use('/api', notFoundHandler);
+app.use('/api', errorHandler);
 
 // Serve frontend for all other routes (SPA fallback)
-app.get('*', (req, res) => {
+// Use middleware instead of route pattern to avoid path-to-regexp issues
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 });
 

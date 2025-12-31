@@ -6,36 +6,9 @@ import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../uti
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { handleRouteError, getErrorMessage } from '../utils/errorUtils.js';
 import logger from '../utils/logger.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { Config, StarrInstanceConfig } from '@scoutarr/shared';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export const configRouter = express.Router();
-
-// Helper function to clear log files
-async function clearLogs(): Promise<void> {
-  const logsDir = path.join(__dirname, '../../../logs');
-  const logFiles = ['combined.log', 'error.log', 'exceptions.log', 'rejections.log'];
-  
-  for (const logFile of logFiles) {
-    const logPath = path.join(logsDir, logFile);
-    try {
-      // Delete the file instead of just clearing it
-      await fs.unlink(logPath);
-      logger.debug(`Deleted log file: ${logFile}`);
-    } catch (error: unknown) {
-      // If file doesn't exist, that's okay - just log and continue
-      const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code !== 'ENOENT') {
-        logger.warn(`Failed to delete log file ${logFile}: ${getErrorMessage(error)}`);
-      }
-    }
-  }
-}
 
 // Get config
 configRouter.get('/', async (req, res) => {
@@ -60,9 +33,6 @@ configRouter.post('/reset-app', async (_req, res) => {
     
     // Clear scheduler history
     schedulerService.clearHistory();
-    
-    // Clear log files
-    await clearLogs();
     
     logger.info('✅ App reset completed - all data cleared');
     res.json({ success: true, config });

@@ -1,10 +1,4 @@
 import winston from 'winston';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync } from 'fs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Define log levels with colors
 const logLevels = {
@@ -35,73 +29,36 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Custom format for file output (JSON)
-const fileFormat = winston.format.combine(
-  winston.format.timestamp(),
-  winston.format.errors({ stack: true }),
-  winston.format.json()
-);
-
-// Determine log level from environment or config
-// We'll read from config after it's loaded, but default to env or production default
+// Determine log level from environment
 let logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
 
-// Function to update log level from config (called after config is loaded)
-export function updateLogLevel(level?: string): void {
-  if (level && ['error', 'warn', 'info', 'http', 'debug'].includes(level)) {
-    logLevel = level;
-    logger.level = level;
-    logger.info(`📝 Log level updated to: ${level}`);
-  }
-}
-
-// Create logger instance
+// Create logger instance with console-only logging
 const logger = winston.createLogger({
   levels: logLevels,
   level: logLevel,
-  format: fileFormat,
   defaultMeta: { service: 'scoutarr' },
   transports: [
     // Write all logs to console
     new winston.transports.Console({
       format: consoleFormat,
     }),
-    // Write all logs with level 'error' and below to error.log
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../../logs/error.log'),
-      level: 'error',
-      format: fileFormat,
-    }),
-    // Write all logs to combined.log
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../../logs/combined.log'),
-      format: fileFormat,
-    }),
   ],
   // Handle exceptions and rejections
   exceptionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../../logs/exceptions.log'),
-      format: fileFormat,
+    new winston.transports.Console({
+      format: consoleFormat,
     }),
   ],
   rejectionHandlers: [
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../../logs/rejections.log'),
-      format: fileFormat,
+    new winston.transports.Console({
+      format: consoleFormat,
     }),
   ],
 });
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../../../logs');
-if (!existsSync(logsDir)) {
-  mkdirSync(logsDir, { recursive: true });
-}
-
 export default logger;
 
-// Helper utilities for consistent structured logging across the app
+// Helper utility for consistent structured logging across the app
 export function startOperation(name: string, meta: Record<string, unknown> = {}) {
   const startTime = Date.now();
   logger.info(`▶️ START ${name}`, { ...meta, operation: name, phase: 'start', ts: new Date().toISOString() });
@@ -109,20 +66,6 @@ export function startOperation(name: string, meta: Record<string, unknown> = {})
     const duration = Date.now() - startTime;
     const level = success ? 'info' : 'error';
     logger.log(level, `◀️ END ${name}`, { ...meta, ...resultMeta, operation: name, phase: 'end', durationMs: duration, ts: new Date().toISOString() });
-  };
-}
-
-export function logStep(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta: Record<string, unknown> = {}) {
-  logger.log(level, message, meta);
-}
-
-export function childLogger(context: Record<string, unknown>) {
-  return {
-    debug: (msg: string, meta: Record<string, unknown> = {}) => logger.debug(msg, { ...context, ...meta }),
-    info: (msg: string, meta: Record<string, unknown> = {}) => logger.info(msg, { ...context, ...meta }),
-    warn: (msg: string, meta: Record<string, unknown> = {}) => logger.warn(msg, { ...context, ...meta }),
-    error: (msg: string, meta: Record<string, unknown> = {}) => logger.error(msg, { ...context, ...meta }),
-    start: (name: string, meta: Record<string, unknown> = {}) => startOperation(name, { ...context, ...meta })
   };
 }
 

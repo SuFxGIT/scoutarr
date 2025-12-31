@@ -73,17 +73,15 @@ export const readarrInstanceSchema = createInstanceSchema(
 
 export const notificationConfigSchema = z.object({
   discordWebhook: z.string().url('Invalid Discord webhook URL').or(z.literal('')),
-  discordEnabled: z.boolean().optional(),
-  ntfyServer: z.string().or(z.literal('')),
-  ntfyTopic: z.string().or(z.literal('')),
-  ntfyEnabled: z.boolean().optional(),
+  notifiarrPassthroughWebhook: z.string().url('Invalid webhook URL').or(z.literal('')),
+  notifiarrPassthroughDiscordChannelId: z.string().default(''),
+  pushoverUserKey: z.string().default(''),
+  pushoverApiToken: z.string().default(''),
 });
 
 export const schedulerConfigSchema = z.object({
-  radarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
-  sonarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
-  lidarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
-  readarr: z.string().refine(validateCronExpression, 'Invalid cron expression'),
+  enabled: z.boolean(),
+  schedule: z.string().refine(validateCronExpression, 'Invalid cron expression'),
   unattended: z.boolean(),
 });
 

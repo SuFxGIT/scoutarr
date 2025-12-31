@@ -9,12 +9,6 @@ const CONFIG_DIR = getConfigDir();
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const CONFIG_EXAMPLE = path.join(CONFIG_DIR, 'config.example.json');
 
-// Type for parsed config (may have additional properties)
-interface ParsedConfig extends Partial<Config> {
-  logLevel?: string;
-  [key: string]: unknown;
-}
-
 class ConfigService {
   private config: Config | null = null;
 
@@ -100,7 +94,7 @@ class ConfigService {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
       logger.debug('✅ Config file read successfully', { size: content.length });
       
-      const parsed = JSON.parse(content) as ParsedConfig;
+      const parsed = JSON.parse(content) as Partial<Config>;
       logger.debug('✅ Config JSON parsed successfully');
       
       // Normalize config: ensure all application arrays exist
@@ -146,13 +140,6 @@ class ConfigService {
       };
       
       this.config = parsed as Config;
-      
-      // Update log level if specified in config
-      if (parsed.logLevel) {
-        logger.debug('📝 Updating log level from config', { logLevel: parsed.logLevel });
-        const { updateLogLevel } = await import('../utils/logger.js');
-        updateLogLevel(parsed.logLevel);
-      }
       
       logger.debug('✅ Configuration loaded successfully', { 
         configFile: CONFIG_FILE,
