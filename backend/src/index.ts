@@ -44,17 +44,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Serve frontend for all other routes (SPA fallback)
-app.get('*', (req, res) => {
-  // Only serve index.html for non-API routes
-  if (!req.path.startsWith('/api/')) {
-    res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
-  }
-});
-
-// Error handling middleware (must be last)
+// Error handling middleware for API routes (must be before SPA fallback)
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+// Serve frontend for all other routes (SPA fallback)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+});
 
 // Initialize services and start server
 let server: Server | null = null;

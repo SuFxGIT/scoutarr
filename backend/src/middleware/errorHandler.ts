@@ -60,15 +60,22 @@ export function errorHandler(
 /**
  * 404 Not Found handler
  * Should be registered after all routes but before error handler
+ * Only handles API routes - non-API routes should be handled by SPA fallback
  */
 export function notFoundHandler(
   req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ): void {
-  logger.warn(`⚠️  Route not found: ${req.method} ${req.path}`);
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.method} ${req.path} not found`
-  });
+  // Only handle API routes that weren't matched
+  if (req.path.startsWith('/api/')) {
+    logger.warn(`⚠️  Route not found: ${req.method} ${req.path}`);
+    res.status(404).json({
+      error: 'Not Found',
+      message: `Route ${req.method} ${req.path} not found`
+    });
+  } else {
+    // Pass through to SPA fallback for non-API routes
+    next();
+  }
 }
