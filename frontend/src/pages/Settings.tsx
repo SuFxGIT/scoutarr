@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { capitalize, startCase } from 'es-toolkit';
+import { capitalize } from 'es-toolkit';
 import {
   Flex,
   Heading,
@@ -198,13 +198,10 @@ function Settings() {
     },
   });
 
-  const saveConfig = async () => {
-    if (!config) return;
-    saveConfigMutation.mutate(config);
-  };
-
-  const saveConfigWithData = async (configToSave: Config) => {
-    saveConfigMutation.mutate(configToSave);
+  const saveConfig = async (configToSave?: Config) => {
+    const configData = configToSave || config;
+    if (!configData) return;
+    saveConfigMutation.mutate(configData);
   };
 
   // Reset app mutation (clears config, quality profiles cache, stats, logs, and localStorage)
@@ -262,7 +259,7 @@ function Settings() {
   type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
 
   // Helper to get next available instance ID
-  const getNextInstanceId = (_app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instances: StarrInstanceConfig[]): number => {
+  const getNextInstanceId = (instances: StarrInstanceConfig[]): number => {
     const existingIds = instances
       .map(inst => inst.instanceId)
       .filter(id => typeof id === 'number')
@@ -385,7 +382,7 @@ function Settings() {
       showErrorToast(`Maximum of ${MAX_INSTANCES_PER_APP} ${capitalize(app)} instances allowed.`);
       return;
     }
-    const nextInstanceId = getNextInstanceId(app, instances);
+    const nextInstanceId = getNextInstanceId(instances);
     const newId = `${app}-${nextInstanceId}`;
 
     let defaultConfig: StarrInstanceConfig;
@@ -1252,7 +1249,7 @@ function Settings() {
               <TasksTab
                 config={config}
                 onConfigChange={setConfig}
-                onSaveConfig={saveConfigWithData}
+                onSaveConfig={saveConfig}
                 schedulerStatus={schedulerStatus}
                 onRefreshStatus={refetchSchedulerStatus}
               />

@@ -1,6 +1,5 @@
 import React from 'react';
-
-type AppType = 'radarr' | 'sonarr' | 'lidarr' | 'readarr';
+import type { AppType } from '../../utils/constants';
 
 interface AppIconProps {
   app: AppType | string;
