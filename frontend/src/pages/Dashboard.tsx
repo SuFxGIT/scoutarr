@@ -17,13 +17,14 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { ITEMS_PER_PAGE } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { MediaLibraryCard } from '../components/MediaLibraryCard';
 import type { Stats } from '../types/api';
 import type { Config } from '../types/config';
+import { configService } from '../services/configService';
+import { statsService } from '../services/statsService';
 
 function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,10 +35,7 @@ function Dashboard() {
   // Fetch config to get instance names
   const { data: config } = useQuery<Config>({
     queryKey: ['config'],
-    queryFn: async () => {
-      const response = await axios.get('/api/config');
-      return response.data;
-    },
+    queryFn: () => configService.getConfig(),
     enabled: true,
     staleTime: Infinity,
   });
@@ -46,19 +44,14 @@ function Dashboard() {
   // Stats are persisted in the backend database, so we should load them on mount
   const { data: stats, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ['stats'],
-    queryFn: async () => {
-      const response = await axios.get('/api/stats');
-      return response.data;
-    },
+    queryFn: () => statsService.getStats(),
     enabled: true, // Fetch on mount to load cached stats from database
     staleTime: Infinity, // Stats never go stale - they only change when a run happens
   });
 
   // Mutation for clearing recent searches
   const clearRecentMutation = useMutation({
-    mutationFn: async () => {
-      await axios.post('/api/stats/clear-recent');
-    },
+    mutationFn: () => statsService.clearRecentActivity(),
     onSuccess: () => {
       toast.success('Recent searches cleared');
       setCurrentPage(1);
@@ -73,9 +66,7 @@ function Dashboard() {
 
   // Mutation for clearing stats
   const clearStatsMutation = useMutation({
-    mutationFn: async () => {
-      await axios.post('/api/stats/clear-data');
-    },
+    mutationFn: () => statsService.clearAllData(),
     onSuccess: () => {
       toast.success('Recent searches and stats cleared');
       setCurrentPage(1);

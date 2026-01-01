@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import type { MediaLibraryResponse, MediaSearchResponse } from '@scoutarr/shared';
 
 export async function fetchMediaLibrary(
@@ -7,8 +7,8 @@ export async function fetchMediaLibrary(
   skipFilters?: boolean
 ): Promise<MediaLibraryResponse> {
   const params = skipFilters ? { skipFilters: 'true' } : {};
-  const response = await axios.get<MediaLibraryResponse>(
-    `/api/media-library/${appType}/${instanceId}`,
+  const response = await apiClient.get<MediaLibraryResponse>(
+    `/media-library/${appType}/${instanceId}`,
     { params }
   );
   return response.data;
@@ -19,8 +19,8 @@ export async function searchMedia(
   instanceId: string,
   mediaIds: number[]
 ): Promise<MediaSearchResponse> {
-  const response = await axios.post<MediaSearchResponse>(
-    '/api/media-library/search',
+  const response = await apiClient.post<MediaSearchResponse>(
+    '/media-library/search',
     {
       appType,
       instanceId,

@@ -33,10 +33,10 @@ import {
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
 import { fetchMediaLibrary, searchMedia } from '../services/mediaLibraryService';
+import { schedulerService } from '../services/schedulerService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
@@ -263,7 +263,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     if (!instanceInfo) return;
     setIsSyncing(true);
     try {
-      await axios.post(`/api/sync/${instanceInfo.appType}/${instanceInfo.instanceId}`);
+      await schedulerService.syncInstance(instanceInfo.appType, instanceInfo.instanceId);
       toast.success('Sync completed');
       refetch(); // Refresh media list
     } catch (error: unknown) {

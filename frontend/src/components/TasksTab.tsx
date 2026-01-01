@@ -18,7 +18,8 @@ import { CronExpressionParser } from 'cron-parser';
 import type { Config } from '../types/config';
 import type { SchedulerStatus, SyncSchedulerStatus } from '../types/api';
 import { calculateTimeUntil, formatCountdown } from '../utils/helpers';
-import { showErrorToast, showSuccessToast } from '../utils/toast';
+import { showSuccessToast } from '../utils/toast';
+import { schedulerService } from '../services/schedulerService';
 
 interface TasksTabProps {
   config: Config;
@@ -279,17 +280,13 @@ export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus
                 }}
                 onSaveConfig={onSaveConfig}
                 countdown={countdowns['scheduler'] || 0}
-                onManualRun={() => {
-                  fetch('/api/search/run', { method: 'POST' })
-                    .then(async (response) => {
-                      if (response.ok) {
-                        showSuccessToast('Upgrade search started');
-                      } else {
-                        const data = await response.json().catch(() => ({}));
-                        showErrorToast(data.message || 'Failed to start upgrade search');
-                      }
-                    })
-                    .catch(() => showErrorToast('Failed to start upgrade search'));
+                onManualRun={async () => {
+                  try {
+                    await schedulerService.runUpgradeSearch();
+                    showSuccessToast('Upgrade search started');
+                  } catch (error) {
+                    // Error toast handled by apiClient interceptor
+                  }
                 }}
                 onRefreshStatus={onRefreshStatus}
               />
@@ -317,17 +314,13 @@ export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus
                 }}
                 onSaveConfig={onSaveConfig}
                 countdown={countdowns['sync-scheduler'] || 0}
-                onManualRun={() => {
-                  fetch('/api/sync/all', { method: 'POST' })
-                    .then(async (response) => {
-                      if (response.ok) {
-                        showSuccessToast('Media library sync started');
-                      } else {
-                        const data = await response.json().catch(() => ({}));
-                        showErrorToast(data.message || 'Failed to start media library sync');
-                      }
-                    })
-                    .catch(() => showErrorToast('Failed to start media library sync'));
+                onManualRun={async () => {
+                  try {
+                    await schedulerService.runMediaSync();
+                    showSuccessToast('Media library sync started');
+                  } catch (error) {
+                    // Error toast handled by apiClient interceptor
+                  }
                 }}
                 onRefreshStatus={onRefreshStatus}
               />

@@ -13,11 +13,11 @@ import { PlayIcon, TrashIcon, ReloadIcon, QuestionMarkCircledIcon } from '@radix
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { formatAppName, getErrorMessage, calculateTimeUntil, formatSchedulerDuration } from '../utils/helpers';
 import { LOG_CONTAINER_HEIGHT, LOG_BG_COLOR, LOG_SCROLL_THRESHOLD } from '../utils/constants';
 import { AppIcon } from './icons/AppIcon';
 import type { SearchResults, SchedulerHistoryEntry } from '../types/api';
+import { schedulerService } from '../services/schedulerService';
 
 interface SchedulerLogsProps {
   schedulerStatus?: {
@@ -48,9 +48,7 @@ export function SchedulerLogs({ schedulerStatus, schedulerHistory, onRefreshHist
 
   // Mutation for running search
   const runSearchMutation = useMutation({
-    mutationFn: async () => {
-      await axios.post('/api/search/run');
-    },
+    mutationFn: () => schedulerService.runUpgradeSearch(),
     onSuccess: () => {
       toast.success('Search run completed');
       queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -63,9 +61,7 @@ export function SchedulerLogs({ schedulerStatus, schedulerHistory, onRefreshHist
 
   // Mutation for clearing scheduler history
   const clearHistoryMutation = useMutation({
-    mutationFn: async () => {
-      await axios.post('/api/status/scheduler/history/clear');
-    },
+    mutationFn: () => schedulerService.clearHistory(),
     onSuccess: () => {
       // Optimistically update the query cache instead of refetching
       queryClient.setQueryData(['schedulerHistory'], []);

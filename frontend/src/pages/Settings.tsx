@@ -25,7 +25,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
-import axios from 'axios';
 import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
@@ -36,6 +35,8 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { TasksTab } from '../components/TasksTab';
 import { SchedulerLogs } from '../components/SchedulerLogs';
 import type { SchedulerHistoryEntry } from '../types/api';
+import { configService } from '../services/configService';
+import { schedulerService } from '../services/schedulerService';
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -66,8 +67,8 @@ function Settings() {
   const { data: loadedConfig, isLoading: loading, error: loadError, refetch: refetchConfig } = useQuery<Config>({
     queryKey: ['config'],
     queryFn: async () => {
-      const response = await axios.get('/api/config');
-      return normalizeConfig(response.data);
+      const data = await configService.getConfig();
+      return normalizeConfig(data);
     },
     refetchOnWindowFocus: true,
   });
@@ -75,20 +76,14 @@ function Settings() {
   // Load scheduler status for Tasks tab
   const { data: schedulerStatus, refetch: refetchSchedulerStatus } = useQuery({
     queryKey: ['scheduler-status'],
-    queryFn: async () => {
-      const response = await axios.get('/api/status/scheduler');
-      return response.data;
-    },
+    queryFn: () => schedulerService.getStatus(),
     refetchInterval: 60000, // Refresh every minute
   });
 
   // Load scheduler history for Logs tab
   const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
     queryKey: ['schedulerHistory'],
-    queryFn: async () => {
-      const response = await axios.get('/api/status/scheduler/history');
-      return response.data;
-    },
+    queryFn: () => schedulerService.getHistory(),
     enabled: true,
     staleTime: Infinity,
   });
@@ -187,7 +182,7 @@ function Settings() {
         const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
         throw new Error(`Validation failed: ${errorMessage}`);
       }
-      await axios.put('/api/config', configToSave);
+      await configService.updateConfig(configToSave);
     },
     onSuccess: async (_, configToSave) => {
       toast.success('Configuration saved successfully!');
@@ -214,9 +209,7 @@ function Settings() {
 
   // Reset app mutation (clears config, quality profiles cache, stats, logs, and localStorage)
   const resetAppMutation = useMutation({
-    mutationFn: async () => {
-      await axios.post('/api/config/reset-app');
-    },
+    mutationFn: () => configService.resetAppInstance('all'),
     onSuccess: () => {
       // Clear localStorage to reset UI state
       try {
@@ -253,9 +246,8 @@ function Settings() {
 
   // Clear tags mutation
   const clearTagsMutation = useMutation({
-    mutationFn: async ({ app, instanceId }: { app: string; instanceId: string }) => {
-      await axios.post(`/api/config/clear-tags/${app}/${instanceId}`);
-    },
+    mutationFn: ({ app, instanceId }: { app: string; instanceId: string }) => 
+      configService.clearTags(app, instanceId),
     onSuccess: () => {
       showSuccessToast('Tags cleared successfully');
       setConfirmingClearTags(null);
@@ -589,15 +581,10 @@ function Settings() {
 
     setLoadingProfiles(prev => ({ ...prev, [key]: true }));
     try {
-      const response = await axios.post(`/api/config/quality-profiles/${app}`, {
-        url,
-        apiKey,
-        instanceId,
-        forceRefresh
-      });
+      const profiles = await configService.getQualityProfiles(app, url, apiKey);
       setQualityProfiles(prev => ({
         ...prev,
-        [key]: response.data.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name }))
+        [key]: profiles
       }));
     } catch (error: unknown) {
       // Silently fail - don't show error toast as this is called automatically
@@ -648,22 +635,23 @@ function Settings() {
 
     try {
       // Send current local config values to test endpoint
-      const response = await axios.post(`/api/config/test/${app}`, {
-        url: appConfig.url,
-        apiKey: appConfig.apiKey
-      });
-      const success = response.data.success === true;
+      const result = await configService.testConnection(
+        app,
+        appConfig.url,
+        appConfig.apiKey
+      );
+      const success = result.success === true;
       setTestResults(prev => ({
         ...prev,
         [key]: { 
           status: success, 
           testing: false,
-          version: response.data.version,
-          appName: response.data.appName
+          version: result.version,
+          appName: result.appName
         }
       }));
       if (success) {
-        const versionText = response.data.version ? ` (v${response.data.version})` : '';
+        const versionText = result.version ? ` (v${result.version})` : '';
         toast.success(`Connection test successful${versionText}`);
         // Fetch quality profiles after successful connection test
         if (instanceId && appConfig.url && appConfig.apiKey) {
