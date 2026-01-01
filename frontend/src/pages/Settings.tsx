@@ -30,14 +30,12 @@ import { getErrorMessage } from '../utils/helpers';
 import { AppType, MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
-import type { SchedulerHistoryEntry } from '../types/api';
 import { configService } from '../services/configService';
 import { schedulerService } from '../services/schedulerService';
 import { buildDefaultInstance, getAppInfo, getNextInstanceId, StarrInstanceConfig } from '../utils/appInfo';
 import { InstanceCard } from '../components/InstanceCard';
 
 const LazyTasksTab = lazy(() => import('../components/TasksTab').then(mod => ({ default: mod.TasksTab })));
-const LazySchedulerLogs = lazy(() => import('../components/SchedulerLogs').then(mod => ({ default: mod.SchedulerLogs })));
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -47,6 +45,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<string>(() => {
     try {
       const savedTab = localStorage.getItem('scoutarr_settings_active_tab');
+      if (savedTab === 'logs') return 'applications';
       return savedTab || 'applications';
     } catch {
       return 'applications';
@@ -76,14 +75,6 @@ function Settings() {
     queryKey: ['scheduler-status'],
     queryFn: () => schedulerService.getStatus(),
     refetchInterval: 60000, // Refresh every minute
-  });
-
-  // Load scheduler history for Logs tab
-  const { data: schedulerHistory = [], refetch: refetchHistory } = useQuery<SchedulerHistoryEntry[]>({
-    queryKey: ['schedulerHistory'],
-    queryFn: () => schedulerService.getHistory(),
-    enabled: true,
-    staleTime: Infinity,
   });
 
   // Update local config when loaded config changes
@@ -202,7 +193,7 @@ function Settings() {
     saveConfigMutation.mutate(configData);
   };
 
-  // Reset app mutation (clears config, quality profiles cache, stats, logs, and localStorage)
+  // Reset app mutation (clears config, quality profiles cache, stats, and localStorage)
   const resetAppMutation = useMutation({
     mutationFn: () => configService.resetAppInstance('all'),
     onSuccess: () => {
@@ -536,7 +527,6 @@ function Settings() {
           <Flex align="center" justify="between" gap="3">
             <Tabs.List>
               <Tabs.Trigger value="applications">Applications</Tabs.Trigger>
-              <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
               <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
               <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
               <Tabs.Trigger value="advanced">Advanced</Tabs.Trigger>
@@ -642,23 +632,6 @@ function Settings() {
                 })()}
               </Grid>
             </Flex>
-          </Tabs.Content>
-
-          <Tabs.Content value="logs" style={{ paddingTop: '1rem' }}>
-            <Suspense fallback={(
-              <Flex align="center" justify="center" gap="2" style={{ padding: '1rem' }}>
-                <Spinner size="2" />
-                <Text size="2" color="gray">Loading logs...</Text>
-              </Flex>
-            )}>
-              {config && (
-                <LazySchedulerLogs
-                  schedulerStatus={schedulerStatus?.scheduler}
-                  schedulerHistory={schedulerHistory}
-                  onRefreshHistory={refetchHistory}
-                />
-              )}
-            </Suspense>
           </Tabs.Content>
 
           <Tabs.Content value="notifications" style={{ paddingTop: '1rem' }}>

@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import type { SchedulerStatus, SyncSchedulerStatus, SchedulerHistoryEntry } from '../types/api';
+import type { SchedulerStatus, SyncSchedulerStatus } from '../types/api';
 
 /**
  * Service for managing scheduler operations
@@ -16,14 +16,6 @@ export const schedulerService = {
       scheduler?: SchedulerStatus;
       sync?: SyncSchedulerStatus;
     }>('/status/scheduler');
-    return response.data;
-  },
-
-  /**
-   * Get scheduler history
-   */
-  async getHistory(): Promise<SchedulerHistoryEntry[]> {
-    const response = await apiClient.get<SchedulerHistoryEntry[]>('/status/scheduler/history');
     return response.data;
   },
 
@@ -46,12 +38,5 @@ export const schedulerService = {
    */
   async syncInstance(appType: string, instanceId: string): Promise<void> {
     await apiClient.post(`/sync/${appType}/${instanceId}`);
-  },
-
-  /**
-   * Clear scheduler history
-   */
-  async clearHistory(): Promise<void> {
-    await apiClient.post('/status/scheduler/history/clear');
   },
 };

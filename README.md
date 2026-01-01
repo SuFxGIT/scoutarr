@@ -133,8 +133,6 @@ The application uses Winston for structured logging with organized, color-coded 
 - `POST /api/config/test/:app` – Test connection to an application
 - `POST /api/config/clear-tags/:app/:instanceId` – Clear tags from all media in a specific instance
 - `GET /api/status` – Get connection status for all applications and scheduler state
-- `GET /api/status/scheduler/history` – Get scheduler run history
-- `POST /api/status/scheduler/history/clear` – Clear scheduler run history
 - `POST /api/search/run` – Run the search for all configured instances
 - `POST /api/search/run-preview` – Preview what would be searched for each instance
 - `GET /api/stats` – Get aggregated search statistics

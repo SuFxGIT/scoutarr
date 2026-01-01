@@ -21,20 +21,10 @@ interface ScheduledTask {
   stop: () => void;
 }
 
-interface SchedulerRunHistory {
-  timestamp: string;
-  results: SearchResults;
-  success: boolean;
-  error?: string;
-}
-
 class SchedulerService {
   private globalTask: ScheduledTask | null = null;
   private globalIsRunning = false;
   private globalCurrentSchedule: string | null = null;
-
-  private runHistory: SchedulerRunHistory[] = [];
-  private maxHistorySize = 100;
 
   /**
    * Helper to send notifications, swallowing errors
@@ -133,12 +123,6 @@ class SchedulerService {
     try {
       const endOp = startOperation('SchedulerService.runGlobalScheduledSearch', { schedule });
       const results = await executeSearchRun();
-      const historyEntry: SchedulerRunHistory = {
-        timestamp: new Date().toISOString(),
-        results,
-        success: true
-      };
-      this.addToHistory(historyEntry);
 
       logger.info('✅ Global scheduled search completed', {
         results: Object.keys(results).map(app => ({
@@ -152,45 +136,12 @@ class SchedulerService {
       endOp({ totalSearched: Object.values(results).reduce((s, r) => s + (r.searched || 0), 0) }, true);
     } catch (error: unknown) {
       const { message, stack } = getErrorDetails(error);
-      const historyEntry: SchedulerRunHistory = {
-        timestamp: new Date().toISOString(),
-        results: {},
-        success: false,
-        error: message
-      };
-      this.addToHistory(historyEntry);
 
       logger.error('❌ Global scheduled search failed', { error: message, stack });
       await this.sendNotifications({}, false, message);
     } finally {
       this.globalIsRunning = false;
     }
-  }
-
-  addToHistory(entry: SchedulerRunHistory): void {
-    logger.debug('📝 Adding entry to scheduler history', {
-      success: entry.success,
-      timestamp: entry.timestamp,
-      resultCount: Object.keys(entry.results).length
-    });
-    this.runHistory.unshift(entry);
-    if (this.runHistory.length > this.maxHistorySize) {
-      const removed = this.runHistory.length - this.maxHistorySize;
-      this.runHistory = this.runHistory.slice(0, this.maxHistorySize);
-      logger.debug('🗑️  Trimmed scheduler history', { removed, maxSize: this.maxHistorySize });
-    }
-    logger.debug('✅ History entry added', { totalEntries: this.runHistory.length });
-  }
-
-  getHistory(): SchedulerRunHistory[] {
-    return [...this.runHistory];
-  }
-
-  clearHistory(): void {
-    const count = this.runHistory.length;
-    logger.info('🗑️  Clearing scheduler history', { entryCount: count });
-    this.runHistory = [];
-    logger.debug('✅ Scheduler history cleared');
   }
 
   getNextRunTime(schedule: string): Date | null {

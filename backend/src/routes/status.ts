@@ -142,23 +142,3 @@ statusRouter.get('/scheduler', async (req, res) => {
     handleRouteError(res, error, 'Failed to get scheduler status');
   }
 });
-
-// Get scheduler run history
-statusRouter.get('/scheduler/history', async (req, res) => {
-  try {
-    const history = schedulerService.getHistory();
-    res.json(history);
-  } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to get scheduler history');
-  }
-});
-
-// Clear scheduler run history
-statusRouter.post('/scheduler/history/clear', async (req, res) => {
-  try {
-    schedulerService.clearHistory();
-    res.json({ success: true });
-  } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to clear scheduler history');
-  }
-});

@@ -52,13 +52,6 @@ export interface StatusResponse {
   [key: string]: InstanceStatus | SchedulerStatus | SyncSchedulerStatus | undefined;
 }
 
-export interface SchedulerHistoryEntry {
-  timestamp: string;
-  results: unknown;
-  success: boolean;
-  error?: string;
-}
-
 export interface Stats {
   totalSearches: number;
   searchesByApplication: Record<string, number>;

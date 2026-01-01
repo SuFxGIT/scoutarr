@@ -1,74 +1,25 @@
 /**
  * Shared configuration types for Scoutarr
+ * Derived from the Zod schemas to keep runtime validation and static types aligned.
  */
+import { z } from 'zod';
+import {
+  radarrInstanceSchema,
+  sonarrInstanceSchema,
+  lidarrInstanceSchema,
+  readarrInstanceSchema,
+  notificationConfigSchema,
+  schedulerConfigSchema,
+  tasksConfigSchema,
+  configSchema,
+} from '../schemas/config.js';
 
-export interface NotificationConfig {
-  discordWebhook: string;
-  notifiarrPassthroughWebhook: string;
-  notifiarrPassthroughDiscordChannelId: string;
-  pushoverUserKey: string;
-  pushoverApiToken: string;
-}
+export type NotificationConfig = z.infer<typeof notificationConfigSchema>;
 
-export interface RadarrInstance {
-  id: string; // Unique identifier for this instance
-  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name?: string; // Display name
-  url: string;
-  apiKey: string;
-  count: number | 'max';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  movieStatus: 'announced' | 'in cinemas' | 'released' | 'any';
-  qualityProfileName: string;
-  enabled?: boolean;
-}
-
-export interface SonarrInstance {
-  id: string; // Unique identifier for this instance
-  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name?: string; // Display name
-  url: string;
-  apiKey: string;
-  count: number | 'max';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  seriesStatus: 'continuing' | 'upcoming' | 'ended' | '';
-  qualityProfileName: string;
-  enabled?: boolean;
-}
-
-export interface LidarrInstance {
-  id: string; // Unique identifier for this instance
-  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name?: string; // Display name
-  url: string;
-  apiKey: string;
-  count: number | 'max';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  artistStatus: 'continuing' | 'ended' | '';
-  qualityProfileName: string;
-  enabled?: boolean;
-}
-
-export interface ReadarrInstance {
-  id: string; // Unique identifier for this instance
-  instanceId?: number; // Unique numeric ID (1, 2, 3, etc.)
-  name?: string; // Display name
-  url: string;
-  apiKey: string;
-  count: number | 'max';
-  tagName: string;
-  ignoreTag: string;
-  monitored: boolean;
-  authorStatus: 'continuing' | 'ended' | '';
-  qualityProfileName: string;
-  enabled?: boolean;
-}
+export type RadarrInstance = z.infer<typeof radarrInstanceSchema>;
+export type SonarrInstance = z.infer<typeof sonarrInstanceSchema>;
+export type LidarrInstance = z.infer<typeof lidarrInstanceSchema>;
+export type ReadarrInstance = z.infer<typeof readarrInstanceSchema>;
 
 export interface ApplicationsConfig {
   radarr: RadarrInstance[];
@@ -77,20 +28,7 @@ export interface ApplicationsConfig {
   readarr: ReadarrInstance[];
 }
 
-export interface SchedulerConfig {
-  enabled: boolean;
-  schedule: string; // Cron expression (e.g., "0 */6 * * *" for every 6 hours)
-  unattended: boolean; // When enabled, automatically removes tags and re-filters when no media is found
-}
+export type SchedulerConfig = z.infer<typeof schedulerConfigSchema>;
+export type TasksConfig = z.infer<typeof tasksConfigSchema>;
 
-export interface TasksConfig {
-  syncSchedule: string; // Cron expression for sync schedule (e.g., "0 3 * * *" for 3am daily)
-  syncEnabled: boolean; // Enable/disable automatic syncing
-}
-
-export interface Config {
-  notifications: NotificationConfig;
-  applications: ApplicationsConfig;
-  scheduler: SchedulerConfig;
-  tasks: TasksConfig;
-}
+export type Config = z.infer<typeof configSchema>;

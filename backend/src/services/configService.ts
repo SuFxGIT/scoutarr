@@ -93,7 +93,7 @@ class ConfigService {
       logger.debug('✅ Config file read successfully', { size: content.length });
       
       const parsedJson = JSON.parse(content);
-      const validatedConfig = configSchema.parse(parsedJson);
+      const validatedConfig = configSchema.parse(parsedJson) as unknown as Config;
 
       const instanceCounts = {
         radarr: validatedConfig.applications.radarr.length,
@@ -111,7 +111,7 @@ class ConfigService {
         schedulerSchedule: validatedConfig.scheduler.schedule
       });
       endOp({ instanceCounts }, true);
-      return this.config;
+      return validatedConfig;
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -157,7 +157,7 @@ class ConfigService {
     const endOp = startOperation('ConfigService.saveConfig', { configFile: CONFIG_FILE });
     logger.debug('💾 Saving configuration', { configFile: CONFIG_FILE });
     try {
-      const validatedConfig = configSchema.parse(config);
+      const validatedConfig = configSchema.parse(config) as unknown as Config;
       const configJson = JSON.stringify(validatedConfig, null, 2);
       await fs.writeFile(CONFIG_FILE, configJson);
       logger.debug('✅ Config file written successfully', { size: configJson.length });

@@ -35,7 +35,7 @@ configRouter.get('/', async (req, res) => {
   }
 });
 
-// Reset app (clears config, stats, and logs)
+// Reset app (clears config and stats)
 configRouter.post('/reset-app', async (_req, res) => {
   logger.info('🔄 App reset requested - clearing all data');
   try {
@@ -44,9 +44,6 @@ configRouter.post('/reset-app', async (_req, res) => {
     
     // Clear stats database
     await statsService.resetStats();
-    
-    // Clear scheduler history
-    schedulerService.clearHistory();
     
     logger.info('✅ App reset completed - all data cleared');
     res.json({ success: true, config });

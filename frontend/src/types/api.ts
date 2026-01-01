@@ -10,5 +10,4 @@ export type {
   StatusResponse,
   SchedulerStatus,
   SyncSchedulerStatus,
-  SchedulerHistoryEntry,
 } from '@scoutarr/shared';

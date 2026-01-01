@@ -25,47 +25,66 @@ const apiKeyValidation = z.string().refine(
   { message: 'API key must be at least 32 characters when provided' }
 );
 
-// Factory function to create instance schemas with app-specific status field
-function createInstanceSchema<T extends string>(
-  statusField: 'movieStatus' | 'seriesStatus' | 'artistStatus' | 'authorStatus',
-  statusEnum: readonly [T, ...T[]]
-) {
-  return z.object({
-    id: z.string(),
-    instanceId: z.number().optional(),
-    name: z.string().optional(),
-    url: urlValidation,
-    apiKey: apiKeyValidation,
-    count: z.union([z.number().int().positive(), z.literal('max')]),
-    tagName: z.string().min(1, 'Tag name is required'),
-    ignoreTag: z.string(),
-    monitored: z.boolean(),
-    [statusField]: z.enum(statusEnum),
-    qualityProfileName: z.string(),
-    enabled: z.boolean().optional(),
-  });
-}
+// Explicit app-specific schemas keep literal keys to avoid widening to an index signature
+export const radarrInstanceSchema = z.object({
+  id: z.string(),
+  instanceId: z.number().optional(),
+  name: z.string().optional(),
+  url: urlValidation,
+  apiKey: apiKeyValidation,
+  count: z.union([z.number().int().positive(), z.literal('max')]),
+  tagName: z.string().min(1, 'Tag name is required'),
+  ignoreTag: z.string(),
+  monitored: z.boolean(),
+  movieStatus: z.enum(['announced', 'in cinemas', 'released', 'any'] as const),
+  qualityProfileName: z.string(),
+  enabled: z.boolean().optional(),
+});
 
-// Create app-specific schemas using factory
-export const radarrInstanceSchema = createInstanceSchema(
-  'movieStatus',
-  ['announced', 'in cinemas', 'released', 'any'] as const
-);
+export const sonarrInstanceSchema = z.object({
+  id: z.string(),
+  instanceId: z.number().optional(),
+  name: z.string().optional(),
+  url: urlValidation,
+  apiKey: apiKeyValidation,
+  count: z.union([z.number().int().positive(), z.literal('max')]),
+  tagName: z.string().min(1, 'Tag name is required'),
+  ignoreTag: z.string(),
+  monitored: z.boolean(),
+  seriesStatus: z.enum(['continuing', 'upcoming', 'ended', ''] as const),
+  qualityProfileName: z.string(),
+  enabled: z.boolean().optional(),
+});
 
-export const sonarrInstanceSchema = createInstanceSchema(
-  'seriesStatus',
-  ['continuing', 'upcoming', 'ended', ''] as const
-);
+export const lidarrInstanceSchema = z.object({
+  id: z.string(),
+  instanceId: z.number().optional(),
+  name: z.string().optional(),
+  url: urlValidation,
+  apiKey: apiKeyValidation,
+  count: z.union([z.number().int().positive(), z.literal('max')]),
+  tagName: z.string().min(1, 'Tag name is required'),
+  ignoreTag: z.string(),
+  monitored: z.boolean(),
+  artistStatus: z.enum(['continuing', 'ended', ''] as const),
+  qualityProfileName: z.string(),
+  enabled: z.boolean().optional(),
+});
 
-export const lidarrInstanceSchema = createInstanceSchema(
-  'artistStatus',
-  ['continuing', 'ended', ''] as const
-);
-
-export const readarrInstanceSchema = createInstanceSchema(
-  'authorStatus',
-  ['continuing', 'ended', ''] as const
-);
+export const readarrInstanceSchema = z.object({
+  id: z.string(),
+  instanceId: z.number().optional(),
+  name: z.string().optional(),
+  url: urlValidation,
+  apiKey: apiKeyValidation,
+  count: z.union([z.number().int().positive(), z.literal('max')]),
+  tagName: z.string().min(1, 'Tag name is required'),
+  ignoreTag: z.string(),
+  monitored: z.boolean(),
+  authorStatus: z.enum(['continuing', 'ended', ''] as const),
+  qualityProfileName: z.string(),
+  enabled: z.boolean().optional(),
+});
 
 export const notificationConfigSchema = z.object({
   discordWebhook: z.string().url('Invalid Discord webhook URL').or(z.literal('')),
