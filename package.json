@@ -22,7 +22,9 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "zod": "^4.3.4"
   }
 }
-
