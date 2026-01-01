@@ -1,16 +1,12 @@
 import express from 'express';
 import { configService } from '../services/configService.js';
-import { radarrService, RadarrMovie } from '../services/radarrService.js';
-import { sonarrService, SonarrSeries } from '../services/sonarrService.js';
-import { lidarrService, LidarrArtist } from '../services/lidarrService.js';
-import { readarrService, ReadarrAuthor } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import { schedulerService } from '../services/schedulerService.js';
 import { notificationService } from '../services/notificationService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractItemsFromResult } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
-import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
+import { StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
 import { FilterableMedia } from '../utils/filterUtils.js';
 import { getErrorMessage, getErrorDetails, handleRouteError } from '../utils/errorUtils.js';
 
@@ -81,9 +77,6 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
 ): ApplicationProcessor<TMedia> {
   const service = getServiceForApp(appType);
 
-  // Determine if search should be one-by-one based on app type
-  const searchMediaOneByOne = appType === 'sonarr' || appType === 'lidarr' || appType === 'readarr';
-
   return {
     name: instanceName,
     config,
@@ -93,23 +86,8 @@ function createProcessor<TConfig extends StarrInstanceConfig, TMedia extends Fil
     getMedia: (cfg: StarrInstanceConfig) => service.getMedia(cfg as TConfig) as Promise<TMedia[]>,
     filterMedia: (cfg: StarrInstanceConfig, media: TMedia[]) => service.filterMedia(cfg as TConfig, media) as Promise<TMedia[]>,
     searchMedia: async (cfg: StarrInstanceConfig, mediaIds: number[]) => {
-      if (appType === 'radarr') {
-        await radarrService.searchMovies(cfg as RadarrInstance, mediaIds);
-      } else if (appType === 'sonarr') {
-        if (mediaIds.length > 0) {
-          await sonarrService.searchSeries(cfg as SonarrInstance, mediaIds[0]);
-        }
-      } else if (appType === 'lidarr') {
-        for (const artistId of mediaIds) {
-          await lidarrService.searchArtists(cfg as LidarrInstance, artistId);
-        }
-      } else if (appType === 'readarr') {
-        for (const authorId of mediaIds) {
-          await readarrService.searchAuthors(cfg as ReadarrInstance, authorId);
-        }
-      }
+      await service.searchMedia(cfg as TConfig, mediaIds);
     },
-    searchMediaOneByOne,
     getTagId: (cfg: StarrInstanceConfig, tagName: string) => service.getTagId(cfg as TConfig, tagName),
     addTag: (cfg: StarrInstanceConfig, mediaIds: number[], tagId: number) => service.addTag(cfg as TConfig, mediaIds, tagId),
     removeTag: (cfg: StarrInstanceConfig, mediaIds: number[], tagId: number) => service.removeTag(cfg as TConfig, mediaIds, tagId),
@@ -205,7 +183,6 @@ interface ApplicationProcessor<TMedia extends FilterableMedia> {
   getMedia: (config: StarrInstanceConfig) => Promise<TMedia[]>;
   filterMedia: (config: StarrInstanceConfig, media: TMedia[]) => Promise<TMedia[]>;
   searchMedia: (config: StarrInstanceConfig, mediaIds: number[]) => Promise<void>;
-  searchMediaOneByOne: boolean;
   getTagId: (config: StarrInstanceConfig, tagName: string) => Promise<number | null>;
   addTag: (config: StarrInstanceConfig, mediaIds: number[], tagId: number) => Promise<void>;
   removeTag: (config: StarrInstanceConfig, mediaIds: number[], tagId: number) => Promise<void>;
@@ -309,17 +286,9 @@ export async function processApplication<TMedia extends FilterableMedia>(
       titles: toSearch.map(processor.getMediaTitle)
     });
 
-    // Search media
+    // Search media - each service handles its own search strategy
     const mediaIds = toSearch.map(processor.getMediaId);
-    if (processor.searchMediaOneByOne) {
-      // Search one at a time (Sonarr/Lidarr/Readarr)
-      for (const media of toSearch) {
-        await processor.searchMedia(processor.config, [processor.getMediaId(media)]);
-      }
-    } else {
-      // Search all at once (Radarr)
-      await processor.searchMedia(processor.config, mediaIds);
-    }
+    await processor.searchMedia(processor.config, mediaIds);
 
     // Add tag using editor endpoint
     const tagName = processor.config.tagName;

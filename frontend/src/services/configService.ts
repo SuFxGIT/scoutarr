@@ -35,18 +35,16 @@ export const configService = {
   },
 
   /**
-   * Fetch quality profiles for an instance
+   * Fetch quality profiles for an instance from database
    */
   async getQualityProfiles(
     app: string,
-    url: string,
-    apiKey: string
+    instanceId: string
   ): Promise<{ id: number; name: string }[]> {
-    const response = await apiClient.post<{ profiles: { id: number; name: string }[] }>(
-      `/config/quality-profiles/${app}`,
-      { url, apiKey }
+    const response = await apiClient.get<{ id: number; name: string }[]>(
+      `/config/quality-profiles/${app}/${instanceId}`
     );
-    return response.data.profiles;
+    return response.data;
   },
 
   /**
@@ -55,14 +53,15 @@ export const configService = {
   async testConnection(
     app: string,
     url: string,
-    apiKey: string
+    apiKey: string,
+    instanceId?: string
   ): Promise<{ success: boolean; version?: string; appName?: string; error?: string }> {
-    const response = await apiClient.post<{ 
-      success: boolean; 
-      version?: string; 
-      appName?: string; 
-      error?: string 
-    }>(`/config/test/${app}`, { url, apiKey });
+    const response = await apiClient.post<{
+      success: boolean;
+      version?: string;
+      appName?: string;
+      error?: string
+    }>(`/config/test/${app}`, { url, apiKey, instanceId });
     return response.data;
   },
 };

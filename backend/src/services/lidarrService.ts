@@ -1,6 +1,5 @@
 import { LidarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
-import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface LidarrArtist extends FilterableMedia {
@@ -76,32 +75,17 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
     return artists.filter(a => a.status === statusValue);
   }
 
-  async getArtists(config: LidarrInstance): Promise<LidarrArtist[]> {
-    return this.fetchMediaWithScores(config);
-  }
-
-  async searchArtists(config: LidarrInstance, artistId: number): Promise<void> {
-    return this.searchMediaItems(config, [artistId], true);
-  }
-
-  async filterArtists(config: LidarrInstance, artists: LidarrArtist[]): Promise<LidarrArtist[]> {
-    return this.filterMediaItems(config, artists);
-  }
-
-  // Implement abstract methods
   async getMedia(config: LidarrInstance): Promise<LidarrArtist[]> {
-    return this.getArtists(config);
+    return this.fetchMediaWithScores(config);
   }
 
   async searchMedia(config: LidarrInstance, mediaIds: number[]): Promise<void> {
     // Lidarr only supports searching one artist at a time
-    for (const artistId of mediaIds) {
-      await this.searchArtists(config, artistId);
-    }
+    await this.searchMediaItems(config, mediaIds, true);
   }
 
   async filterMedia(config: LidarrInstance, media: LidarrArtist[]): Promise<LidarrArtist[]> {
-    return this.filterArtists(config, media);
+    return this.filterMediaItems(config, media);
   }
 }
 

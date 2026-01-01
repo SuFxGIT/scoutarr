@@ -353,7 +353,7 @@ export function InstanceCard({
                             onValueChange={(_value: string) => {}}
                             disabled
                           >
-                            <Select.Trigger placeholder="Click 'Test Connection' to load profiles" style={{ width: '100%' }} />
+                            <Select.Trigger placeholder="No profiles synced. Click 'Test Connection' to sync." style={{ width: '100%' }} />
                           </Select.Root>
                         );
                       }

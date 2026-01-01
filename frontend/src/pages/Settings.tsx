@@ -27,7 +27,7 @@ import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { AppType, MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
+import { AppType, APP_TYPES, MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
 import { configService } from '../services/configService';
@@ -84,6 +84,22 @@ function Settings() {
       loadedConfigRef.current = loadedConfig;
     }
   }, [loadedConfig]);
+
+  // Load quality profiles from database for all configured instances
+  useEffect(() => {
+    if (!config) return;
+
+    APP_TYPES.forEach(app => {
+      const appConfig = config.applications[app];
+      if (Array.isArray(appConfig)) {
+        appConfig.forEach(instance => {
+          if (instance.id) {
+            loadQualityProfilesFromDB(app, instance.id);
+          }
+        });
+      }
+    });
+  }, [config]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback((): boolean => {
@@ -193,7 +209,7 @@ function Settings() {
     saveConfigMutation.mutate(configData);
   };
 
-  // Reset app mutation (clears config, quality profiles cache, stats, and localStorage)
+  // Reset app mutation (clears config, quality profiles database, stats, and localStorage)
   const resetAppMutation = useMutation({
     mutationFn: () => configService.resetAppInstance('all'),
     onSuccess: () => {
@@ -274,7 +290,7 @@ function Settings() {
         [`${app}-${instanceId}`]: { status: null, testing: false }
       }));
       
-      // Clear quality profiles cache when URL or API key changes
+      // Clear quality profiles when URL or API key changes
       const urlChanged = field === 'url' && currentInstance?.url !== value;
       const apiKeyChanged = field === 'apiKey' && currentInstance?.apiKey !== value;
       
@@ -413,32 +429,18 @@ function Settings() {
     );
   };
 
-  const fetchQualityProfiles = async (app: AppType, instanceId: string, url: string, apiKey: string) => {
+  const loadQualityProfilesFromDB = async (app: AppType, instanceId: string) => {
     const key = `${app}-${instanceId}`;
-    
-    if (!url || !apiKey) {
-      setQualityProfiles(prev => {
-        const newProfiles = { ...prev };
-        delete newProfiles[key];
-        return newProfiles;
-      });
-      return;
-    }
-
-    // Validate URL
-    if (!validator.isURL(url, { require_protocol: true })) {
-      return;
-    }
 
     setLoadingProfiles(prev => ({ ...prev, [key]: true }));
     try {
-      const profiles = await configService.getQualityProfiles(app, url, apiKey);
+      const profiles = await configService.getQualityProfiles(app, instanceId);
       setQualityProfiles(prev => ({
         ...prev,
         [key]: profiles
       }));
     } catch (error: unknown) {
-      // Silently fail - don't show error toast as this is called automatically
+      // Silently fail - profiles may not be synced yet
       setQualityProfiles(prev => {
         const newProfiles = { ...prev };
         delete newProfiles[key];
@@ -489,13 +491,14 @@ function Settings() {
       const result = await configService.testConnection(
         app,
         appConfig.url,
-        appConfig.apiKey
+        appConfig.apiKey,
+        instanceId
       );
       const success = result.success === true;
       setTestResults(prev => ({
         ...prev,
-        [key]: { 
-          status: success, 
+        [key]: {
+          status: success,
           testing: false,
           version: result.version,
           appName: result.appName
@@ -504,9 +507,9 @@ function Settings() {
       if (success) {
         const versionText = result.version ? ` (v${result.version})` : '';
         toast.success(`Connection test successful${versionText}`);
-        // Fetch quality profiles after successful connection test
-        if (instanceId && appConfig.url && appConfig.apiKey) {
-          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey);
+        // Load quality profiles from database after successful connection test
+        if (instanceId) {
+          loadQualityProfilesFromDB(app, instanceId);
         }
       } else {
         showErrorToast('Connection test failed');
@@ -736,7 +739,7 @@ function Settings() {
                 <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Reset App</Text>
                   <Text size="1" color="gray">
-                    This will completely reset the app to a fresh state like a first-time installation. It will permanently delete all configuration, quality profiles cache, statistics database, log files, and clear browser storage. The app will reload automatically after reset. This action cannot be undone.
+                    This will completely reset the app to a fresh state like a first-time installation. It will permanently delete all configuration, quality profiles database, statistics database, log files, and clear browser storage. The app will reload automatically after reset. This action cannot be undone.
                   </Text>
                   {confirmingResetApp ? (
                     <Flex gap="2" align="center" wrap="wrap">

@@ -74,29 +74,16 @@ class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {
     });
   }
 
-  async getMovies(config: RadarrInstance): Promise<RadarrMovie[]> {
+  async getMedia(config: RadarrInstance): Promise<RadarrMovie[]> {
     return this.fetchMediaWithScores(config);
   }
 
-  async searchMovies(config: RadarrInstance, movieIds: number[]): Promise<void> {
-    return this.searchMediaItems(config, movieIds, false);
-  }
-
-  async filterMovies(config: RadarrInstance, movies: RadarrMovie[]): Promise<RadarrMovie[]> {
-    return this.filterMediaItems(config, movies);
-  }
-
-  // Implement abstract methods
-  async getMedia(config: RadarrInstance): Promise<RadarrMovie[]> {
-    return this.getMovies(config);
-  }
-
   async searchMedia(config: RadarrInstance, mediaIds: number[]): Promise<void> {
-    return this.searchMovies(config, mediaIds);
+    return this.searchMediaItems(config, mediaIds, false);
   }
 
   async filterMedia(config: RadarrInstance, media: RadarrMovie[]): Promise<RadarrMovie[]> {
-    return this.filterMovies(config, media);
+    return this.filterMediaItems(config, media);
   }
 }
 

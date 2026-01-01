@@ -1,16 +1,12 @@
 import express from 'express';
 import { capitalize } from 'es-toolkit';
 import { configService } from '../services/configService.js';
-import { radarrService } from '../services/radarrService.js';
-import { sonarrService } from '../services/sonarrService.js';
-import { lidarrService } from '../services/lidarrService.js';
-import { readarrService } from '../services/readarrService.js';
 import { statsService } from '../services/statsService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
-import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig } from '@scoutarr/shared';
+import type { StarrInstanceConfig } from '@scoutarr/shared';
 
 export const mediaLibraryRouter = express.Router();
 
@@ -271,27 +267,10 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       mediaCount: mediaIds.length
     });
 
-    // Get service for this app type
+    // Get service for this app type and search media
     const service = getServiceForApp(appType as AppType);
-
-    // Search media using the appropriate method for this app type
-    // Radarr supports bulk search, others require sequential
-    if (appType === 'radarr') {
-      await radarrService.searchMovies(instance as RadarrInstance, mediaIds);
-      logger.debug('✅ [Scoutarr] Bulk search started', { appType, count: mediaIds.length });
-    } else {
-      // Sonarr, Lidarr, and Readarr require one-by-one search
-      for (const mediaId of mediaIds) {
-        if (appType === 'sonarr') {
-          await sonarrService.searchSeries(instance as SonarrInstance, mediaId);
-        } else if (appType === 'lidarr') {
-          await lidarrService.searchArtists(instance as LidarrInstance, mediaId);
-        } else if (appType === 'readarr') {
-          await readarrService.searchAuthors(instance as ReadarrInstance, mediaId);
-        }
-      }
-      logger.debug('✅ [Scoutarr] Sequential search started', { appType, count: mediaIds.length });
-    }
+    await service.searchMedia(instance, mediaIds);
+    logger.debug('✅ [Scoutarr] Search started', { appType, count: mediaIds.length });
 
     // Add tag to searched items
     const tagName = instance.tagName || 'upgradinatorr';

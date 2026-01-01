@@ -67,6 +67,7 @@ configRouter.put('/', async (req, res) => {
 // Test connection for an application
 configRouter.post('/test/:app', async (req, res) => {
   const { app } = req.params;
+  const { instanceId } = req.body;
   logger.info(`🔌 Testing connection for ${app}`);
   try {
     // Use config from request body if provided, otherwise fall back to saved config
@@ -92,6 +93,25 @@ configRouter.post('/test/:app', async (req, res) => {
       { url: appConfig.url, ...testResult }
     );
 
+    // If test successful and instanceId provided, sync quality profiles to database
+    if (testResult.success && instanceId) {
+      try {
+        logger.debug(`📡 [${app}] Fetching quality profiles for sync`);
+        const service = getServiceForApp(app as AppType);
+        const profiles = await service.getQualityProfiles(appConfig as StarrInstanceConfig);
+
+        logger.debug(`💾 [${app}] Syncing ${profiles.length} quality profiles to database`);
+        await statsService.syncQualityProfiles(instanceId, profiles);
+        logger.info(`✅ [${app}] Quality profiles synced to database`, { instanceId, count: profiles.length });
+      } catch (profileError: unknown) {
+        // Log error but don't fail the test - connection was successful
+        logger.warn(`⚠️  Failed to sync quality profiles for ${app}`, {
+          instanceId,
+          error: getErrorMessage(profileError)
+        });
+      }
+    }
+
     res.status(status).json(response);
   } catch (error: unknown) {
     handleRouteError(res, error, 'Connection test failed');
@@ -101,45 +121,18 @@ configRouter.post('/test/:app', async (req, res) => {
 // Get quality profiles for an application instance
 configRouter.get('/quality-profiles/:app/:instanceId', async (req, res) => {
   const { app, instanceId } = req.params;
-  logger.info(`📋 Fetching quality profiles for ${app} instance ${instanceId}`);
+  logger.debug(`📋 Fetching quality profiles from database for ${app} instance ${instanceId}`);
   try {
-    const config = configService.getConfig();
-    const instanceConfig = findInstanceConfig(config, app, instanceId);
+    // Fetch quality profiles from database
+    const dbProfiles = await statsService.getQualityProfilesFromDatabase(instanceId);
 
-    if (!instanceConfig || !instanceConfig.url || !instanceConfig.apiKey) {
-      return res.status(400).json({ error: 'Instance not found or not configured' });
-    }
+    // Transform database format to API format
+    const profiles = dbProfiles.map(p => ({
+      id: p.quality_profile_id,
+      name: p.quality_profile_name
+    }));
 
-    // Fetch quality profiles using service registry
-    const service = getServiceForApp(app as AppType);
-    const profiles = await service.getQualityProfiles(instanceConfig);
-
-    logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`, { instanceId });
-    res.json(profiles);
-  } catch (error: unknown) {
-    handleRouteError(res, error, 'Failed to fetch quality profiles');
-  }
-});
-
-// Get quality profiles for an application (using URL and API key from request body)
-configRouter.post('/quality-profiles/:app', async (req, res) => {
-  const { app } = req.params;
-  logger.info(`📋 Fetching quality profiles for ${app}`);
-  try {
-    const { url, apiKey } = req.body as {
-      url?: string;
-      apiKey?: string;
-    };
-
-    if (!url || !apiKey) {
-      return res.status(400).json({ error: 'URL and API key are required' });
-    }
-
-    // Fetch quality profiles using service registry
-    const service = getServiceForApp(app as AppType);
-    const profiles = await service.getQualityProfiles({ url, apiKey } as StarrInstanceConfig);
-
-    logger.debug(`✅ Fetched ${profiles.length} quality profiles for ${app}`);
+    logger.debug(`✅ Retrieved ${profiles.length} quality profiles from database`, { instanceId });
     res.json(profiles);
   } catch (error: unknown) {
     handleRouteError(res, error, 'Failed to fetch quality profiles');

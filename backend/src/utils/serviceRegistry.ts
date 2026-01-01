@@ -12,6 +12,7 @@ import { FilterableMedia } from './filterUtils.js';
 export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
   getMedia: (config: TConfig) => Promise<TMedia[]>;
   filterMedia: (config: TConfig, media: TMedia[]) => Promise<TMedia[]>;
+  searchMedia: (config: TConfig, mediaIds: number[]) => Promise<void>;
   getMediaId: (media: TMedia) => number;
   getMediaTitle: (media: TMedia) => string;
   getTagId: (config: TConfig, tagName: string) => Promise<number | null>;
@@ -26,8 +27,9 @@ export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
  */
 export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
   radarr: {
-    getMedia: (config: RadarrInstance) => radarrService.getMovies(config),
-    filterMedia: (config: RadarrInstance, media: RadarrMovie[]) => radarrService.filterMovies(config, media),
+    getMedia: (config: RadarrInstance) => radarrService.getMedia(config),
+    filterMedia: (config: RadarrInstance, media: RadarrMovie[]) => radarrService.filterMedia(config, media),
+    searchMedia: (config: RadarrInstance, mediaIds: number[]) => radarrService.searchMedia(config, mediaIds),
     getMediaId: (m: RadarrMovie) => radarrService.getMediaId(m),
     getMediaTitle: (m: RadarrMovie) => radarrService.getMediaTitle(m),
     getTagId: (config: RadarrInstance, tagName: string) => radarrService.getTagId(config, tagName),
@@ -40,8 +42,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
       radarrService.convertTagIdsToNames(config, tagIds)
   },
   sonarr: {
-    getMedia: (config: SonarrInstance) => sonarrService.getSeries(config),
-    filterMedia: (config: SonarrInstance, media: SonarrSeries[]) => sonarrService.filterSeries(config, media),
+    getMedia: (config: SonarrInstance) => sonarrService.getMedia(config),
+    filterMedia: (config: SonarrInstance, media: SonarrSeries[]) => sonarrService.filterMedia(config, media),
+    searchMedia: (config: SonarrInstance, mediaIds: number[]) => sonarrService.searchMedia(config, mediaIds),
     getMediaId: (s: SonarrSeries) => sonarrService.getMediaId(s),
     getMediaTitle: (s: SonarrSeries) => sonarrService.getMediaTitle(s),
     getTagId: (config: SonarrInstance, tagName: string) => sonarrService.getTagId(config, tagName),
@@ -54,8 +57,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
       sonarrService.convertTagIdsToNames(config, tagIds)
   },
   lidarr: {
-    getMedia: (config: LidarrInstance) => lidarrService.getArtists(config),
-    filterMedia: (config: LidarrInstance, media: LidarrArtist[]) => lidarrService.filterArtists(config, media),
+    getMedia: (config: LidarrInstance) => lidarrService.getMedia(config),
+    filterMedia: (config: LidarrInstance, media: LidarrArtist[]) => lidarrService.filterMedia(config, media),
+    searchMedia: (config: LidarrInstance, mediaIds: number[]) => lidarrService.searchMedia(config, mediaIds),
     getMediaId: (a: LidarrArtist) => lidarrService.getMediaId(a),
     getMediaTitle: (a: LidarrArtist) => lidarrService.getMediaTitle(a),
     getTagId: (config: LidarrInstance, tagName: string) => lidarrService.getTagId(config, tagName),
@@ -68,8 +72,9 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
       lidarrService.convertTagIdsToNames(config, tagIds)
   },
   readarr: {
-    getMedia: (config: ReadarrInstance) => readarrService.getAuthors(config),
-    filterMedia: (config: ReadarrInstance, media: ReadarrAuthor[]) => readarrService.filterAuthors(config, media),
+    getMedia: (config: ReadarrInstance) => readarrService.getMedia(config),
+    filterMedia: (config: ReadarrInstance, media: ReadarrAuthor[]) => readarrService.filterMedia(config, media),
+    searchMedia: (config: ReadarrInstance, mediaIds: number[]) => readarrService.searchMedia(config, mediaIds),
     getMediaId: (a: ReadarrAuthor) => readarrService.getMediaId(a),
     getMediaTitle: (a: ReadarrAuthor) => readarrService.getMediaTitle(a),
     getTagId: (config: ReadarrInstance, tagName: string) => readarrService.getTagId(config, tagName),

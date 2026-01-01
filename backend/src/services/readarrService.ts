@@ -1,6 +1,5 @@
 import { ReadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
-import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface ReadarrAuthor extends FilterableMedia {
@@ -76,32 +75,17 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
     return authors.filter(a => a.status === statusValue);
   }
 
-  async getAuthors(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
-    return this.fetchMediaWithScores(config);
-  }
-
-  async searchAuthors(config: ReadarrInstance, authorId: number): Promise<void> {
-    return this.searchMediaItems(config, [authorId], true);
-  }
-
-  async filterAuthors(config: ReadarrInstance, authors: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
-    return this.filterMediaItems(config, authors);
-  }
-
-  // Implement abstract methods
   async getMedia(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
-    return this.getAuthors(config);
+    return this.fetchMediaWithScores(config);
   }
 
   async searchMedia(config: ReadarrInstance, mediaIds: number[]): Promise<void> {
     // Readarr only supports searching one author at a time
-    for (const authorId of mediaIds) {
-      await this.searchAuthors(config, authorId);
-    }
+    await this.searchMediaItems(config, mediaIds, true);
   }
 
   async filterMedia(config: ReadarrInstance, media: ReadarrAuthor[]): Promise<ReadarrAuthor[]> {
-    return this.filterAuthors(config, media);
+    return this.filterMediaItems(config, media);
   }
 }
 

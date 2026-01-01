@@ -1,6 +1,5 @@
 import { SonarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
-import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface SonarrSeries extends FilterableMedia {
@@ -65,47 +64,19 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrSeries> {
     return series.filter(s => s.status === statusValue);
   }
 
-  async getSeries(config: SonarrInstance): Promise<SonarrSeries[]> {
-    return this.fetchMediaWithScores(config);
-  }
-
-  async searchSeries(config: SonarrInstance, seriesId: number): Promise<void> {
-    logger.info('🔍 [Sonarr API] Searching series', { name: config.name, seriesId });
-    try {
-      const client = this.createClient(config);
-      await client.post(`/api/${this.apiVersion}/command`, {
-        name: 'SeriesSearch',
-        seriesId
-      });
-      logger.debug('✅ [Sonarr API] Search command sent', { seriesId });
-    } catch (error: unknown) {
-      this.logError('Failed to search series', error, { 
-        seriesId,
-        url: config.url,
-        name: config.name
-      });
-      throw error;
-    }
-  }
-
-  async filterSeries(config: SonarrInstance, series: SonarrSeries[]): Promise<SonarrSeries[]> {
-    return this.filterMediaItems(config, series);
-  }
-
-  // Implement abstract methods
   async getMedia(config: SonarrInstance): Promise<SonarrSeries[]> {
-    return this.getSeries(config);
+    return this.fetchMediaWithScores(config);
   }
 
   async searchMedia(config: SonarrInstance, mediaIds: number[]): Promise<void> {
     // Sonarr only supports searching one series at a time
     if (mediaIds.length > 0) {
-      await this.searchSeries(config, mediaIds[0]);
+      await this.searchMediaItems(config, [mediaIds[0]], true);
     }
   }
 
   async filterMedia(config: SonarrInstance, media: SonarrSeries[]): Promise<SonarrSeries[]> {
-    return this.filterSeries(config, media);
+    return this.filterMediaItems(config, media);
   }
 }
 
