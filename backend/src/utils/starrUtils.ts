@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { capitalize } from 'es-toolkit';
 import logger from './logger.js';
 import { getErrorMessage } from './errorUtils.js';
 
@@ -85,7 +86,7 @@ export async function testStarrConnection(
     const systemData = response.data;
     const actualAppName = systemData.appName;
     const version = systemData.version;
-    const expectedAppName = expectedApp.charAt(0).toUpperCase() + expectedApp.slice(1).toLowerCase();
+    const expectedAppName = capitalize(expectedApp.toLowerCase());
     
     if (!actualAppName) {
       logger.warn(`⚠️  [${expectedApp}] No appName in response`, { url });

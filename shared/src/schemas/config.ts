@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import validator from 'validator';
 import { CronExpressionParser } from 'cron-parser';
 
 const validateCronExpression = (cron: string) => {
@@ -13,12 +14,7 @@ const validateCronExpression = (cron: string) => {
 // Reusable URL validation
 const urlValidation = z.string().refine((val) => {
   if (val === '') return true;
-  try {
-    new URL(val);
-    return true;
-  } catch {
-    return false;
-  }
+  return validator.isURL(val, { require_protocol: true });
 }, {
   message: 'Invalid URL format',
 });

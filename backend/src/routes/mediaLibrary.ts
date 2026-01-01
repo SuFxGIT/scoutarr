@@ -1,4 +1,5 @@
 import express from 'express';
+import { capitalize } from 'es-toolkit';
 import { configService } from '../services/configService.js';
 import { radarrService } from '../services/radarrService.js';
 import { sonarrService } from '../services/sonarrService.js';
@@ -68,7 +69,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
 
       // Fetch and sync quality profiles
-      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
+      logger.debug(`📡 [${capitalize(appType)} API] Fetching quality profiles`);
       const profiles = await service.getQualityProfiles(instance);
 
       // Sync quality profiles to database
@@ -294,11 +295,11 @@ mediaLibraryRouter.post('/search', async (req, res) => {
 
     // Add tag to searched items
     const tagName = instance.tagName || 'upgradinatorr';
-    logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Getting tag ID`, { tagName });
+    logger.debug(`📡 [${capitalize(appType)} API] Getting tag ID`, { tagName });
     const tagId = await service.getTagId(instance, tagName);
 
     if (tagId !== null) {
-      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Adding tag to media`, { tagId, count: mediaIds.length });
+      logger.debug(`📡 [${capitalize(appType)} API] Adding tag to media`, { tagId, count: mediaIds.length });
       await service.addTag(instance, mediaIds, tagId);
       logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: mediaIds.length });
 

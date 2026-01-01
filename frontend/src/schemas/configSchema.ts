@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import validator from 'validator';
 import { CronExpressionParser } from 'cron-parser';
 
 const validateCronExpression = (cron: string) => {
@@ -10,21 +11,19 @@ const validateCronExpression = (cron: string) => {
   }
 };
 
+// Reusable URL validation
+const urlValidation = z.string().refine((val) => {
+  if (val === '') return true;
+  return validator.isURL(val, { require_protocol: true });
+}, {
+  message: 'Invalid URL format',
+});
+
 export const radarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
   name: z.string().optional(),
-  url: z.string().refine((val) => {
-    if (val === '') return true;
-    try {
-      new URL(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, {
-    message: 'Invalid URL format',
-  }),
+  url: urlValidation,
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
@@ -41,17 +40,7 @@ export const sonarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
   name: z.string().optional(),
-  url: z.string().refine((val) => {
-    if (val === '') return true;
-    try {
-      new URL(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, {
-    message: 'Invalid URL format',
-  }),
+  url: urlValidation,
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
@@ -68,17 +57,7 @@ export const lidarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
   name: z.string().optional(),
-  url: z.string().refine((val) => {
-    if (val === '') return true;
-    try {
-      new URL(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, {
-    message: 'Invalid URL format',
-  }),
+  url: urlValidation,
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),
@@ -95,17 +74,7 @@ export const readarrInstanceSchema = z.object({
   id: z.string(),
   instanceId: z.number().optional(),
   name: z.string().optional(),
-  url: z.string().refine((val) => {
-    if (val === '') return true;
-    try {
-      new URL(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, {
-    message: 'Invalid URL format',
-  }),
+  url: urlValidation,
   apiKey: z.string().refine((val) => val === '' || val.length >= 32, {
     message: 'API key must be at least 32 characters when provided',
   }),

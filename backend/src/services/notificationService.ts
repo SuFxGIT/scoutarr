@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { capitalize } from 'es-toolkit';
 import { configService } from './configService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { extractItemsFromResult } from '../utils/starrUtils.js';
@@ -266,7 +267,7 @@ class NotificationService {
     const appType = parts[0];
     const instanceId = parts.length > 1 ? parts.slice(1).join('-') : null;
     
-    const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
+    const appName = capitalize(appType);
     return instanceId ? `${appName} (${instanceId})` : appName;
   }
 }

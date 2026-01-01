@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { capitalize, startCase } from 'es-toolkit';
 import {
   Flex,
   Heading,
@@ -389,7 +390,7 @@ function Settings() {
     const instances = getInstances(app);
     // Limit instances per app
     if (instances.length >= MAX_INSTANCES_PER_APP) {
-      showErrorToast(`Maximum of ${MAX_INSTANCES_PER_APP} ${app.charAt(0).toUpperCase() + app.slice(1)} instances allowed.`);
+      showErrorToast(`Maximum of ${MAX_INSTANCES_PER_APP} ${capitalize(app)} instances allowed.`);
       return;
     }
     const nextInstanceId = getNextInstanceId(app, instances);
@@ -711,7 +712,7 @@ function Settings() {
                   onClick={() => addInstance(selectedAppType)}
                   disabled={getInstances(selectedAppType).length >= MAX_INSTANCES_PER_APP}
                 >
-                  <PlusIcon /> Add {selectedAppType.charAt(0).toUpperCase() + selectedAppType.slice(1)} Instance
+                  <PlusIcon /> Add {capitalize(selectedAppType)} Instance
                 </Button>
               )}
               <Button size="2" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
@@ -904,7 +905,7 @@ function Settings() {
 
                               <Flex direction="column" gap="2">
                                 <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Number of {appInfo.mediaTypePlural.charAt(0).toUpperCase() + appInfo.mediaTypePlural.slice(1)} to Search</Text>
+                                  <Text size="2" weight="medium">Number of {startCase(appInfo.mediaTypePlural)} to Search</Text>
                                   <Tooltip content={`How many ${appInfo.mediaTypePlural} to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching ${appInfo.mediaTypePlural}.`}>
                                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                                   </Tooltip>

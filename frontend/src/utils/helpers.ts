@@ -1,4 +1,5 @@
 import humanizeDuration from 'humanize-duration';
+import { capitalize } from 'es-toolkit';
 import { differenceInMilliseconds } from 'date-fns';
 
 /**
@@ -8,10 +9,10 @@ import { differenceInMilliseconds } from 'date-fns';
 export const formatAppName = (app: string): string => {
   if (app.includes('-')) {
     const parts = app.split('-');
-    const appType = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    const appType = capitalize(parts[0]);
     return appType;
   }
-  return app.charAt(0).toUpperCase() + app.slice(1);
+  return capitalize(app);
 };
 
 /**

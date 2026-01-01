@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import { capitalize } from 'es-toolkit';
 import logger, { startOperation } from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
@@ -104,7 +105,7 @@ class SyncSchedulerService {
       await statsService.upsertInstance(instance.id, appType, instance.name);
 
       // Fetch quality profiles from API
-      logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles for sync`);
+      logger.debug(`📡 [${capitalize(appType)} API] Fetching quality profiles for sync`);
       const profiles = await service.getQualityProfiles(instance);
 
       // Sync quality profiles to database

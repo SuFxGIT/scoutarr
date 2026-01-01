@@ -17,6 +17,7 @@
     "axios": "^1.6.2",
     "cron-parser": "^5.4.0",
     "date-fns": "^4.1.0",
+    "es-toolkit": "^1.43.0",
     "humanize-duration": "^3.33.2",
     "react": "^19.2.3",
     "react-data-grid": "^7.0.0-beta.59",

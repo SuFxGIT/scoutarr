@@ -1,4 +1,5 @@
 import { Flex, Badge } from '@radix-ui/themes';
+import { capitalize } from 'es-toolkit';
 import { APP_TYPES } from '../utils/constants';
 import { AppIcon } from './icons/AppIcon';
 
@@ -46,7 +47,7 @@ export function ConnectionStatusBadges({ connectionStatus }: ConnectionStatusBad
     <>
       {APP_TYPES.map(appType => {
         const stats = groupedStatus[appType];
-        const appName = appType.charAt(0).toUpperCase() + appType.slice(1);
+        const appName = capitalize(appType);
         let statusMessage = '';
         let badgeColor: 'green' | 'gray' | 'red' = 'red';
 
