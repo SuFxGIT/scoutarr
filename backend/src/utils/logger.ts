@@ -19,13 +19,21 @@ const logColors = {
 
 winston.addColors(logColors);
 
-// Custom format for console output
+// Custom format for console output (include metadata as JSON to avoid losing context)
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.colorize({ all: true }),
-  winston.format.printf(({ timestamp, level, message }) => {
-    // Only output the timestamp, level, and message - no metadata
-    return `${timestamp} [${level}]: ${message}`;
+  winston.format.printf((info) => {
+    const { timestamp, level, message, ...meta } = info as Record<string, unknown>;
+    let metaString = '';
+    if (meta && Object.keys(meta).length > 0) {
+      try {
+        metaString = ' ' + JSON.stringify(meta);
+      } catch {
+        metaString = ' ' + String(meta);
+      }
+    }
+    return `${timestamp} [${level}]: ${message}${metaString}`;
   })
 );
 

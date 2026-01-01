@@ -12,9 +12,19 @@ import { getConfiguredInstances, getMediaTypeKey, APP_TYPES, AppType, extractIte
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig, SearchResults, SearchResult } from '@scoutarr/shared';
 import { FilterableMedia } from '../utils/filterUtils.js';
-import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
+import { getErrorMessage, getErrorDetails, handleRouteError } from '../utils/errorUtils.js';
 
 export const searchRouter = express.Router();
+
+// Run upgrade search immediately
+searchRouter.post('/run', async (_req, res) => {
+  try {
+    const results = await executeSearchRun();
+    res.json(results);
+  } catch (error: unknown) {
+    handleRouteError(res, error, 'Failed to run search');
+  }
+});
 
 // Helper function to randomly select items
 function randomSelect<T>(items: T[], count: number | 'max'): T[] {
@@ -48,6 +58,16 @@ async function saveStatsForResults(results: SearchResults): Promise<void> {
     const items = extractItemsFromResult(result);
     
     await statsService.addSearch(appType, result.searched, items, result.instanceName);
+
+    // Info-level feedback for operators
+    logger.info('ℹ️  Stats updated for search result', {
+      resultKey,
+      appType,
+      instanceName: result.instanceName,
+      searched: result.searched,
+      itemCount: items.length,
+      itemTitles: items.map(i => i.title)
+    });
   }
 }
 
@@ -163,7 +183,13 @@ export async function executeSearchRun(): Promise<SearchResults> {
 
   logger.info('✅ Search run execution completed', {
     resultCount: Object.keys(results).length,
-    totalSearched: Object.values(results).reduce((sum, r) => sum + (r.searched || 0), 0)
+    totalSearched: Object.values(results).reduce((sum, r) => sum + (r.searched || 0), 0),
+    perApp: Object.entries(results).map(([key, r]) => ({
+      key,
+      searched: r.searched || 0,
+      success: r.success,
+      items: (r.items || []).map(i => i.title)
+    }))
   });
 
   return results;
@@ -204,6 +230,43 @@ export async function processApplication<TMedia extends FilterableMedia>(
     let allMedia = preloadedMedia || await processor.getMedia(processor.config);
     let filtered = await processor.filterMedia(processor.config, allMedia);
 
+    logger.info('ℹ️  Media loaded for processing', {
+      instanceId: processor.instanceId,
+      appType: processor.appType,
+      cached: !!preloadedMedia,
+      totalLoaded: allMedia.length,
+      filteredCount: filtered.length,
+      tagInclude: processor.config.tagName,
+      tagExclude: processor.config.ignoreTag,
+      monitored: processor.config.monitored,
+      qualityProfile: processor.config.qualityProfileName,
+      unattended: processor.unattended || false
+    });
+
+    logger.info('ℹ️  Applied filters summary', {
+      instanceId: processor.instanceId,
+      appType: processor.appType,
+      filters: {
+        monitored: processor.config.monitored,
+        ignoreTag: processor.config.ignoreTag,
+        tagName: processor.config.tagName,
+        qualityProfileName: processor.config.qualityProfileName,
+        status: 'movieStatus' in processor.config
+          ? processor.config.movieStatus
+          : 'seriesStatus' in processor.config
+          ? processor.config.seriesStatus
+          : 'artistStatus' in processor.config
+          ? processor.config.artistStatus
+          : 'authorStatus' in processor.config
+          ? processor.config.authorStatus
+          : undefined,
+      },
+      counts: {
+        before: allMedia.length,
+        after: filtered.length
+      }
+    });
+
     // Unattended mode: if no media found, remove tag from all and re-filter
     if (processor.unattended && filtered.length === 0) {
       logger.info(`🔄 Unattended mode: No media found, removing tag from all ${processor.name} and re-filtering`);
@@ -237,6 +300,15 @@ export async function processApplication<TMedia extends FilterableMedia>(
     // Select random media based on count
     const toSearch = randomSelect(filtered, processor.config.count);
 
+    logger.info('ℹ️  Selected media for search', {
+      instanceId: processor.instanceId,
+      appType: processor.appType,
+      requested: processor.config.count,
+      selected: toSearch.length,
+      filteredAvailable: filtered.length,
+      titles: toSearch.map(processor.getMediaTitle)
+    });
+
     // Search media
     const mediaIds = toSearch.map(processor.getMediaId);
     if (processor.searchMediaOneByOne) {
@@ -253,6 +325,14 @@ export async function processApplication<TMedia extends FilterableMedia>(
     const tagName = processor.config.tagName;
     const tagId = await processor.getTagId(processor.config, tagName);
     if (tagId !== null && mediaIds.length > 0 && tagName) {
+      logger.info('🏷️  Applying tag to searched media', {
+        instanceId: processor.instanceId,
+        appType: processor.appType,
+        tagName,
+        tagId,
+        mediaCount: mediaIds.length,
+        titles: toSearch.map(processor.getMediaTitle)
+      });
       await processor.addTag(processor.config, mediaIds, tagId);
 
       // Track tag in instances table
@@ -267,7 +347,11 @@ export async function processApplication<TMedia extends FilterableMedia>(
 
     logger.info(`✅ ${processor.name} search completed`, {
       searched: toSearch.length,
-      items: toSearch.map(processor.getMediaTitle)
+      items: toSearch.map(processor.getMediaTitle),
+      tagApplied: tagName || null,
+      tagId: tagId || null,
+      appType: processor.appType,
+      instanceId: processor.instanceId
     });
 
     endOp({ searched: toSearch.length }, true);
