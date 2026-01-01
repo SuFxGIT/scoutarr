@@ -10,9 +10,10 @@ import {
   Popover,
   Button,
   TextField,
-  IconButton
+  IconButton,
+  Callout
 } from '@radix-ui/themes';
-import { QuestionMarkCircledIcon, PlayIcon } from '@radix-ui/react-icons';
+import { QuestionMarkCircledIcon, PlayIcon, InfoCircledIcon } from '@radix-ui/react-icons';
 import { CronExpressionParser } from 'cron-parser';
 import type { Config } from '../types/config';
 import type { SchedulerStatus, SyncSchedulerStatus } from '../types/api';
@@ -214,6 +215,24 @@ export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus
       <Card>
         <Flex direction="column" gap="3" p="4">
           <Heading size="5">Scheduled Tasks</Heading>
+
+          <Callout.Root size="1" variant="surface" color="blue">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              Need help with cron expressions? Visit{' '}
+              <a 
+                href="https://crontab.guru" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: 'var(--accent-11)', textDecoration: 'underline' }}
+              >
+                crontab.guru
+              </a>
+              {' '}for an interactive guide.
+            </Callout.Text>
+          </Callout.Root>
 
           <Table.Root variant="surface">
             <Table.Header>
