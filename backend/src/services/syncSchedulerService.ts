@@ -231,6 +231,7 @@ class SyncSchedulerService {
 
   getNextRunTime(): Date | null {
     if (!this.currentSchedule) return null;
+    logger.debug('⏱️  Calculating next sync run', { currentSchedule: this.currentSchedule });
     try {
       const interval = CronExpressionParser.parse(this.currentSchedule);
       return interval.next().toDate();

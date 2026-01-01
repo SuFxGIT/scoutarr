@@ -1,11 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { Flex, Heading, Button, Separator, Box } from '@radix-ui/themes';
-import Settings from './pages/Settings';
-import Dashboard from './pages/Dashboard';
-import MediaLibrary from './pages/MediaLibrary';
+import React, { lazy, Suspense } from 'react';
+import { Flex, Heading, Button, Separator, Box, Spinner, Text } from '@radix-ui/themes';
 import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeToggle } from './components/ThemeToggle';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MediaLibrary = lazy(() => import('./pages/MediaLibrary'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function NavigationLinks() {
   const { handleNavigation } = useNavigation();
@@ -56,11 +58,20 @@ function AppContent() {
       </Box>
 
       <Box maxWidth="1200px" width="100%" p="4" mx="auto">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/library" element={<MediaLibrary />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <Suspense
+          fallback={(
+            <Flex align="center" justify="center" gap="2" style={{ padding: '2rem' }}>
+              <Spinner size="2" />
+              <Text size="2" color="gray">Loading...</Text>
+            </Flex>
+          )}
+        >
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/library" element={<MediaLibrary />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </Suspense>
       </Box>
     </Flex>
   );

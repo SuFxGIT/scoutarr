@@ -14,7 +14,16 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          radix: ['@radix-ui/themes', '@radix-ui/react-icons', '@radix-ui/react-collapsible'],
+          query: ['@tanstack/react-query'],
+        }
+      }
+    }
   }
 });
 

@@ -51,6 +51,13 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
   const [editedSchedule, setEditedSchedule] = useState(cronExpression);
   const [error, setError] = useState<string>('');
 
+  // Debug logging to investigate stuck "Calculating" state
+  useEffect(() => {
+    if (enabled && !nextRun) {
+      console.info('[TasksTab] Next run unavailable', { name, cronExpression, enabled, nextRun });
+    }
+  }, [enabled, nextRun, name, cronExpression]);
+
   // Update local state when cronExpression changes
   useEffect(() => {
     setEditedSchedule(cronExpression);
@@ -183,6 +190,16 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
 
 export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus, onRefreshStatus }: TasksTabProps) {
   const [countdowns, setCountdowns] = useState<Record<string, number>>({});
+
+  // Log scheduler status changes for debugging stuck countdowns
+  useEffect(() => {
+    console.info('[TasksTab] Scheduler status updated', {
+      schedulerEnabled: config.scheduler?.enabled,
+      schedulerNextRun: schedulerStatus?.scheduler?.nextRun,
+      syncEnabled: config.tasks?.syncEnabled,
+      syncNextRun: schedulerStatus?.sync?.nextRun,
+    });
+  }, [schedulerStatus, config.scheduler?.enabled, config.tasks?.syncEnabled]);
 
   // Update countdowns every second
   useEffect(() => {

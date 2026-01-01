@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { capitalize } from 'es-toolkit';
 import {
   Flex,
@@ -8,7 +8,6 @@ import {
   TextField,
   Text,
   Select,
-  Switch,
   Separator,
   Tabs,
   Callout,
@@ -19,8 +18,7 @@ import {
   AlertDialog,
   Box
 } from '@radix-ui/themes';
-import * as Collapsible from '@radix-ui/react-collapsible';
-import { CheckIcon, CrossCircledIcon, PlusIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
+import { CheckIcon, CrossCircledIcon, PlusIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
@@ -29,14 +27,17 @@ import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrIns
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
-import { MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
+import { AppType, MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
-import { TasksTab } from '../components/TasksTab';
-import { SchedulerLogs } from '../components/SchedulerLogs';
 import type { SchedulerHistoryEntry } from '../types/api';
 import { configService } from '../services/configService';
 import { schedulerService } from '../services/schedulerService';
+import { buildDefaultInstance, getAppInfo, getNextInstanceId, StarrInstanceConfig } from '../utils/appInfo';
+import { InstanceCard } from '../components/InstanceCard';
+
+const LazyTasksTab = lazy(() => import('../components/TasksTab').then(mod => ({ default: mod.TasksTab })));
+const LazySchedulerLogs = lazy(() => import('../components/SchedulerLogs').then(mod => ({ default: mod.SchedulerLogs })));
 
 function Settings() {
   const queryClient = useQueryClient();
@@ -51,7 +52,7 @@ function Settings() {
       return 'applications';
     }
   });
-  const [selectedAppType, setSelectedAppType] = useState<'radarr' | 'sonarr' | 'lidarr' | 'readarr'>('radarr');
+  const [selectedAppType, setSelectedAppType] = useState<AppType>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
   const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
@@ -255,25 +256,6 @@ function Settings() {
     },
   });
 
-  // Type for instance configs
-  type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
-
-  // Helper to get next available instance ID
-  const getNextInstanceId = (instances: StarrInstanceConfig[]): number => {
-    const existingIds = instances
-      .map(inst => inst.instanceId)
-      .filter(id => typeof id === 'number')
-      .sort((a, b) => a - b);
-    
-    // Find the first gap or next number
-    for (let i = 1; i <= existingIds.length + 1; i++) {
-      if (!existingIds.includes(i)) {
-        return i;
-      }
-    }
-    return existingIds.length + 1;
-  };
-
   // Helper to normalize config - ensure instances have stable IDs and instanceIds
   const normalizeConfig = (config: Config): Config => {
     const normalized = { ...config };
@@ -328,13 +310,13 @@ function Settings() {
   };
 
   // Get instances for an app
-  const getInstances = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr'): StarrInstanceConfig[] => {
+  const getInstances = (app: AppType): StarrInstanceConfig[] => {
     if (!config) return [];
     return config.applications[app] as StarrInstanceConfig[];
   };
 
   // Update instance config
-  const updateInstanceConfig = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string, field: string, value: unknown) => {
+  const updateInstanceConfig = (app: AppType, instanceId: string, field: string, value: unknown) => {
     if (!config) return;
     const instances = getInstances(app);
     const currentInstance = instances.find(inst => inst.id === instanceId);
@@ -374,7 +356,7 @@ function Settings() {
   };
 
   // Add new instance
-  const addInstance = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr') => {
+  const addInstance = (app: AppType) => {
     if (!config) return;
     const instances = getInstances(app);
     // Limit instances per app
@@ -383,70 +365,7 @@ function Settings() {
       return;
     }
     const nextInstanceId = getNextInstanceId(instances);
-    const newId = `${app}-${nextInstanceId}`;
-
-    let defaultConfig: StarrInstanceConfig;
-    if (app === 'radarr') {
-      defaultConfig = {
-        id: newId,
-        instanceId: nextInstanceId,
-        name: '',
-        url: '',
-        apiKey: '',
-        count: 5,
-        tagName: 'upgradinatorr',
-        ignoreTag: '',
-        monitored: true,
-        movieStatus: 'any' as const,
-        qualityProfileName: '',
-        enabled: true
-      };
-    } else if (app === 'sonarr') {
-      defaultConfig = {
-        id: newId,
-        instanceId: nextInstanceId,
-        name: '',
-        url: '',
-        apiKey: '',
-        count: 5,
-        tagName: 'upgradinatorr',
-        ignoreTag: '',
-        monitored: true,
-        seriesStatus: '',
-        qualityProfileName: '',
-        enabled: true
-      };
-    } else if (app === 'lidarr') {
-      defaultConfig = {
-        id: newId,
-        instanceId: nextInstanceId,
-        name: '',
-        url: '',
-        apiKey: '',
-        count: 5,
-        tagName: 'upgradinatorr',
-        ignoreTag: '',
-        monitored: true,
-        artistStatus: '',
-        qualityProfileName: '',
-        enabled: true
-      };
-    } else { // readarr
-      defaultConfig = {
-        id: newId,
-        instanceId: nextInstanceId,
-        name: '',
-        url: '',
-        apiKey: '',
-        count: 5,
-        tagName: 'upgradinatorr',
-        ignoreTag: '',
-        monitored: true,
-        authorStatus: '',
-        qualityProfileName: '',
-        enabled: true
-      };
-    }
+    const defaultConfig = buildDefaultInstance(app, nextInstanceId);
     
     setConfig({
       ...config,
@@ -458,7 +377,7 @@ function Settings() {
   };
 
   // Remove instance
-  const removeInstance = (app: 'radarr' | 'sonarr' | 'lidarr' | 'readarr', instanceId: string) => {
+  const removeInstance = (app: AppType, instanceId: string) => {
     if (!config) return;
     const instances = getInstances(app);
     const updatedInstances = instances.filter(inst => inst.id !== instanceId);
@@ -509,12 +428,12 @@ function Settings() {
     return null;
   }
 
-  const renderTestButton = (app: string, instanceId?: string) => {
+  const renderTestButton = (app: AppType, instanceId?: string) => {
     const key = instanceId ? `${app}-${instanceId}` : app;
     const testResult = testResults[key];
     let appConfig: StarrInstanceConfig | undefined;
-    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as StarrInstanceConfig[];
+    if (instanceId && Array.isArray(config.applications[app])) {
+      const instances = config.applications[app] as StarrInstanceConfig[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
       const appConfigs = config.applications[app as keyof Config['applications']];
@@ -559,7 +478,7 @@ function Settings() {
     );
   };
 
-  const fetchQualityProfiles = async (app: string, instanceId: string, url: string, apiKey: string, forceRefresh: boolean = false) => {
+  const fetchQualityProfiles = async (app: AppType, instanceId: string, url: string, apiKey: string) => {
     const key = `${app}-${instanceId}`;
     
     if (!url || !apiKey) {
@@ -595,12 +514,12 @@ function Settings() {
     }
   };
 
-  const testConnection = async (app: string, instanceId?: string) => {
+  const testConnection = async (app: AppType, instanceId?: string) => {
     if (!config) return;
     const key = instanceId ? `${app}-${instanceId}` : app;
     let appConfig: StarrInstanceConfig | undefined;
-    if (instanceId && Array.isArray(config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'])) {
-      const instances = config.applications[app as 'radarr' | 'sonarr' | 'lidarr' | 'readarr'] as StarrInstanceConfig[];
+    if (instanceId && Array.isArray(config.applications[app])) {
+      const instances = config.applications[app] as StarrInstanceConfig[];
       appConfig = instances.find(inst => inst.id === instanceId);
     } else {
       const appConfigs = config.applications[app as keyof Config['applications']];
@@ -652,7 +571,7 @@ function Settings() {
         toast.success(`Connection test successful${versionText}`);
         // Fetch quality profiles after successful connection test
         if (instanceId && appConfig.url && appConfig.apiKey) {
-          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey, true);
+          fetchQualityProfiles(app, instanceId, appConfig.url, appConfig.apiKey);
         }
       } else {
         showErrorToast('Connection test failed');
@@ -664,17 +583,6 @@ function Settings() {
       }));
       showErrorToast('Connection test failed: ' + getErrorMessage(error));
     }
-  };
-
-  // Helper to get app-specific labels and configuration
-  const getAppInfo = (appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr') => {
-    const appNames = {
-      radarr: { name: 'Radarr', mediaType: 'Movies', mediaTypePlural: 'movies', defaultPort: '7878' },
-      sonarr: { name: 'Sonarr', mediaType: 'Series', mediaTypePlural: 'series', defaultPort: '8989' },
-      lidarr: { name: 'Lidarr', mediaType: 'Artists', mediaTypePlural: 'artists', defaultPort: '8686' },
-      readarr: { name: 'Readarr', mediaType: 'Authors', mediaTypePlural: 'authors', defaultPort: '8787' }
-    };
-    return appNames[appType];
   };
 
   return (
@@ -700,7 +608,7 @@ function Settings() {
                   <PlusIcon /> Add {capitalize(selectedAppType)} Instance
                 </Button>
               )}
-              <Button size="2" onClick={saveConfig} disabled={saveConfigMutation.isPending || loading}>
+              <Button size="2" onClick={() => saveConfig()} disabled={saveConfigMutation.isPending || loading}>
                 {saveConfigMutation.isPending ? (
                   <>
                     <Spinner size="1" /> Saving...
@@ -718,7 +626,7 @@ function Settings() {
                 <Heading size="5">Applications</Heading>
                 <Flex gap="2" align="center">
                   <Text size="2" weight="medium">Application Type</Text>
-                  <Select.Root value={selectedAppType} onValueChange={(value: string) => setSelectedAppType(value as 'radarr' | 'sonarr' | 'lidarr' | 'readarr')}>
+                  <Select.Root value={selectedAppType} onValueChange={(value: string) => setSelectedAppType(value as AppType)}>
                     <Select.Trigger style={{ minWidth: '120px' }} />
                     <Select.Content position="popper" sideOffset={5}>
                       <Select.Item value="radarr">
@@ -755,11 +663,16 @@ function Settings() {
                   return getInstances(selectedAppType).map((instance, index) => {
                     const instanceKey = `${selectedAppType}-${instance.id}`;
                     const isExpanded = expandedInstances.has(instanceKey);
-                    
+
                     return (
-                    <Card key={instance.id} style={{ alignSelf: 'flex-start', width: '100%' }}>
-                      <Flex direction="column" gap="2">
-                        <Collapsible.Root open={isExpanded} onOpenChange={(open: boolean) => {
+                      <InstanceCard
+                        key={instance.id}
+                        appType={selectedAppType}
+                        appInfo={appInfo}
+                        instance={instance}
+                        index={index}
+                        isExpanded={isExpanded}
+                        onExpandedChange={(open: boolean) => {
                           const newExpanded = new Set(expandedInstances);
                           if (open) {
                             newExpanded.add(instanceKey);
@@ -767,393 +680,20 @@ function Settings() {
                             newExpanded.delete(instanceKey);
                           }
                           setExpandedInstances(newExpanded);
-                        }}>
-                          <Collapsible.Trigger asChild>
-                            <Box
-                              width="100%"
-                              p="3"
-                              mb="0"
-                              style={{ cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
-                              onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
-                            >
-                              <Flex align="center" gap="2" width="100%" justify="between">
-                                <Flex align="center" gap="2">
-                                  <AppIcon app={selectedAppType} size={18} variant="light" />
-                                  <Text size="3" weight="bold">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
-                                </Flex>
-                                <Flex align="center" gap="2">
-                                  {confirmingDeleteInstance === `${selectedAppType}-${instance.id}` ? (
-                                    <Flex gap="1" align="center">
-                                      <Text size="1" color="gray">Delete?</Text>
-                                      <Button
-                                        variant="solid"
-                                        color="red"
-                                        size="1"
-                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                          e.stopPropagation();
-                                          removeInstance(selectedAppType, instance.id);
-                                        }}
-                                      >
-                                        Yes
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="1"
-                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                          e.stopPropagation();
-                                          setConfirmingDeleteInstance(null);
-                                        }}
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </Flex>
-                                  ) : (
-                                    <Tooltip content="Delete this instance">
-                                      <Button
-                                        variant="soft"
-                                        color="red"
-                                        size="1"
-                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                          e.stopPropagation();
-                                          setConfirmingDeleteInstance(`${selectedAppType}-${instance.id}`);
-                                        }}
-                                      >
-                                        <TrashIcon />
-                                      </Button>
-                                    </Tooltip>
-                                  )}
-                                  {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-                                </Flex>
-                              </Flex>
-                            </Box>
-                          </Collapsible.Trigger>
-                          
-                          <Collapsible.Content style={{ overflow: 'hidden' }}>
-                            <Flex direction="column" gap="3" p="3" pt="2">
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Enable Instance</Text>
-                                  <Tooltip content="When enabled, this instance will be included in search operations. When disabled, it will be skipped.">
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <Switch
-                                  checked={instance.enabled !== false}
-                                  onCheckedChange={(checked: boolean) => updateInstanceConfig(selectedAppType, instance.id, 'enabled', checked)}
-                                />
-                              </Flex>
-                              <Separator size="4" />
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Name (optional)</Text>
-                                  <Tooltip content={`A name to identify this instance (e.g., 'Main ${appInfo.name}', '4K ${appInfo.name}').`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  value={instance.name || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'name', e.target.value)}
-                                  placeholder={`${appInfo.name} ${index + 1}`}
-                                />
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">{appInfo.name} URL</Text>
-                                  <Tooltip content={`The base URL where your ${appInfo.name} instance is accessible (e.g., http://localhost:${appInfo.defaultPort} or https://${selectedAppType}.example.com)`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  placeholder={`http://localhost:${appInfo.defaultPort}`}
-                                  value={instance.url || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'url', e.target.value)}
-                                />
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">API Key</Text>
-                                  <Tooltip content={`Your ${appInfo.name} API key found in Settings → General → Security → API Key (must be 32 characters)`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  type="password"
-                                  placeholder="API Key"
-                                  value={instance.apiKey || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'apiKey', e.target.value)}
-                                />
-                              </Flex>
-
-                              {renderTestButton(selectedAppType, instance.id)}
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Number of {startCase(appInfo.mediaTypePlural)} to Search</Text>
-                                  <Tooltip content={`How many ${appInfo.mediaTypePlural} to randomly select and search for upgrades each time the script runs. Use 'max' to search all matching ${appInfo.mediaTypePlural}.`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  type="number"
-                                  value={(instance.count || 5).toString()}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'count', parseInt(e.target.value) || 5)}
-                                />
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Tag Name (optional)</Text>
-                                  <Tooltip content={`The tag name to use for tracking which ${appInfo.mediaTypePlural} have been searched. This tag will be created automatically if it doesn't exist.`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  value={instance.tagName || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'tagName', e.target.value)}
-                                />
-                              </Flex>
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Ignore Tag (optional)</Text>
-                                  <Tooltip content={`${appInfo.mediaType} with this tag will be excluded from upgrade searches. Leave empty to include all ${appInfo.mediaTypePlural} matching other criteria.`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <TextField.Root
-                                  value={instance.ignoreTag || ''}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(selectedAppType, instance.id, 'ignoreTag', e.target.value)}
-                                />
-                              </Flex>
-
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Search Monitored {appInfo.mediaType} Only</Text>
-                                  <Tooltip content={`When enabled, only ${appInfo.mediaTypePlural} that are currently monitored will be considered for upgrades.`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <Switch
-                                  checked={instance.monitored ?? true}
-                                  onCheckedChange={(checked: boolean) => updateInstanceConfig(selectedAppType, instance.id, 'monitored', checked)}
-                                />
-                              </Flex>
-
-                              {selectedAppType === 'radarr' && (
-                                <Flex direction="column" gap="2">
-                                  <Flex align="center" gap="1">
-                                    <Text size="2" weight="medium">Movie Status</Text>
-                                    <Tooltip content="Only movies with this status or higher will be considered for upgrades. Released is recommended for most use cases.">
-                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                    </Tooltip>
-                                  </Flex>
-                                  <Select.Root
-                                    value={(instance as RadarrInstance).movieStatus || 'any'}
-                                    onValueChange={(value: string) => updateInstanceConfig('radarr', instance.id, 'movieStatus', value)}
-                                  >
-                                    <Select.Trigger />
-                                    <Select.Content position="popper" sideOffset={5}>
-                                      <Select.Item value="any">Any</Select.Item>
-                                      <Select.Item value="announced">Announced</Select.Item>
-                                      <Select.Item value="in cinemas">In Cinemas</Select.Item>
-                                      <Select.Item value="released">Released</Select.Item>
-                                    </Select.Content>
-                                  </Select.Root>
-                                </Flex>
-                              )}
-                              
-                              {selectedAppType === 'sonarr' && (
-                                <Flex direction="column" gap="2">
-                                  <Flex align="center" gap="1">
-                                    <Text size="2" weight="medium">Series Status</Text>
-                                    <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
-                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                    </Tooltip>
-                                  </Flex>
-                                  <Select.Root
-                                    value={(instance as SonarrInstance).seriesStatus || 'any'}
-                                    onValueChange={(value: string) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
-                                  >
-                                    <Select.Trigger />
-                                    <Select.Content position="popper" sideOffset={5}>
-                                      <Select.Item value="any">Any</Select.Item>
-                                      <Select.Item value="continuing">Continuing</Select.Item>
-                                      <Select.Item value="upcoming">Upcoming</Select.Item>
-                                      <Select.Item value="ended">Ended</Select.Item>
-                                    </Select.Content>
-                                  </Select.Root>
-                                </Flex>
-                              )}
-
-                              {(selectedAppType === 'lidarr' || selectedAppType === 'readarr') && (
-                                <Flex direction="column" gap="2">
-                                  <Flex align="center" gap="1">
-                                    <Text size="2" weight="medium">{appInfo.mediaType} Status</Text>
-                                    <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} with this status will be considered for upgrades. Leave as 'Any' to include all statuses.`}>
-                                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                    </Tooltip>
-                                  </Flex>
-                                  <Select.Root
-                                    value={selectedAppType === 'lidarr' ? ((instance as LidarrInstance).artistStatus || 'any') : ((instance as ReadarrInstance).authorStatus || 'any')}
-                                    onValueChange={(value: string) => {
-                                      const field = selectedAppType === 'lidarr' ? 'artistStatus' : 'authorStatus';
-                                      updateInstanceConfig(selectedAppType, instance.id, field, value === 'any' ? '' : value);
-                                    }}
-                                  >
-                                    <Select.Trigger />
-                                    <Select.Content position="popper" sideOffset={5}>
-                                      <Select.Item value="any">Any</Select.Item>
-                                      <Select.Item value="continuing">Continuing</Select.Item>
-                                      <Select.Item value="ended">Ended</Select.Item>
-                                    </Select.Content>
-                                  </Select.Root>
-                                </Flex>
-                              )}
-
-                              <Flex direction="column" gap="2">
-                                <Flex align="center" gap="1">
-                                  <Text size="2" weight="medium">Quality Profile</Text>
-                                  <Tooltip content={`Only ${appInfo.mediaTypePlural.toLowerCase()} using this specific quality profile will be considered. Use "Test Connection" to refresh the quality profiles list.`}>
-                                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                                  </Tooltip>
-                                </Flex>
-                                <Flex gap="2" align="center" style={{ width: '100%' }}>
-                                  <Flex style={{ flex: 1, minWidth: 0 }}>
-                                      {(() => {
-                                        const profileKey = `${selectedAppType}-${instance.id}`;
-                                        const profiles = qualityProfiles[profileKey] || [];
-                                        const isLoading = loadingProfiles[profileKey];
-                                        const hasUrlAndApiKey = instance.url && instance.apiKey;
-                                        
-                                        if (!hasUrlAndApiKey) {
-                                          return (
-                                            <Select.Root
-                                              value={undefined}
-                                              onValueChange={(_value: string) => {}}
-                                              disabled
-                                            >
-                                              <Select.Trigger placeholder="Configure URL and API Key first" style={{ width: '100%' }} />
-                                            </Select.Root>
-                                          );
-                                        }
-                                        
-                                        if (isLoading) {
-                                          return (
-                                            <Select.Root disabled>
-                                              <Select.Trigger placeholder="Loading profiles..." style={{ width: '100%' }} />
-                                            </Select.Root>
-                                          );
-                                        }
-                                        
-                                        // If profiles haven't been fetched yet, show selected profile name if one exists, otherwise show message to test connection
-                                        if (profiles.length === 0) {
-                                          const savedProfileName = instance.qualityProfileName;
-                                          if (savedProfileName) {
-                                            // Show the selected profile name even if profiles haven't been loaded yet
-                                            return (
-                                              <Select.Root
-                                                value={savedProfileName}
-                                                onValueChange={(_value: string) => {}}
-                                                disabled
-                                              >
-                                                <Select.Trigger style={{ width: '100%' }} />
-                                                <Select.Content position="popper" sideOffset={5}>
-                                                  <Select.Item value={savedProfileName}>{savedProfileName}</Select.Item>
-                                                </Select.Content>
-                                              </Select.Root>
-                                            );
-                                          }
-                                          return (
-                                            <Select.Root
-                                              value={undefined}
-                                              onValueChange={(_value: string) => {}}
-                                              disabled
-                                            >
-                                              <Select.Trigger placeholder="Click 'Test Connection' to load profiles" style={{ width: '100%' }} />
-                                            </Select.Root>
-                                          );
-                                        }
-                                        
-                                        // Use a special value "__all__" to represent "all profiles" (empty string in config)
-                                        // If a profile is selected, use its name; otherwise use "__all__"
-                                        const selectedProfileName = instance.qualityProfileName || '';
-                                        const selectValue = selectedProfileName || '__all__';
-                                        
-                                        return (
-                                          <Select.Root
-                                            value={selectValue}
-                                            onValueChange={(value: string) => {
-                                              // Save quality profile name only when a profile is selected (not "__all__")
-                                              // Empty string means "all profiles" - backend will skip quality profile filtering
-                                              // This matches upgradinatorr script behavior: empty/null/whitespace = no filtering
-                                              const configValue = value === '__all__' ? '' : value;
-                                              updateInstanceConfig(selectedAppType, instance.id, 'qualityProfileName', configValue);
-                                            }}
-                                          >
-                                            <Select.Trigger placeholder="All quality profiles" style={{ width: '100%' }} />
-                                            <Select.Content position="popper" sideOffset={5}>
-                                              <Select.Item value="__all__">All quality profiles</Select.Item>
-                                              {profiles.map((profile) => (
-                                                <Select.Item key={profile.id} value={profile.name}>
-                                                  {profile.name}
-                                                </Select.Item>
-                                              ))}
-                                            </Select.Content>
-                                          </Select.Root>
-                                        );
-                                      })()}
-                                    </Flex>
-                                </Flex>
-                              </Flex>
-
-                              <Separator size="4" />
-
-                              <Flex direction="row" align="center" justify="between" gap="2">
-                                <Text size="2" weight="medium">Clear Tags</Text>
-                                {confirmingClearTags === `${selectedAppType}-${instance.id}` ? (
-                                  <Flex gap="2" align="center">
-                                    <Text size="1" color="gray">Confirm?</Text>
-                                    <Button
-                                      variant="solid"
-                                      size="2"
-                                      color="red"
-                                      onClick={() => {
-                                        clearTagsMutation.mutate({ app: selectedAppType, instanceId: instance.id });
-                                      }}
-                                      disabled={clearTagsMutation.isPending}
-                                    >
-                                      {clearTagsMutation.isPending ? 'Clearing...' : 'Confirm'}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="2"
-                                      onClick={() => setConfirmingClearTags(null)}
-                                      disabled={clearTagsMutation.isPending}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </Flex>
-                                ) : (
-                                  <Tooltip content={`Removes the configured tag from all ${appInfo.mediaTypePlural.toLowerCase()} in this ${appInfo.name} instance. This is useful for resetting the upgrade process or clearing tags from all media at once.`}>
-                                    <Button
-                                      variant="outline"
-                                      size="2"
-                                      color="red"
-                                      onClick={() => setConfirmingClearTags(`${selectedAppType}-${instance.id}`)}
-                                    >
-                                      Clear Tags
-                                    </Button>
-                                  </Tooltip>
-                                )}
-                              </Flex>
-                            </Flex>
-                          </Collapsible.Content>
-                        </Collapsible.Root>
-                      </Flex>
-                    </Card>
-                  );
+                        }}
+                        renderTestButton={renderTestButton}
+                        updateInstanceConfig={updateInstanceConfig}
+                        onRemove={removeInstance}
+                        confirmingDeleteId={confirmingDeleteInstance}
+                        setConfirmingDeleteId={setConfirmingDeleteInstance}
+                        qualityProfiles={qualityProfiles}
+                        loadingProfiles={loadingProfiles}
+                        confirmingClearTags={confirmingClearTags}
+                        setConfirmingClearTags={setConfirmingClearTags}
+                        onClearTags={(app, instanceId) => clearTagsMutation.mutate({ app, instanceId })}
+                        clearTagsPending={clearTagsMutation.isPending}
+                      />
+                    );
                   });
                 })()}
               </Grid>
@@ -1161,13 +701,20 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="logs" style={{ paddingTop: '1rem' }}>
-            {config && (
-              <SchedulerLogs
-                schedulerStatus={schedulerStatus?.scheduler}
-                schedulerHistory={schedulerHistory}
-                onRefreshHistory={refetchHistory}
-              />
-            )}
+            <Suspense fallback={(
+              <Flex align="center" justify="center" gap="2" style={{ padding: '1rem' }}>
+                <Spinner size="2" />
+                <Text size="2" color="gray">Loading logs...</Text>
+              </Flex>
+            )}>
+              {config && (
+                <LazySchedulerLogs
+                  schedulerStatus={schedulerStatus?.scheduler}
+                  schedulerHistory={schedulerHistory}
+                  onRefreshHistory={refetchHistory}
+                />
+              )}
+            </Suspense>
           </Tabs.Content>
 
           <Tabs.Content value="notifications" style={{ paddingTop: '1rem' }}>
@@ -1245,15 +792,22 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="tasks">
-            {config && (
-              <TasksTab
-                config={config}
-                onConfigChange={setConfig}
-                onSaveConfig={saveConfig}
-                schedulerStatus={schedulerStatus}
-                onRefreshStatus={refetchSchedulerStatus}
-              />
-            )}
+            <Suspense fallback={(
+              <Flex align="center" justify="center" gap="2" style={{ padding: '1rem' }}>
+                <Spinner size="2" />
+                <Text size="2" color="gray">Loading tasks...</Text>
+              </Flex>
+            )}>
+              {config && (
+                <LazyTasksTab
+                  config={config}
+                  onConfigChange={setConfig}
+                  onSaveConfig={saveConfig}
+                  schedulerStatus={schedulerStatus}
+                  onRefreshStatus={refetchSchedulerStatus}
+                />
+              )}
+            </Suspense>
           </Tabs.Content>
 
           <Tabs.Content value="advanced" style={{ paddingTop: '1rem' }}>

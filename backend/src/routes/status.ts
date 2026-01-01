@@ -114,6 +114,17 @@ statusRouter.get('/scheduler', async (req, res) => {
       ? syncSchedulerService.getNextRunTime()
       : null;
 
+    logger.debug('📅 Scheduler status requested', {
+      schedulerEnabled: config.scheduler?.enabled || false,
+      schedulerRunning: schedulerStatus.running,
+      schedulerSchedule: schedulerStatus.schedule,
+      schedulerNextRun: schedulerStatus.nextRun,
+      syncEnabled: syncConfig?.syncEnabled || false,
+      syncConfigSchedule: syncConfig?.syncSchedule,
+      syncCurrentSchedule: syncSchedule,
+      syncNextRun: syncNextRun ? syncNextRun.toISOString?.() || syncNextRun : null,
+    });
+
     res.json({
       scheduler: {
         enabled: config.scheduler?.enabled || false,
