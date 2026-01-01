@@ -197,30 +197,6 @@ class SyncSchedulerService {
     }
   }
 
-  async syncInstance(appType: AppType, instanceId: string): Promise<void> {
-    const endOp = startOperation('SyncScheduler.syncInstance', { appType, instanceId });
-    try {
-      logger.info(`🔄 Manually syncing ${appType} instance: ${instanceId}`);
-
-      const config = configService.getConfig();
-      const instances = config.applications[appType];
-      const instance = instances.find(inst => inst.id === instanceId);
-
-      if (!instance) {
-        throw new Error(`Instance ${instanceId} not found for ${appType}`);
-      }
-
-      await this.syncSingleInstance(appType, instance);
-      endOp({}, true);
-    } catch (error: unknown) {
-      logger.error(`❌ Error syncing ${appType} instance ${instanceId}`, {
-        error: getErrorMessage(error)
-      });
-      endOp({ error: getErrorMessage(error) }, false);
-      throw error;
-    }
-  }
-
   isSyncRunning(): boolean {
     return this.isRunning;
   }

@@ -36,7 +36,6 @@ import { toast } from 'sonner';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
 import { fetchMediaLibrary, searchMedia } from '../services/mediaLibraryService';
-import { schedulerService } from '../services/schedulerService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
@@ -176,7 +175,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     { columnKey: 'title', direction: 'ASC' }
   ]);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isSyncing, setIsSyncing] = useState(false);
   const showAllParam = searchParams.get('showAll');
   const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
 
@@ -258,20 +256,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     if (selectedMediaIds.size === 0) return;
     searchMutation.mutate();
   }, [selectedMediaIds.size, searchMutation]);
-
-  const handleSync = useCallback(async () => {
-    if (!instanceInfo) return;
-    setIsSyncing(true);
-    try {
-      await schedulerService.syncInstance(instanceInfo.appType, instanceInfo.instanceId);
-      toast.success('Sync completed');
-      refetch(); // Refresh media list
-    } catch (error: unknown) {
-      toast.error('Sync failed: ' + getErrorMessage(error));
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [instanceInfo, refetch]);
 
   // Filter and sort media, pre-compute formatted dates
   const filteredAndSortedMedia = useMemo(() => {
@@ -545,20 +529,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
             {/* Action Buttons */}
             <Flex justify="end" gap="2" pt="3">
-              <Button
-                variant="outline"
-                onClick={handleSync}
-                disabled={isSyncing || !selectedInstance}
-              >
-                {isSyncing ? (
-                  <>
-                    <Spinner size="1" />
-                    Syncing...
-                  </>
-                ) : (
-                  'Sync Now'
-                )}
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => setSelectedMediaIds(new Set())}

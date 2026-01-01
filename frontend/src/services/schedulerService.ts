@@ -32,11 +32,4 @@ export const schedulerService = {
   async runMediaSync(): Promise<void> {
     await apiClient.post('/sync/all');
   },
-
-  /**
-   * Sync specific instance
-   */
-  async syncInstance(appType: string, instanceId: string): Promise<void> {
-    await apiClient.post(`/sync/${appType}/${instanceId}`);
-  },
 };
