@@ -28,7 +28,7 @@ import { statsService } from '../services/statsService';
 
 function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [confirmingClear, setConfirmingClear] = useState<'stats' | 'recent' | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState<Stats['recentSearches'][number] | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
@@ -49,42 +49,26 @@ function Dashboard() {
     staleTime: Infinity, // Stats never go stale - they only change when a run happens
   });
 
-  // Mutation for clearing recent searches
-  const clearRecentMutation = useMutation({
-    mutationFn: () => statsService.clearRecentActivity(),
-    onSuccess: () => {
-      toast.success('Recent searches cleared');
-      setCurrentPage(1);
-      setConfirmingClear(null);
-      refetchStats();
-    },
-    onError: (error: unknown) => {
-      toast.error('Failed to clear recent searches: ' + getErrorMessage(error));
-      setConfirmingClear(null);
-    },
-  });
-
   // Mutation for clearing stats
   const clearStatsMutation = useMutation({
     mutationFn: () => statsService.clearAllData(),
     onSuccess: () => {
       toast.success('Recent searches and stats cleared');
       setCurrentPage(1);
-      setConfirmingClear(null);
+      setConfirmingClear(false);
       refetchStats();
     },
     onError: (error: unknown) => {
       toast.error('Failed to clear data: ' + getErrorMessage(error));
-      setConfirmingClear(null);
+      setConfirmingClear(false);
     },
   });
 
   // Render confirmation buttons for clear actions
-  const renderConfirmButtons = (type: 'stats' | 'recent', onConfirm: () => void) => {
-    if (confirmingClear !== type) return null;
+  const renderConfirmButtons = (onConfirm: () => void) => {
+    if (!confirmingClear) return null;
 
-    const isPending = (type === 'stats' && clearStatsMutation.isPending) ||
-                      (type === 'recent' && clearRecentMutation.isPending);
+    const isPending = clearStatsMutation.isPending;
 
     return (
       <Flex gap="2" align="center">
@@ -107,7 +91,7 @@ function Dashboard() {
         <Button
           variant="outline"
           size="2"
-          onClick={() => setConfirmingClear(null)}
+          onClick={() => setConfirmingClear(false)}
           disabled={isPending}
         >
           Cancel
@@ -139,14 +123,6 @@ function Dashboard() {
             }
           });
           
-          // Fallback to searchesByApplication if searchesByInstance is empty
-          if (lidarrTotal === 0 && radarrTotal === 0 && sonarrTotal === 0 && readarrTotal === 0) {
-            lidarrTotal = stats.searchesByApplication?.lidarr || 0;
-            radarrTotal = stats.searchesByApplication?.radarr || 0;
-            sonarrTotal = stats.searchesByApplication?.sonarr || 0;
-            readarrTotal = stats.searchesByApplication?.readarr || 0;
-          }
-          
           return (
             <Card>
               <Flex direction="column" gap="3">
@@ -154,12 +130,12 @@ function Dashboard() {
                   <Heading size="5">Statistics</Heading>
                   <Tooltip content="Delete all search history and tagged media records from the database. This will reset all statistics to zero.">
                     <span>
-                      {renderConfirmButtons('stats', () => clearStatsMutation.mutate()) || (
+                      {renderConfirmButtons(() => clearStatsMutation.mutate()) || (
                         <Button 
                           variant="outline" 
                           color="red"
                           size="2" 
-                          onClick={() => setConfirmingClear('stats')}
+                          onClick={() => setConfirmingClear(true)}
                         >
                           Clear Data
                         </Button>

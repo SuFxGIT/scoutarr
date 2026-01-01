@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Config } from '@scoutarr/shared';
+import { Config, configSchema } from '@scoutarr/shared';
 import logger, { startOperation } from '../utils/logger.js';
 import { getConfigDir } from '../utils/paths.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
@@ -43,14 +43,12 @@ class ConfigService {
       logger.info('✅ Configuration initialized successfully', { configFile: CONFIG_FILE });
       endOp();
     } catch (error: unknown) {
-      logger.warn('⚠️  Error initializing config, creating default config', {
+      logger.error('❌ Error initializing configuration', {
         error: getErrorMessage(error),
         configFile: CONFIG_FILE
       });
-      await this.createDefaultConfig();
-      await this.loadConfig();
-      logger.info('✅ Default configuration created and loaded');
-      endOp({}, true);
+      endOp({ error: getErrorMessage(error) }, false);
+      throw error;
     }
   }
 
@@ -94,58 +92,23 @@ class ConfigService {
       const content = await fs.readFile(CONFIG_FILE, 'utf-8');
       logger.debug('✅ Config file read successfully', { size: content.length });
       
-      const parsed = JSON.parse(content) as Partial<Config>;
-      logger.debug('✅ Config JSON parsed successfully');
-      
-      // Normalize config: ensure all application arrays exist
-      if (!parsed.applications) {
-        logger.debug('⚠️  No applications in config, initializing empty object');
-        parsed.applications = {
-          radarr: [],
-          sonarr: [],
-          lidarr: [],
-          readarr: []
-        };
-      }
-      if (!Array.isArray(parsed.applications.radarr)) {
-        parsed.applications.radarr = [];
-      }
-      if (!Array.isArray(parsed.applications.sonarr)) {
-        parsed.applications.sonarr = [];
-      }
-      if (!Array.isArray(parsed.applications.lidarr)) {
-        logger.debug('⚠️  Lidarr not an array, initializing empty array');
-        parsed.applications.lidarr = [];
-      }
-      if (!Array.isArray(parsed.applications.readarr)) {
-        logger.debug('⚠️  Readarr not an array, initializing empty array');
-        parsed.applications.readarr = [];
-      }
+      const parsedJson = JSON.parse(content);
+      const validatedConfig = configSchema.parse(parsedJson);
 
-      // Normalize tasks config with defaults if missing
-      if (!parsed.tasks) {
-        logger.debug('⚠️  No tasks config found, initializing with defaults');
-        parsed.tasks = {
-          syncSchedule: '0 3 * * *',
-          syncEnabled: true
-        };
-      }
-      
-      // Count configured instances
       const instanceCounts = {
-        radarr: parsed.applications.radarr.length,
-        sonarr: parsed.applications.sonarr.length,
-        lidarr: parsed.applications.lidarr.length,
-        readarr: parsed.applications.readarr.length
+        radarr: validatedConfig.applications.radarr.length,
+        sonarr: validatedConfig.applications.sonarr.length,
+        lidarr: validatedConfig.applications.lidarr.length,
+        readarr: validatedConfig.applications.readarr.length
       };
-      
-      this.config = parsed as Config;
-      
-      logger.debug('✅ Configuration loaded successfully', { 
+
+      this.config = validatedConfig;
+
+      logger.debug('✅ Configuration loaded successfully', {
         configFile: CONFIG_FILE,
         instanceCounts,
-        schedulerEnabled: parsed.scheduler?.enabled || false,
-        schedulerSchedule: parsed.scheduler?.schedule || 'not set'
+        schedulerEnabled: validatedConfig.scheduler.enabled,
+        schedulerSchedule: validatedConfig.scheduler.schedule
       });
       endOp({ instanceCounts }, true);
       return this.config;
@@ -194,11 +157,12 @@ class ConfigService {
     const endOp = startOperation('ConfigService.saveConfig', { configFile: CONFIG_FILE });
     logger.debug('💾 Saving configuration', { configFile: CONFIG_FILE });
     try {
-      const configJson = JSON.stringify(config, null, 2);
+      const validatedConfig = configSchema.parse(config);
+      const configJson = JSON.stringify(validatedConfig, null, 2);
       await fs.writeFile(CONFIG_FILE, configJson);
       logger.debug('✅ Config file written successfully', { size: configJson.length });
       
-      this.config = config;
+      this.config = validatedConfig;
       
       // Count configured instances
       const instanceCounts = {

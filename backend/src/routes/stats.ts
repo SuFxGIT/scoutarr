@@ -42,12 +42,6 @@ statsRouter.post('/reset', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Stats reset successfully' });
 }));
 
-// Clear recent searches only
-statsRouter.post('/clear-recent', asyncHandler(async (req, res) => {
-  await statsService.clearRecentSearches();
-  res.json({ success: true, message: 'Recent searches cleared successfully' });
-}));
-
 // Clear data (recent searches and stats) - keeps database structure
 statsRouter.post('/clear-data', asyncHandler(async (req, res) => {
   logger.info('🗑️  Clear data requested');

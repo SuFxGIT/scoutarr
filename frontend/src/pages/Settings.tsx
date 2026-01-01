@@ -23,7 +23,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
-import type { Config, RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
+import type { Config } from '../types/config';
 import { configSchema } from '../schemas/configSchema';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
@@ -67,10 +67,7 @@ function Settings() {
   // Load config with react-query
   const { data: loadedConfig, isLoading: loading, error: loadError, refetch: refetchConfig } = useQuery<Config>({
     queryKey: ['config'],
-    queryFn: async () => {
-      const data = await configService.getConfig();
-      return normalizeConfig(data);
-    },
+    queryFn: () => configService.getConfig(),
     refetchOnWindowFocus: true,
   });
 
@@ -255,59 +252,6 @@ function Settings() {
       setConfirmingClearTags(null);
     },
   });
-
-  // Helper to normalize config - ensure instances have stable IDs and instanceIds
-  const normalizeConfig = (config: Config): Config => {
-    const normalized = { ...config };
-    
-    // Ensure notifications object exists with all required fields
-    if (!normalized.notifications) {
-      normalized.notifications = {
-        discordWebhook: '',
-        notifiarrPassthroughWebhook: '',
-        notifiarrPassthroughDiscordChannelId: '',
-        pushoverUserKey: '',
-        pushoverApiToken: ''
-      };
-    } else {
-      // Ensure all notification fields are strings (default to empty string if undefined)
-      normalized.notifications = {
-        discordWebhook: normalized.notifications.discordWebhook ?? '',
-        notifiarrPassthroughWebhook: normalized.notifications.notifiarrPassthroughWebhook ?? '',
-        notifiarrPassthroughDiscordChannelId: normalized.notifications.notifiarrPassthroughDiscordChannelId ?? '',
-        pushoverUserKey: normalized.notifications.pushoverUserKey ?? '',
-        pushoverApiToken: normalized.notifications.pushoverApiToken ?? ''
-      };
-    }
-    
-    // Ensure applications object exists
-    if (!normalized.applications) {
-      normalized.applications = { radarr: [], sonarr: [], lidarr: [], readarr: [] };
-    }
-    
-    // Ensure all app arrays exist and normalize instances
-    normalized.applications.radarr = (normalized.applications.radarr || []).map((inst: RadarrInstance, idx: number) => ({
-      ...inst,
-      instanceId: inst.instanceId || idx + 1
-    }));
-
-    normalized.applications.sonarr = (normalized.applications.sonarr || []).map((inst: SonarrInstance, idx: number) => ({
-      ...inst,
-      instanceId: inst.instanceId || idx + 1
-    }));
-    
-    normalized.applications.lidarr = (normalized.applications.lidarr || []).map((inst: LidarrInstance, idx: number) => ({
-      ...inst,
-      instanceId: inst.instanceId || idx + 1
-    }));
-    
-    normalized.applications.readarr = (normalized.applications.readarr || []).map((inst: ReadarrInstance, idx: number) => ({
-      ...inst,
-      instanceId: inst.instanceId || idx + 1
-    }));
-    
-    return normalized;
-  };
 
   // Get instances for an app
   const getInstances = (app: AppType): StarrInstanceConfig[] => {

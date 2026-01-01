@@ -138,8 +138,9 @@ The application uses Winston for structured logging with organized, color-coded 
 - `POST /api/search/run` – Run the search for all configured instances
 - `POST /api/search/run-preview` – Preview what would be searched for each instance
 - `GET /api/stats` – Get aggregated search statistics
+- `GET /api/stats/recent` – Get paginated recent searches
 - `POST /api/stats/reset` – Reset all statistics
-- `POST /api/stats/clear-recent` – Clear the list of recent searches
+- `POST /api/stats/clear-data` – Clear search history while keeping the database structure
 
 ## License
 

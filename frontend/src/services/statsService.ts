@@ -14,13 +14,6 @@ export const statsService = {
   },
 
   /**
-   * Clear recent activity
-   */
-  async clearRecentActivity(): Promise<void> {
-    await apiClient.post('/stats/clear-recent');
-  },
-
-  /**
    * Clear all statistics data
    */
   async clearAllData(): Promise<void> {

@@ -96,35 +96,7 @@ class StatsService {
       )
     `);
 
-    // Check if media_library needs migration
-    const needsMigration = this.checkMediaLibraryMigration();
-
-    if (needsMigration) {
-      logger.info('🔄 Migrating media_library table to use quality_profile_id');
-      this.migrateMediaLibrary();
-    } else {
-      // Create media_library table with new schema
-      this.db.exec(`
-        CREATE TABLE IF NOT EXISTS media_library (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          instance_id TEXT NOT NULL,
-          media_id INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          monitored INTEGER NOT NULL,
-          tags TEXT NOT NULL,
-          quality_profile_id INTEGER,
-          status TEXT NOT NULL,
-          last_search_time TEXT,
-          date_imported TEXT,
-          has_file INTEGER NOT NULL DEFAULT 0,
-          custom_format_score INTEGER,
-          raw_data TEXT,
-          synced_at TEXT NOT NULL,
-          UNIQUE(instance_id, media_id),
-          FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
-        )
-      `);
-    }
+    this.ensureMediaLibraryTable();
 
 
     // Create indexes for better query performance
@@ -145,94 +117,44 @@ class StatsService {
 
   }
 
-  private checkMediaLibraryMigration(): boolean {
-    if (!this.db) return false;
-
-    try {
-      // Check if media_library table exists
-      const tableCheck = this.db.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='media_library'"
-      ).get();
-
-      if (!tableCheck) {
-        // Table doesn't exist yet, no migration needed
-        return false;
-      }
-
-      // Check if table has quality_profile_name column (old schema)
-      const columnInfo = this.db.prepare('PRAGMA table_info(media_library)').all() as Array<{
-        name: string;
-      }>;
-
-      const hasOldColumn = columnInfo.some(col => col.name === 'quality_profile_name');
-      const hasNewColumn = columnInfo.some(col => col.name === 'quality_profile_id');
-
-      // Need migration if has old column and doesn't have new column
-      return hasOldColumn && !hasNewColumn;
-    } catch (error: unknown) {
-      logger.error('❌ Error checking migration status', { error: getErrorMessage(error) });
-      return false;
-    }
-  }
-
-  private migrateMediaLibrary(): void {
+  private ensureMediaLibraryTable(): void {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
-      // Wrap migration in transaction for atomicity
-      const migration = this.db.transaction(() => {
-        // Create new media_library table with updated schema
-        this.db!.exec(`
-          CREATE TABLE media_library_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            instance_id TEXT NOT NULL,
-            media_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            monitored INTEGER NOT NULL,
-            tags TEXT NOT NULL,
-            quality_profile_id INTEGER,
-            status TEXT NOT NULL,
-            last_search_time TEXT,
-            date_imported TEXT,
-            has_file INTEGER NOT NULL DEFAULT 0,
-            custom_format_score INTEGER,
-            raw_data TEXT,
-            synced_at TEXT NOT NULL,
-            UNIQUE(instance_id, media_id),
-            FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
-          )
-        `);
+      const columnInfo = this.db.prepare('PRAGMA table_info(media_library)').all() as Array<{ name: string }>;
+      const tableExists = columnInfo.length > 0;
+      const hasLegacyColumn = columnInfo.some(col => col.name === 'quality_profile_name');
+      const missingQualityProfileId = tableExists && !columnInfo.some(col => col.name === 'quality_profile_id');
 
-        // Copy data from old table to new table
-        // Set quality_profile_id to NULL - will be populated on next sync
-        this.db!.exec(`
-          INSERT INTO media_library_new (
-            id, instance_id, media_id, title, monitored, tags,
-            quality_profile_id, status, last_search_time, date_imported,
-            has_file, custom_format_score, raw_data, synced_at
-          )
-          SELECT
-            id, instance_id, media_id, title, monitored, tags,
-            NULL, status, last_search_time, date_imported,
-            has_file, custom_format_score, raw_data, synced_at
-          FROM media_library
-        `);
-
-        // Drop old table
-        this.db!.exec('DROP TABLE media_library');
-
-        // Rename new table
-        this.db!.exec('ALTER TABLE media_library_new RENAME TO media_library');
-      });
-
-      migration();
-
-      logger.info('✅ Media library table migration completed successfully');
+      if (tableExists && (hasLegacyColumn || missingQualityProfileId)) {
+        logger.warn('⚠️  Legacy media_library schema detected; dropping and recreating table without migration');
+        this.db.exec('DROP TABLE IF EXISTS media_library');
+      }
     } catch (error: unknown) {
-      const errorMessage = getErrorMessage(error);
-      logger.error('❌ Error migrating media_library table', { error: errorMessage });
-      throw error;
+      logger.warn('⚠️  Could not inspect media_library schema, rebuilding table', { error: getErrorMessage(error) });
+      this.db.exec('DROP TABLE IF EXISTS media_library');
     }
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS media_library (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id TEXT NOT NULL,
+        media_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        monitored INTEGER NOT NULL,
+        tags TEXT NOT NULL,
+        quality_profile_id INTEGER,
+        status TEXT NOT NULL,
+        last_search_time TEXT,
+        date_imported TEXT,
+        has_file INTEGER NOT NULL DEFAULT 0,
+        custom_format_score INTEGER,
+        raw_data TEXT,
+        synced_at TEXT NOT NULL,
+        UNIQUE(instance_id, media_id),
+        FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
+      )
+    `);
   }
 
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
@@ -487,13 +409,6 @@ class StatsService {
       });
       throw error;
     }
-  }
-
-  async clearRecentSearches(): Promise<void> {
-    // Note: Since we're using a single database table for all searches,
-    // "clearing recent searches" effectively clears all stats.
-    // This method exists for API compatibility with the frontend.
-    await this.resetStats();
   }
 
   async clearData(): Promise<void> {
@@ -795,7 +710,7 @@ class StatsService {
     monitored: boolean;
     tags: string[]; // Tag names, not IDs
     quality_profile_id: number | null; // Profile ID
-    quality_profile_name: string | null; // Profile name (for backwards compatibility)
+    quality_profile_name: string | null;
     status: string;
     last_search_time: string | null;
     date_imported: string | null;
