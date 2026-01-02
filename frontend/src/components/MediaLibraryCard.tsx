@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { DataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps } from 'react-data-grid';
+import { DataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
 import {
@@ -292,6 +292,27 @@ function DropdownFilterHeaderCell({ column, sortDirection, priority, filterValue
   );
 }
 
+// Helper functions for localStorage persistence
+function loadFromStorage<T>(key: string, defaultValue: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch {
+    // Silent fail - use default if localStorage unavailable or parsing fails
+  }
+  return defaultValue;
+}
+
+function saveToStorage<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Silent fail - functionality works but won't persist (e.g., private browsing mode)
+  }
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
 }
@@ -305,9 +326,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>([
-    { columnKey: 'title', direction: 'ASC' }
-  ]);
+  const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
+    loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
+  );
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>({
     title: '',
     qualityProfileName: 'all',
@@ -316,11 +337,30 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     dateImported: '',
     tags: 'all'
   });
+  const [columnOrder, setColumnOrder] = useState<readonly string[]>(() =>
+    loadFromStorage('scoutarr_media_library_column_order', [
+      'qualityProfileName',
+      'lastSearched',
+      'dateImported',
+      'customFormatScore',
+      'tags'
+    ])
+  );
 
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
     setLastLibraryUrl(location.pathname + location.search);
   }, [location.pathname, location.search, setLastLibraryUrl]);
+
+  // Persist column order to localStorage whenever it changes
+  useEffect(() => {
+    saveToStorage('scoutarr_media_library_column_order', columnOrder);
+  }, [columnOrder]);
+
+  // Persist sort columns to localStorage whenever they change
+  useEffect(() => {
+    saveToStorage('scoutarr_media_library_sort_columns', sortColumns);
+  }, [sortColumns]);
 
   // Parse selected instance (format: "appType-instanceId")
   const instanceInfo = useMemo(() => {
@@ -509,101 +549,131 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   // Memoized rowKeyGetter for performance
   const rowKeyGetter = useCallback((row: MediaLibraryRow) => row.id, []);
 
+  // Handle column reordering (keep title column locked)
+  const handleColumnsReorder = useCallback((sourceKey: string, targetKey: string) => {
+    // Prevent reordering if source or target is title or select column
+    if (sourceKey === 'title' || targetKey === 'title' || sourceKey === SELECT_COLUMN_KEY || targetKey === SELECT_COLUMN_KEY) {
+      return;
+    }
+
+    setColumnOrder((prevOrder) => {
+      const newOrder = [...prevOrder];
+      const sourceIndex = newOrder.indexOf(sourceKey);
+      const targetIndex = newOrder.indexOf(targetKey);
+
+      if (sourceIndex === -1 || targetIndex === -1) return prevOrder;
+
+      // Remove source and insert at target position
+      const [removed] = newOrder.splice(sourceIndex, 1);
+      newOrder.splice(targetIndex, 0, removed);
+
+      return newOrder;
+    });
+  }, []);
+
   // Column configuration for DataGrid
   // Note: sortable and resizable are set via defaultColumnOptions, no need to repeat
-  const columns: readonly Column<MediaLibraryRow>[] = useMemo(() => [
-    SelectColumn,
-    {
-      key: 'title',
-      name: 'Title',
-      minWidth: 100,
-      renderCell: (props) => <TitleCell row={props.row} />,
-      renderHeaderCell: (props) => (
-        <TextFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.title}
-          onFilterChange={(value) => handleFilterChange('title', value)}
-        />
-      )
-    },
-    {
-      key: 'qualityProfileName',
-      name: 'Quality Profile',
-      width: 130,
-      renderCell: (props) => <QualityProfileCell row={props.row} />,
-      renderHeaderCell: (props) => (
-        <DropdownFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.qualityProfileName}
-          onFilterChange={(value) => handleFilterChange('qualityProfileName', value)}
-          options={[
-            { value: 'all', label: 'All' },
-            ...filterOptions.qualityProfiles.map(profile => ({ value: profile, label: profile }))
-          ]}
-        />
-      )
-    },
-    {
-      key: 'lastSearched',
-      name: 'Searched',
-      width: 115,
-      sortable: true,
-      renderCell: (props) => <DateCell value={props.row.formattedLastSearched} />,
-      renderHeaderCell: (props) => (
-        <TextFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.lastSearched}
-          onFilterChange={(value) => handleFilterChange('lastSearched', value)}
-        />
-      )
-    },
-    {
-      key: 'dateImported',
-      name: 'Imported',
-      width: 115,
-      sortable: true,
-      renderCell: (props) => <DateCell value={props.row.formattedDateImported} />,
-      renderHeaderCell: (props) => (
-        <TextFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.dateImported}
-          onFilterChange={(value) => handleFilterChange('dateImported', value)}
-        />
-      )
-    },
-    {
-      key: 'customFormatScore',
-      name: 'CF Score',
-      width: 100,
-      renderCell: (props) => <CFScoreCell row={props.row} />,
-      renderHeaderCell: (props) => (
-        <NumericFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.cfScore}
-          onFilterChange={(value) => handleFilterChange('cfScore', value)}
-        />
-      )
-    },
-    {
-      key: 'tags',
-      name: 'Tags',
-      width: 136,
-      sortable: true,
-      cellClass: 'tags-cell-padding',
-      renderCell: (props) => <TagsCell row={props.row} scoutarrTags={mediaData?.scoutarrTags} />,
-      renderHeaderCell: (props) => (
-        <DropdownFilterHeaderCell
-          {...props}
-          filterValue={columnFilters.tags}
-          onFilterChange={(value) => handleFilterChange('tags', value)}
-          options={[
-            { value: 'all', label: 'All' },
-            ...filterOptions.tags.map(tag => ({ value: tag, label: tag }))
-          ]}
-        />
-      )
-    }
-  ], [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags]);
+  const columns: readonly Column<MediaLibraryRow>[] = useMemo(() => {
+    // Define all available columns
+    const allColumns: Record<string, Column<MediaLibraryRow>> = {
+      qualityProfileName: {
+        key: 'qualityProfileName',
+        name: 'Quality Profile',
+        width: 130,
+        renderCell: (props) => <QualityProfileCell row={props.row} />,
+        renderHeaderCell: (props) => (
+          <DropdownFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.qualityProfileName}
+            onFilterChange={(value) => handleFilterChange('qualityProfileName', value)}
+            options={[
+              { value: 'all', label: 'All' },
+              ...filterOptions.qualityProfiles.map(profile => ({ value: profile, label: profile }))
+            ]}
+          />
+        )
+      },
+      lastSearched: {
+        key: 'lastSearched',
+        name: 'Searched',
+        width: 115,
+        sortable: true,
+        renderCell: (props) => <DateCell value={props.row.formattedLastSearched} />,
+        renderHeaderCell: (props) => (
+          <TextFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.lastSearched}
+            onFilterChange={(value) => handleFilterChange('lastSearched', value)}
+          />
+        )
+      },
+      dateImported: {
+        key: 'dateImported',
+        name: 'Imported',
+        width: 115,
+        sortable: true,
+        renderCell: (props) => <DateCell value={props.row.formattedDateImported} />,
+        renderHeaderCell: (props) => (
+          <TextFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.dateImported}
+            onFilterChange={(value) => handleFilterChange('dateImported', value)}
+          />
+        )
+      },
+      customFormatScore: {
+        key: 'customFormatScore',
+        name: 'CF Score',
+        width: 100,
+        renderCell: (props) => <CFScoreCell row={props.row} />,
+        renderHeaderCell: (props) => (
+          <NumericFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.cfScore}
+            onFilterChange={(value) => handleFilterChange('cfScore', value)}
+          />
+        )
+      },
+      tags: {
+        key: 'tags',
+        name: 'Tags',
+        width: 136,
+        sortable: true,
+        renderCell: (props) => <TagsCell row={props.row} scoutarrTags={mediaData?.scoutarrTags} />,
+        renderHeaderCell: (props) => (
+          <DropdownFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.tags}
+            onFilterChange={(value) => handleFilterChange('tags', value)}
+            options={[
+              { value: 'all', label: 'All' },
+              ...filterOptions.tags.map(tag => ({ value: tag, label: tag }))
+            ]}
+          />
+        )
+      }
+    };
+
+    // Build ordered columns array: SelectColumn (not draggable), title (not draggable), then reorderable columns
+    return [
+      SelectColumn,
+      {
+        key: 'title',
+        name: 'Title',
+        minWidth: 100,
+        draggable: false,
+        renderCell: (props) => <TitleCell row={props.row} />,
+        renderHeaderCell: (props) => (
+          <TextFilterHeaderCell
+            {...props}
+            filterValue={columnFilters.title}
+            onFilterChange={(value) => handleFilterChange('title', value)}
+          />
+        )
+      } as Column<MediaLibraryRow>,
+      ...columnOrder.map(key => allColumns[key])
+    ];
+  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder]);
 
   return (
     <Card>
@@ -708,11 +778,13 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 onSelectedRowsChange={setSelectedMediaIds}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
+                onColumnsReorder={handleColumnsReorder}
                 rowHeight={48}
                 headerRowHeight={68}
                 defaultColumnOptions={{
                   sortable: true,
-                  resizable: true
+                  resizable: true,
+                  draggable: true
                 }}
                 style={{ height: '100%' }}
               />
