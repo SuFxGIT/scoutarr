@@ -27,7 +27,7 @@ import {
   ClockIcon,
   DotFilledIcon,
   CalendarIcon,
-  BadgeIcon,
+  BadgeIcon
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -287,86 +287,6 @@ function DropdownFilterHeaderCell({ column, sortDirection, priority, filterValue
           ))}
         </Select.Content>
       </Select.Root>
-    </Flex>
-  );
-}
-
-// Toggle filter header cell component for boolean filters
-interface ToggleFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
-  filterValue: string;
-  onFilterChange: (value: string) => void;
-}
-
-function ToggleFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: ToggleFilterHeaderCellProps) {
-  // Cycle through: all -> true -> false -> all
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (filterValue === 'all') {
-      onFilterChange('true');
-    } else if (filterValue === 'true') {
-      onFilterChange('false');
-    } else {
-      onFilterChange('all');
-    }
-  };
-
-  const getFilterLabel = () => {
-    if (filterValue === 'true') return 'Monitored';
-    if (filterValue === 'false') return 'Not Monitored';
-    return 'All';
-  };
-
-  const getFilterColor = () => {
-    if (filterValue === 'true') return 'green';
-    if (filterValue === 'false') return 'red';
-    return 'gray';
-  };
-
-  return (
-    <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <Flex align="center" gap="1" justify="between">
-        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {column.name}
-        </Text>
-        {sortDirection && (
-          <Flex align="center" gap="1">
-            {priority !== undefined && priority > 0 && (
-              <Text size="1" color="gray">{priority + 1}</Text>
-            )}
-            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
-          </Flex>
-        )}
-      </Flex>
-      <Button
-        size="1"
-        variant="soft"
-        color={getFilterColor()}
-        onClick={handleToggle}
-        style={{ width: '100%', cursor: 'pointer' }}
-      >
-        {getFilterLabel()}
-      </Button>
-    </Flex>
-  );
-}
-
-// Standard header cell component for columns without filters
-function StandardHeaderCell({ column, sortDirection, priority }: RenderHeaderCellProps<MediaLibraryRow>) {
-  return (
-    <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <Flex align="center" gap="1" justify="between">
-        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {column.name}
-        </Text>
-        {sortDirection && (
-          <Flex align="center" gap="1">
-            {priority !== undefined && priority > 0 && (
-              <Text size="1" color="gray">{priority + 1}</Text>
-            )}
-            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
-          </Flex>
-        )}
-      </Flex>
     </Flex>
   );
 }

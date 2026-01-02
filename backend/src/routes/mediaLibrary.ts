@@ -6,6 +6,7 @@ import logger, { startOperation } from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
+import { extractFileInfo } from '../utils/mediaFileUtils.js';
 import type { StarrInstanceConfig } from '@scoutarr/shared';
 
 export const mediaLibraryRouter = express.Router();
@@ -117,38 +118,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     // Transform media to response format
     // Use native lastSearchTime from the API (more accurate than our database)
     const mediaWithDates = allMedia.map(m => {
-      // Extract dateImported, customFormatScore, and hasFile from file
-      let dateImported: string | undefined;
-      let customFormatScore: number | undefined;
-      let hasFile = false;
-
-      if (m.movieFile?.dateAdded) {
-        dateImported = m.movieFile.dateAdded;
-        hasFile = true;
-        customFormatScore = (m.movieFile as { customFormatScore?: number }).customFormatScore;
-      } else if (m.episodeFile?.dateAdded) {
-        dateImported = m.episodeFile.dateAdded;
-        hasFile = true;
-        customFormatScore = (m.episodeFile as { customFormatScore?: number }).customFormatScore;
-      } else if (m.trackFiles && m.trackFiles.length > 0) {
-        // For Lidarr, use the most recent track file
-        const dates = m.trackFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
-        if (dates.length > 0) {
-          dateImported = dates.sort().reverse()[0]; // Most recent
-          hasFile = true;
-          const trackWithScore = m.trackFiles.find((f: { customFormatScore?: number }) => (f as { customFormatScore?: number }).customFormatScore !== undefined);
-          customFormatScore = trackWithScore ? (trackWithScore as { customFormatScore?: number }).customFormatScore : undefined;
-        }
-      } else if (m.bookFiles && m.bookFiles.length > 0) {
-        // For Readarr, use the most recent book file
-        const dates = m.bookFiles.map((f: { dateAdded?: string }) => f.dateAdded).filter((d: string | undefined): d is string => !!d);
-        if (dates.length > 0) {
-          dateImported = dates.sort().reverse()[0]; // Most recent
-          hasFile = true;
-          const bookWithScore = m.bookFiles.find((f: { customFormatScore?: number }) => (f as { customFormatScore?: number }).customFormatScore !== undefined);
-          customFormatScore = bookWithScore ? (bookWithScore as { customFormatScore?: number }).customFormatScore : undefined;
-        }
-      }
+      // Extract file information using centralized utility
+      const fileInfo = extractFileInfo(m);
 
       return {
         id: service.getMediaId(m),
@@ -157,10 +128,10 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         status: m.status,
         qualityProfileName: m.qualityProfileName,
         tags: m.tags,
-        lastSearched: m.lastSearchTime, // Native field from Radarr/Sonarr/Lidarr/Readarr API
-        dateImported: dateImported, // File import date
-        customFormatScore,
-        hasFile
+        lastSearched: m.lastSearchTime,
+        dateImported: fileInfo.dateImported,
+        customFormatScore: fileInfo.customFormatScore,
+        hasFile: fileInfo.hasFile
       };
     });
 

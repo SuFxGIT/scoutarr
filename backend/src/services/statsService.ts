@@ -620,42 +620,8 @@ class StatsService {
 
       const transaction = this.db.transaction((items: typeof mediaItems) => {
         for (const item of items) {
-          // Extract dateImported and customFormatScore from file
-          let dateImported: string | undefined;
-          let hasFile = 0;
-          let customFormatScore: number | null = null;
-
-          if (item.movieFile?.dateAdded) {
-            dateImported = item.movieFile.dateAdded;
-            hasFile = 1;
-            customFormatScore = (item.movieFile as { customFormatScore?: number }).customFormatScore ?? null;
-          } else if (item.episodeFile?.dateAdded) {
-            dateImported = item.episodeFile.dateAdded;
-            hasFile = 1;
-            customFormatScore = (item.episodeFile as { customFormatScore?: number }).customFormatScore ?? null;
-          } else if (item.trackFiles && item.trackFiles.length > 0) {
-            const dates = item.trackFiles
-              .map(f => f.dateAdded)
-              .filter((d): d is string => !!d);
-            if (dates.length > 0) {
-              dateImported = dates.sort().reverse()[0];
-              hasFile = 1;
-              // For Lidarr, get customFormatScore from the most recent track file
-              const trackWithScore = item.trackFiles.find(f => (f as { customFormatScore?: number }).customFormatScore !== undefined);
-              customFormatScore = trackWithScore ? ((trackWithScore as { customFormatScore?: number }).customFormatScore ?? null) : null;
-            }
-          } else if (item.bookFiles && item.bookFiles.length > 0) {
-            const dates = item.bookFiles
-              .map(f => f.dateAdded)
-              .filter((d): d is string => !!d);
-            if (dates.length > 0) {
-              dateImported = dates.sort().reverse()[0];
-              hasFile = 1;
-              // For Readarr, get customFormatScore from the most recent book file
-              const bookWithScore = item.bookFiles.find(f => (f as { customFormatScore?: number }).customFormatScore !== undefined);
-              customFormatScore = bookWithScore ? ((bookWithScore as { customFormatScore?: number }).customFormatScore ?? null) : null;
-            }
-          }
+          // Extract file information using centralized utility
+          const fileInfo = extractFileInfoForDb(item);
 
           insertStmt.run(
             instanceId,
@@ -666,9 +632,9 @@ class StatsService {
             item.qualityProfileId || null,
             item.status,
             item.lastSearchTime || null,
-            dateImported || null,
-            hasFile,
-            customFormatScore,
+            fileInfo.dateImported || null,
+            fileInfo.hasFile,
+            fileInfo.customFormatScore,
             JSON.stringify(item), // Store full raw data for future use
             syncTime
           );
