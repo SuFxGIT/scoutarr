@@ -16,7 +16,6 @@ import {
   Callout,
   TextField,
   Tooltip,
-  Switch,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -395,8 +394,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     lastSearched: '',
     dateImported: ''
   });
-  const showAllParam = searchParams.get('showAll');
-  const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
 
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
@@ -419,10 +416,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     error,
     refetch,
   } = useQuery<MediaLibraryResponse>({
-    queryKey: ['mediaLibrary', selectedInstance, showAll],
+    queryKey: ['mediaLibrary', selectedInstance],
     queryFn: async () => {
       if (!instanceInfo) return { media: [], total: 0, instanceName: '', appType: '' };
-      return fetchMediaLibrary(instanceInfo.appType, instanceInfo.instanceId, showAll);
+      return fetchMediaLibrary(instanceInfo.appType, instanceInfo.instanceId);
     },
     enabled: !!instanceInfo,
     staleTime: 30000, // 30 seconds
@@ -452,24 +449,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const handleInstanceChange = (value: string) => {
     setSelectedInstance(value);
     setSelectedMediaIds(new Set()); // Clear selection when changing instance
-    // Update URL to persist both instance and showAll
-    if (showAll) {
-      setSearchParams({ instance: value, showAll: 'true' });
-    } else {
-      setSearchParams({ instance: value });
-    }
-  };
-
-  const handleShowAllChange = (checked: boolean) => {
-    setShowAll(checked);
-    // Update URL to persist state
-    if (selectedInstance) {
-      if (checked) {
-        setSearchParams({ instance: selectedInstance, showAll: 'true' });
-      } else {
-        setSearchParams({ instance: selectedInstance });
-      }
-    }
+    setSearchParams({ instance: value });
   };
 
   const handleManualSearch = useCallback(async () => {
@@ -499,7 +479,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const filteredAndSortedMedia = useMemo(() => {
     if (!mediaData?.media) return [];
 
-    // Filter media based on search query and column filters
+    // Start with all media (no instance filters applied by default)
     let filtered = mediaData.media;
     
     // Apply column filters
@@ -701,7 +681,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         <Separator size="4" />
 
         {/* Instance Selection Section */}
-        {!config || !hasAnyInstances ? (
+        {(!config || !hasAnyInstances) && (
           <Callout.Root color="orange">
             <Callout.Icon>
               <InfoCircledIcon />
@@ -710,19 +690,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
               No instances configured. Please add instances in Settings.
             </Callout.Text>
           </Callout.Root>
-        ) : (
-          selectedInstance && (
-            <Flex align="center" gap="2">
-              <Switch
-                checked={showAll}
-                onCheckedChange={handleShowAllChange}
-              />
-              <Text size="2">Show all media (disable instance filters)</Text>
-              <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
-                <InfoCircledIcon style={{ cursor: 'help' }} />
-              </Tooltip>
-            </Flex>
-          )
         )}
 
         {/* Loading State */}

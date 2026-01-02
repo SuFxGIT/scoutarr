@@ -81,8 +81,7 @@ export interface MediaLibraryItem {
 
 export interface MediaLibraryResponse {
   media: MediaLibraryItem[];
-  total: number; // Absolute total in database for this instance
-  filtered: number; // Count after applying instance filters (same as media.length after filters)
+  total: number;
   instanceName: string;
   appType: string;
 }
