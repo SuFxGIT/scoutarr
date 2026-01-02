@@ -1,12 +1,12 @@
 import express from 'express';
-import { capitalize } from 'es-toolkit';
 import { configService } from '../services/configService.js';
 import { statsService } from '../services/statsService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
-import { getErrorMessage } from '../utils/errorUtils.js';
+import { getErrorMessage, handleRouteError } from '../utils/errorUtils.js';
 import { extractFileInfo } from '../utils/mediaFileUtils.js';
+import { syncInstanceMedia } from '../utils/mediaSync.js';
 import type { StarrInstanceConfig } from '@scoutarr/shared';
 
 export const mediaLibraryRouter = express.Router();
@@ -50,42 +50,24 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       sync: shouldSync
     });
 
-    // Upsert instance record
-    logger.debug('💾 [Scoutarr DB] Upserting instance record', { instanceId, appType });
-    await statsService.upsertInstance(instanceId, appType, instance.name);
-
     // Check if we should sync from API or use database
     let allMedia;
     let fromCache = false;
 
     if (shouldSync) {
-      // Sync from API
+      // Sync from API using centralized utility
       logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
-      allMedia = await service.getMedia(instance);
-      logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
-
-      // Fetch and sync quality profiles
-      logger.debug(`📡 [${capitalize(appType)} API] Fetching quality profiles`);
-      const profiles = await service.getQualityProfiles(instance);
-
-      // Sync quality profiles to database
-      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-      await statsService.syncQualityProfiles(instanceId, profiles);
-      logger.debug('✅ [Scoutarr DB] Quality profiles synced');
-
-      // Convert tag IDs to names before syncing
-      logger.debug('🏷️  [Scoutarr] Converting tag IDs to names');
-      const mediaWithTagNames = await Promise.all(
-        allMedia.map(async (item) => {
-          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-          return { ...item, tags: tagNames };
-        })
-      );
-      logger.debug('✅ [Scoutarr] Tag IDs converted to names');
-
-      // Sync to database first
-      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: mediaWithTagNames.length });
-      await statsService.syncMediaToDatabase(instanceId, mediaWithTagNames);
+      const syncResult = await syncInstanceMedia({
+        instanceId,
+        appType: appType as AppType,
+        instance
+      });
+      
+      allMedia = syncResult.mediaWithTags;
+      
+      // Sync to database
+      logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
+      await statsService.syncMediaToDatabase(instanceId, allMedia);
       logger.debug('✅ [Scoutarr DB] Synced media to database');
     } else {
       // Always use database (no API fallback)
@@ -153,16 +135,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     endOp({ total: allMedia.length }, true);
 
   } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error('❌ Error fetching media library', {
-      error: errorMessage,
-      appType: req.params.appType,
-      instanceId: req.params.instanceId
-    });
-    res.status(500).json({
-      error: 'Failed to fetch media library',
-      message: errorMessage
-    });
+    endOp({ error: getErrorMessage(error) }, false);
+    handleRouteError(res, error, 'Failed to fetch media library');
   }
 });
 
@@ -244,17 +218,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     endOp({ searched: mediaIds.length }, true);
 
   } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error('❌ Manual search failed', {
-      error: errorMessage,
-      appType: req.body.appType,
-      instanceId: req.body.instanceId
-    });
-    endOp({ error: errorMessage }, false);
-    res.status(500).json({
-      success: false,
-      error: 'Search failed',
-      message: errorMessage
-    });
+    endOp({ error: getErrorMessage(error) }, false);
+    handleRouteError(res, error, 'Manual search failed');
   }
 });

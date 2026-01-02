@@ -1,9 +1,8 @@
 import { createRequire } from 'module';
-import { capitalize } from 'es-toolkit';
 import logger, { startOperation } from '../utils/logger.js';
 import { configService } from './configService.js';
 import { statsService } from './statsService.js';
-import { getServiceForApp } from '../utils/serviceRegistry.js';
+import { syncInstanceMedia } from '../utils/mediaSync.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
 
@@ -99,32 +98,14 @@ class SyncSchedulerService {
     try {
       logger.info(`🔄 Syncing ${appType} instance: ${instance.name || instance.id}`);
 
-      const service = getServiceForApp(appType as AppType);
-
-      // Upsert instance record
-      await statsService.upsertInstance(instance.id, appType, instance.name);
-
-      // Fetch quality profiles from API
-      logger.debug(`📡 [${capitalize(appType)} API] Fetching quality profiles for sync`);
-      const profiles = await service.getQualityProfiles(instance);
-
-      // Sync quality profiles to database
-      logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
-      await statsService.syncQualityProfiles(instance.id, profiles);
-      logger.debug('✅ [Scoutarr DB] Quality profiles synced');
-
-      // Fetch all media from API
-      const allMedia = await service.getMedia(instance);
-      logger.debug(`✅ Fetched ${allMedia.length} items from ${appType} instance ${instance.id}`);
-
-      // Convert tag IDs to names before syncing
-      logger.info(`🏷️  Converting tag IDs to names for ${allMedia.length} items`);
-      const mediaWithTagNames = await Promise.all(
-        allMedia.map(async (item) => {
-          const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-          return { ...item, tags: tagNames };
-        })
-      );
+      // Sync media using centralized utility
+      const syncResult = await syncInstanceMedia({
+        instanceId: instance.id,
+        appType: appType as AppType,
+        instance
+      });
+      
+      const mediaWithTagNames = syncResult.mediaWithTags;
       
       // Count unique tags found
       const allTagNames = new Set<string>();
