@@ -498,7 +498,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'title',
       name: 'Title',
-      minWidth: 170,
+      minWidth: 100,
       renderCell: (props) => <TitleCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -511,7 +511,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'qualityProfileName',
       name: 'Quality Profile',
-      minWidth: 130,
+      width: 130,
       renderCell: (props) => <QualityProfileCell row={props.row} />,
       renderHeaderCell: (props) => (
         <DropdownFilterHeaderCell
@@ -528,7 +528,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'lastSearched',
       name: 'Searched',
-      minWidth: 140,
+      width: 115,
       renderCell: (props) => <LastSearchedCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -541,7 +541,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'dateImported',
       name: 'Imported',
-      minWidth: 140,
+      width: 115,
       renderCell: (props) => <LastImportedCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -554,7 +554,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'customFormatScore',
       name: 'CF Score',
-      minWidth: 90,
+      width: 100,
       renderCell: (props) => <CFScoreCell row={props.row} />,
       renderHeaderCell: (props) => (
         <NumericFilterHeaderCell
@@ -567,7 +567,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'tags',
       name: 'Tags',
-      minWidth: 150,
+      width: 136,
+      cellClass: 'tags-cell-padding',
       renderCell: (props) => <TagsCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell

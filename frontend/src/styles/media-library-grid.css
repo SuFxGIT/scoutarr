@@ -18,6 +18,11 @@
   box-shadow: var(--shadow-1);
 }
 
+/* Add padding to last column to compensate for scrollbar */
+.media-library-grid .tags-cell-padding {
+  padding-right: 1rem !important;
+}
+
 .media-library-grid .rdg-cell {
   padding-block: 0.5rem;
   padding-inline: 0.75rem;
