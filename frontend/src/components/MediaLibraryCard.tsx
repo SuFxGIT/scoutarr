@@ -132,18 +132,10 @@ function QualityProfileCell({ row }: CellProps) {
   return <Text size="2">{row.qualityProfileName || 'N/A'}</Text>;
 }
 
-function LastSearchedCell({ row }: CellProps) {
+function DateCell({ value }: { value: string }) {
   return (
     <Text size="2" color="gray">
-      {row.formattedLastSearched}
-    </Text>
-  );
-}
-
-function LastImportedCell({ row }: CellProps) {
-  return (
-    <Text size="2" color="gray">
-      {row.formattedDateImported}
+      {value}
     </Text>
   );
 }
@@ -186,6 +178,31 @@ interface ColumnFilters {
   tags: string; // 'all' or specific tag
 }
 
+// Shared header title component with sort indicators
+interface HeaderCellTitleProps {
+  column: { name: string | React.ReactElement };
+  sortDirection?: 'ASC' | 'DESC';
+  priority?: number;
+}
+
+function HeaderCellTitle({ column, sortDirection, priority }: HeaderCellTitleProps) {
+  return (
+    <Flex align="center" gap="1" justify="between">
+      <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {column.name}
+      </Text>
+      {sortDirection && (
+        <Flex align="center" gap="1">
+          {priority !== undefined && priority > 0 && (
+            <Text size="1" color="gray">{priority + 1}</Text>
+          )}
+          <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+        </Flex>
+      )}
+    </Flex>
+  );
+}
+
 // Text filter header cell component
 interface TextFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
   filterValue: string;
@@ -195,19 +212,7 @@ interface TextFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRo
 function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: TextFilterHeaderCellProps) {
   return (
     <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <Flex align="center" gap="1" justify="between">
-        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {column.name}
-        </Text>
-        {sortDirection && (
-          <Flex align="center" gap="1">
-            {priority !== undefined && priority > 0 && (
-              <Text size="1" color="gray">{priority + 1}</Text>
-            )}
-            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
-          </Flex>
-        )}
-      </Flex>
+      <HeaderCellTitle column={column} sortDirection={sortDirection} priority={priority} />
       <TextField.Root
         size="1"
         placeholder={`Filter ${column.name}...`}
@@ -233,19 +238,7 @@ interface NumericFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibrar
 function NumericFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: NumericFilterHeaderCellProps) {
   return (
     <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <Flex align="center" gap="1" justify="between">
-        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {column.name}
-        </Text>
-        {sortDirection && (
-          <Flex align="center" gap="1">
-            {priority !== undefined && priority > 0 && (
-              <Text size="1" color="gray">{priority + 1}</Text>
-            )}
-            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
-          </Flex>
-        )}
-      </Flex>
+      <HeaderCellTitle column={column} sortDirection={sortDirection} priority={priority} />
       <TextField.Root
         size="1"
         type="number"
@@ -274,19 +267,7 @@ interface DropdownFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibra
 function DropdownFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange, options }: DropdownFilterHeaderCellProps) {
   return (
     <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <Flex align="center" gap="1" justify="between">
-        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {column.name}
-        </Text>
-        {sortDirection && (
-          <Flex align="center" gap="1">
-            {priority !== undefined && priority > 0 && (
-              <Text size="1" color="gray">{priority + 1}</Text>
-            )}
-            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
-          </Flex>
-        )}
-      </Flex>
+      <HeaderCellTitle column={column} sortDirection={sortDirection} priority={priority} />
       <Select.Root
         value={filterValue}
         onValueChange={onFilterChange}
@@ -446,19 +427,19 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         filtered = filtered.filter(item => (item.customFormatScore ?? -Infinity) >= minScore);
       }
     }
+    // Date filters helper
+    const filterByDate = (dateField: 'lastSearched' | 'dateImported', query: string) => {
+      return (item: MediaLibraryItem) => {
+        const date = item[dateField];
+        const formatted = date ? format(new Date(date), 'PP') : (dateField === 'lastSearched' ? 'Never' : '');
+        return formatted.toLowerCase().includes(query.toLowerCase());
+      };
+    };
     if (columnFilters.lastSearched.trim()) {
-      const query = columnFilters.lastSearched.toLowerCase();
-      filtered = filtered.filter(item => {
-        const formatted = item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never';
-        return formatted.toLowerCase().includes(query);
-      });
+      filtered = filtered.filter(filterByDate('lastSearched', columnFilters.lastSearched));
     }
     if (columnFilters.dateImported.trim()) {
-      const query = columnFilters.dateImported.toLowerCase();
-      filtered = filtered.filter(item => {
-        const formatted = item.dateImported ? format(new Date(item.dateImported), 'PPp') : '';
-        return formatted.toLowerCase().includes(query);
-      });
+      filtered = filtered.filter(filterByDate('dateImported', columnFilters.dateImported));
     }
     if (columnFilters.tags !== 'all') {
       filtered = filtered.filter(item => {
@@ -473,6 +454,15 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       const { columnKey, direction } = sortColumns[0];
       const multiplier = direction === 'ASC' ? 1 : -1;
 
+      // Date sorting helper
+      const compareDates = (dateField: 'lastSearched' | 'dateImported') => {
+        return (a: MediaLibraryItem, b: MediaLibraryItem) => {
+          const aDate = a[dateField] ? new Date(a[dateField]!) : new Date(0);
+          const bDate = b[dateField] ? new Date(b[dateField]!) : new Date(0);
+          return compareAsc(aDate, bDate);
+        };
+      };
+
       sorted.sort((a, b) => {
         let comparison = 0;
 
@@ -482,18 +472,17 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           const aProfile = a.qualityProfileName || '';
           const bProfile = b.qualityProfileName || '';
           comparison = aProfile.localeCompare(bProfile);
-        } else if (columnKey === 'lastSearched') {
-          const aDate = a.lastSearched ? new Date(a.lastSearched) : new Date(0);
-          const bDate = b.lastSearched ? new Date(b.lastSearched) : new Date(0);
-          comparison = compareAsc(aDate, bDate);
-        } else if (columnKey === 'dateImported') {
-          const aDate = a.dateImported ? new Date(a.dateImported) : new Date(0);
-          const bDate = b.dateImported ? new Date(b.dateImported) : new Date(0);
-          comparison = compareAsc(aDate, bDate);
+        } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
+          comparison = compareDates(columnKey)(a, b);
         } else if (columnKey === 'customFormatScore') {
           const aScore = a.customFormatScore ?? -Infinity;
           const bScore = b.customFormatScore ?? -Infinity;
           comparison = aScore - bScore;
+        } else if (columnKey === 'tags') {
+          // Sort by first tag alphabetically, items without tags go last
+          const aTag = a.tags && a.tags.length > 0 ? a.tags[0] : '\uffff';
+          const bTag = b.tags && b.tags.length > 0 ? b.tags[0] : '\uffff';
+          comparison = aTag.localeCompare(bTag);
         }
 
         return comparison * multiplier;
@@ -558,7 +547,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       key: 'lastSearched',
       name: 'Searched',
       width: 115,
-      renderCell: (props) => <LastSearchedCell row={props.row} />,
+      sortable: true,
+      renderCell: (props) => <DateCell value={props.row.formattedLastSearched} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
           {...props}
@@ -571,7 +561,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       key: 'dateImported',
       name: 'Imported',
       width: 115,
-      renderCell: (props) => <LastImportedCell row={props.row} />,
+      sortable: true,
+      renderCell: (props) => <DateCell value={props.row.formattedDateImported} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
           {...props}
@@ -597,6 +588,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       key: 'tags',
       name: 'Tags',
       width: 136,
+      sortable: true,
       cellClass: 'tags-cell-padding',
       renderCell: (props) => <TagsCell row={props.row} scoutarrTags={mediaData?.scoutarrTags} />,
       renderHeaderCell: (props) => (
