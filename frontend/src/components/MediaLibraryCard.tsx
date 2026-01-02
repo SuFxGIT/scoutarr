@@ -668,7 +668,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           <Flex align="center" gap="3">
             {mediaData && (
               <Text size="2" color="gray">
-                {filteredAndSortedMedia.length} of {mediaData.media.length} items ({selectedMediaIds.size} selected)
+                {filteredAndSortedMedia.length} of {mediaData.total} items ({selectedMediaIds.size} selected)
                 {showAll && ' • Filters disabled'}
               </Text>
             )}
