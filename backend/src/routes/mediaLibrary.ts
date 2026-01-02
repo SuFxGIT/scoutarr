@@ -56,12 +56,13 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     // Check if we should sync from API or use database
     let filteredMedia;
+    let allMedia; // Track all media for total count
     let fromCache = false;
 
     if (shouldSync) {
       // Sync from API
       logger.debug('🔄 [Scoutarr] Syncing from *arr API', { appType });
-      const allMedia = await service.getMedia(instance);
+      allMedia = await service.getMedia(instance);
       logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
 
       // Fetch and sync quality profiles
@@ -108,7 +109,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       fromCache = true;
 
       // Convert database format to API format for filtering
-      const mediaFromDb = dbMedia.map(m => ({
+      allMedia = dbMedia.map(m => ({
         id: m.media_id,
         title: m.title,
         monitored: m.monitored,
@@ -129,12 +130,12 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       // Re-apply instance filters (settings may have changed since sync, unless skipFilters is true)
       if (shouldSkipFilters) {
         logger.debug('⏭️  [Scoutarr] Skipping instance filters for cached data (showAll=true)');
-        filteredMedia = mediaFromDb;
+        filteredMedia = allMedia;
       } else {
         logger.debug('🔽 [Scoutarr] Applying instance filters to cached data');
-        filteredMedia = await service.filterMedia(instance, mediaFromDb);
+        filteredMedia = await service.filterMedia(instance, allMedia);
         logger.debug('✅ [Scoutarr] Applied instance filters to cached data', {
-          total: mediaFromDb.length,
+          total: allMedia.length,
           filtered: filteredMedia.length
         });
       }
@@ -192,7 +193,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     const withLastSearchCount = mediaWithDates.filter(m => m.lastSearched).length;
     logger.debug('✅ [Scoutarr] Media library prepared', {
-      total: mediaWithDates.length,
+      absoluteTotal: allMedia.length,
+      filtered: mediaWithDates.length,
       withLastSearchTime: withLastSearchCount,
       fromCache
     });
@@ -200,12 +202,13 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     // Return response
     res.json({
       media: mediaWithDates,
-      total: mediaWithDates.length,
+      total: allMedia.length, // Absolute total from database
+      filtered: mediaWithDates.length, // Count after instance filters applied
       instanceName: instance.name || `${appType}-${instanceId}`,
       appType,
       fromCache
     });
-    endOp({ total: mediaWithDates.length }, true);
+    endOp({ absoluteTotal: allMedia.length, filtered: mediaWithDates.length }, true);
 
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
