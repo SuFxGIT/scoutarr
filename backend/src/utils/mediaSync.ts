@@ -3,31 +3,31 @@
  * Centralizes logic for syncing media, quality profiles, and tag conversion
  */
 
-import { capitalize } from 'es-toolkit';
 import { statsService } from '../services/statsService.js';
 import { getServiceForApp } from './serviceRegistry.js';
 import logger from './logger.js';
 import type { AppType } from './starrUtils.js';
+import type { StarrInstanceConfig } from '@scoutarr/shared';
 
 interface SyncInstanceOptions {
   instanceId: string;
   appType: AppType;
-  instance: any;
+  instance: StarrInstanceConfig;
 }
 
-interface SyncResult {
+interface SyncResult<TMedia = unknown> {
   mediaCount: number;
-  mediaWithTags: any[];
+  mediaWithTags: TMedia[];
 }
 
 /**
  * Converts tag IDs to tag names for a collection of media items
  */
-export async function convertMediaTagsToNames(
+export async function convertMediaTagsToNames<TMedia extends { tags: number[] }>(
   service: ReturnType<typeof getServiceForApp>,
-  instance: any,
-  mediaItems: any[]
-): Promise<any[]> {
+  instance: StarrInstanceConfig,
+  mediaItems: TMedia[]
+): Promise<Array<Omit<TMedia, 'tags'> & { tags: string[] }>> {
   logger.debug('🏷️  Converting tag IDs to names', { count: mediaItems.length });
   
   const mediaWithTagNames = await Promise.all(
@@ -48,9 +48,9 @@ export async function syncInstanceQualityProfiles(
   instanceId: string,
   appType: string,
   service: ReturnType<typeof getServiceForApp>,
-  instance: any
+  instance: StarrInstanceConfig
 ): Promise<void> {
-  logger.debug(`📡 [${capitalize(appType)} API] Fetching quality profiles`);
+  logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching quality profiles`);
   const profiles = await service.getQualityProfiles(instance);
 
   logger.debug('💾 [Scoutarr DB] Syncing quality profiles to database');
@@ -74,7 +74,7 @@ export async function syncInstanceMedia(options: SyncInstanceOptions): Promise<S
   await syncInstanceQualityProfiles(instanceId, appType, service, instance);
 
   // Fetch all media from API
-  logger.debug(`📡 [${capitalize(appType)} API] Fetching media`);
+  logger.debug(`📡 [${appType.charAt(0).toUpperCase() + appType.slice(1)} API] Fetching media`);
   const allMedia = await service.getMedia(instance);
   logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
 
