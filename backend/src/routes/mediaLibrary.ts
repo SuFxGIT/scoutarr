@@ -124,12 +124,17 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       fromCache
     });
 
+    // Get scoutarr_tags for this instance
+    const instanceRecord = await statsService.getInstance(instanceId);
+    const scoutarrTags = instanceRecord ? JSON.parse(instanceRecord.scoutarr_tags || '[]') as string[] : [];
+
     // Return response
     res.json({
       media: mediaWithDates,
       total: allMedia.length,
       instanceName: instance.name || `${appType}-${instanceId}`,
       appType,
+      scoutarrTags,
       fromCache
     });
     endOp({ total: allMedia.length }, true);

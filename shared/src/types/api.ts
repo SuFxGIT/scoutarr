@@ -84,6 +84,7 @@ export interface MediaLibraryResponse {
   total: number;
   instanceName: string;
   appType: string;
+  scoutarrTags?: string[];
 }
 
 export interface MediaSearchRequest {

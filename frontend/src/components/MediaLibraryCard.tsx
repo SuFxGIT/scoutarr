@@ -93,22 +93,26 @@ function getStatusTooltip(status: string): string {
 }
 
 // Cell renderer components
-interface TitleCellProps {
+interface CellProps {
   row: MediaLibraryRow;
 }
 
-function TitleCell({ row }: TitleCellProps) {
+interface TagsCellProps extends CellProps {
+  scoutarrTags?: string[];
+}
+
+function TitleCell({ row }: CellProps) {
   return (
     <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
       <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
-        <Tooltip content={getStatusTooltip(row.status)}>
-          <Box style={{ display: 'flex', alignItems: 'center' }}>
-            {getStatusIcon(row.status)}
-          </Box>
-        </Tooltip>
         <Tooltip content={row.monitored ? 'Monitored' : 'Not Monitored'}>
           <Box style={{ display: 'flex', alignItems: 'center' }}>
             {getMonitoredIcon(row.monitored)}
+          </Box>
+        </Tooltip>
+        <Tooltip content={getStatusTooltip(row.status)}>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
+            {getStatusIcon(row.status)}
           </Box>
         </Tooltip>
       </Flex>
@@ -124,11 +128,11 @@ function TitleCell({ row }: TitleCellProps) {
   );
 }
 
-function QualityProfileCell({ row }: TitleCellProps) {
+function QualityProfileCell({ row }: CellProps) {
   return <Text size="2">{row.qualityProfileName || 'N/A'}</Text>;
 }
 
-function LastSearchedCell({ row }: TitleCellProps) {
+function LastSearchedCell({ row }: CellProps) {
   return (
     <Text size="2" color="gray">
       {row.formattedLastSearched}
@@ -136,7 +140,7 @@ function LastSearchedCell({ row }: TitleCellProps) {
   );
 }
 
-function LastImportedCell({ row }: TitleCellProps) {
+function LastImportedCell({ row }: CellProps) {
   return (
     <Text size="2" color="gray">
       {row.formattedDateImported}
@@ -144,22 +148,30 @@ function LastImportedCell({ row }: TitleCellProps) {
   );
 }
 
-function CFScoreCell({ row }: TitleCellProps) {
+function CFScoreCell({ row }: CellProps) {
   return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
 }
 
-function TagsCell({ row }: TitleCellProps) {
+function TagsCell({ row, scoutarrTags = [] }: TagsCellProps) {
   if (!row.tags || row.tags.length === 0) {
     return null;
   }
 
   return (
     <Flex gap="1" wrap="wrap" style={{ maxWidth: '100%' }}>
-      {row.tags.map((tag, index) => (
-        <Badge key={index} size="1" variant="soft" color="blue">
-          {tag}
-        </Badge>
-      ))}
+      {row.tags.map((tag, index) => {
+        const isScoutarrTag = scoutarrTags.includes(tag);
+        return (
+          <Badge 
+            key={index} 
+            size="1" 
+            variant="soft" 
+            color={isScoutarrTag ? "yellow" : "blue"}
+          >
+            {tag}
+          </Badge>
+        );
+      })}
     </Flex>
   );
 }
@@ -171,6 +183,7 @@ interface ColumnFilters {
   cfScore: string;
   lastSearched: string;
   dateImported: string;
+  tags: string; // 'all' or specific tag
 }
 
 // Text filter header cell component
@@ -319,7 +332,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     qualityProfileName: 'all',
     cfScore: '',
     lastSearched: '',
-    dateImported: ''
+    dateImported: '',
+    tags: 'all'
   });
 
   // Update lastLibraryUrl whenever the location changes
@@ -386,7 +400,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
   // Extract unique values for dropdown filters
   const filterOptions = useMemo(() => {
-    if (!mediaData?.media) return { qualityProfiles: [] };
+    if (!mediaData?.media) return { qualityProfiles: [], tags: [] };
 
     const qualityProfiles = Array.from(new Set(
       mediaData.media
@@ -394,7 +408,16 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         .filter((name): name is string => !!name)
     )).sort();
 
-    return { qualityProfiles };
+    // Extract all unique tags from all media items
+    const allTags = new Set<string>();
+    mediaData.media.forEach(item => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+    const tags = Array.from(allTags).sort();
+
+    return { qualityProfiles, tags };
   }, [mediaData?.media]);
 
   // Column filter handlers
@@ -435,6 +458,12 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       filtered = filtered.filter(item => {
         const formatted = item.dateImported ? format(new Date(item.dateImported), 'PPp') : '';
         return formatted.toLowerCase().includes(query);
+      });
+    }
+    if (columnFilters.tags !== 'all') {
+      filtered = filtered.filter(item => {
+        if (!item.tags || !Array.isArray(item.tags)) return false;
+        return item.tags.includes(columnFilters.tags);
       });
     }
 
@@ -569,16 +598,20 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       name: 'Tags',
       width: 136,
       cellClass: 'tags-cell-padding',
-      renderCell: (props) => <TagsCell row={props.row} />,
+      renderCell: (props) => <TagsCell row={props.row} scoutarrTags={mediaData?.scoutarrTags} />,
       renderHeaderCell: (props) => (
-        <TextFilterHeaderCell
+        <DropdownFilterHeaderCell
           {...props}
-          filterValue={columnFilters.title}
-          onFilterChange={() => {}}
+          filterValue={columnFilters.tags}
+          onFilterChange={(value) => handleFilterChange('tags', value)}
+          options={[
+            { value: 'all', label: 'All' },
+            ...filterOptions.tags.map(tag => ({ value: tag, label: tag }))
+          ]}
         />
       )
     }
-  ], [columnFilters, handleFilterChange, filterOptions]);
+  ], [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags]);
 
   return (
     <Card>
