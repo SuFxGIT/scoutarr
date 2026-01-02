@@ -663,34 +663,18 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     <Card>
       <Flex direction="column" gap="3">
         {/* Header with title and stats */}
-        <Flex align="center" justify="between">
+        <Flex align="center" justify="between" gap="3">
           <Heading size="5">Media Library</Heading>
-          {mediaData && (
-            <Text size="2" color="gray">
-              {filteredAndSortedMedia.length} of {mediaData.media.length} items ({selectedMediaIds.size} selected)
-              {showAll && ' • Filters disabled'}
-            </Text>
-          )}
-        </Flex>
-        <Separator size="4" />
-
-        {/* Instance Selection Section */}
-        {!config || !hasAnyInstances ? (
-          <Callout.Root color="orange">
-            <Callout.Icon>
-              <InfoCircledIcon />
-            </Callout.Icon>
-            <Callout.Text>
-              No instances configured. Please add instances in Settings.
-            </Callout.Text>
-          </Callout.Root>
-        ) : (
-          <>
-            {/* Instance Selector */}
-            <Flex gap="3" align="center">
-              <Text size="2" weight="medium">Instance:</Text>
+          <Flex align="center" gap="3">
+            {mediaData && (
+              <Text size="2" color="gray">
+                {filteredAndSortedMedia.length} of {mediaData.media.length} items ({selectedMediaIds.size} selected)
+                {showAll && ' • Filters disabled'}
+              </Text>
+            )}
+            {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
-                <Select.Trigger style={{ width: '300px' }} placeholder="Choose an instance..." />
+                  <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
                 <Select.Content position="popper">
                   {APP_TYPES.map((appType) => {
                     const instances = config.applications[appType] || [];
@@ -712,22 +696,34 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                   })}
                 </Select.Content>
               </Select.Root>
-            </Flex>
-
-            {/* Show All Toggle */}
-            {selectedInstance && (
-              <Flex align="center" gap="2">
-                <Switch
-                  checked={showAll}
-                  onCheckedChange={handleShowAllChange}
-                />
-                <Text size="2">Show all media (disable instance filters)</Text>
-                <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
-                  <InfoCircledIcon style={{ cursor: 'help' }} />
-                </Tooltip>
-              </Flex>
             )}
-          </>
+          </Flex>
+        </Flex>
+        <Separator size="4" />
+
+        {/* Instance Selection Section */}
+        {!config || !hasAnyInstances ? (
+          <Callout.Root color="orange">
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              No instances configured. Please add instances in Settings.
+            </Callout.Text>
+          </Callout.Root>
+        ) : (
+          selectedInstance && (
+            <Flex align="center" gap="2">
+              <Switch
+                checked={showAll}
+                onCheckedChange={handleShowAllChange}
+              />
+              <Text size="2">Show all media (disable instance filters)</Text>
+              <Tooltip content="When enabled, shows all media regardless of monitored status, tags, quality profile, or status filters configured for this instance">
+                <InfoCircledIcon style={{ cursor: 'help' }} />
+              </Tooltip>
+            </Flex>
+          )
         )}
 
         {/* Loading State */}
