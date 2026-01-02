@@ -467,8 +467,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     // Pre-compute formatted dates to avoid formatting on every render
     return sorted.map(item => ({
       ...item,
-      formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
-      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : ''
+      formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PP') : 'Never',
+      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PP') : ''
     }));
   }, [mediaData?.media, sortColumns, columnFilters]);
 
