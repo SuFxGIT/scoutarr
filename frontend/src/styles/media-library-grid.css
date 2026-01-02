@@ -1,38 +1,39 @@
 /* Media Library DataGrid Customization */
 .media-library-grid {
-  --rdg-background-color: var(--color-panel);
+  --rdg-background-color: var(--color-surface);
   --rdg-header-background-color: var(--color-surface);
-  --rdg-row-hover-background-color: var(--accent-a3);
-  --rdg-row-selected-background-color: var(--accent-a4);
-  --rdg-row-selected-hover-background-color: var(--accent-a5);
-  --rdg-border-color: var(--gray-a6);
+  --rdg-row-hover-background-color: var(--accent-a2);
+  --rdg-row-selected-background-color: var(--accent-a3);
+  --rdg-row-selected-hover-background-color: var(--accent-a4);
+  --rdg-border-color: var(--gray-a5);
   --rdg-color: var(--gray-12);
   --rdg-font-size: 0.875rem;
   --rdg-selection-color: transparent;
-  --rdg-checkbox-focus-color: var(--accent-8);
+  --rdg-checkbox-focus-color: var(--accent-9);
 
-  border: 1px solid var(--gray-a6);
+  border: 1px solid var(--gray-a5);
   border-radius: var(--radius-3);
   block-size: 100%;
+  box-shadow: var(--shadow-1);
 }
 
 .media-library-grid .rdg-cell {
   padding-block: 0.75rem;
-  padding-inline: 0.75rem;
-  border-bottom: 1px solid var(--gray-a4);
-  border-right: 1px solid var(--yellow-a6);
+  padding-inline: 1rem;
+  border-bottom: 1px solid var(--gray-a3);
+  border-right: none;
   display: flex;
   align-items: center;
 }
 
 .media-library-grid .rdg-header-row {
-  font-weight: 600;
-  font-size: 0.8125rem;
-  letter-spacing: 0.01em;
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--gray-11);
-  background-color: var(--gray-a2);
-  border-bottom: 2px solid var(--gray-a6);
+  background-color: var(--gray-2);
+  border-bottom: 1px solid var(--gray-a6);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -40,15 +41,70 @@
 }
 
 .media-library-grid .rdg-header-cell {
-  padding-block: 0.625rem;
-  padding-inline: 0.75rem;
-  border-right: 1px solid var(--yellow-a6);
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-right: none;
   user-select: none;
+  align-items: start;
+}
+
+/* Header cell with filter - needs more padding */
+.media-library-grid .rdg-header-cell > div {
+  width: 100%;
+  min-height: 52px; /* Ensures consistent height across all headers */
+}
+
+/* Filter input and select styling inside headers */
+.media-library-grid .rdg-header-cell input,
+.media-library-grid .rdg-header-cell button[role="combobox"] {
+  width: 100%;
+  background-color: var(--color-panel);
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-2);
+  color: var(--gray-12);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.media-library-grid .rdg-header-cell input:hover,
+.media-library-grid .rdg-header-cell button[role="combobox"]:hover {
+  border-color: var(--gray-a7);
+}
+
+.media-library-grid .rdg-header-cell input:focus,
+.media-library-grid .rdg-header-cell button[role="combobox"]:focus {
+  outline: none;
+  border-color: var(--accent-8);
+  box-shadow: 0 0 0 1px var(--accent-8);
+}
+
+.media-library-grid .rdg-header-cell input::placeholder {
+  color: var(--gray-a10);
+}
+
+/* Ensure select trigger doesn't get cut off */
+.media-library-grid .rdg-header-cell button[role="combobox"] {
+  justify-content: space-between;
+  text-align: left;
+}
+
+/* Toggle filter button styling */
+.media-library-grid .rdg-header-cell button[type="button"] {
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.media-library-grid .rdg-header-cell button[type="button"]:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.media-library-grid .rdg-header-cell button[type="button"]:active {
+  transform: translateY(0);
 }
 
 .media-library-grid .rdg-row {
   min-height: 55px;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.1s ease;
 }
 
 .media-library-grid .rdg-row:hover {
@@ -56,24 +112,26 @@
 }
 
 .media-library-grid .rdg-row[aria-selected="true"] {
-  background-color: var(--accent-a4);
-  border-left: 3px solid var(--accent-9);
-  padding-left: calc(0.75rem - 3px);
+  background-color: var(--accent-a3);
+  box-shadow: inset 2px 0 0 var(--accent-9);
 }
 
 .media-library-grid .rdg-row[aria-selected="true"]:hover {
-  background-color: var(--accent-a5);
+  background-color: var(--accent-a4);
 }
 
 /* Checkbox styling */
 .media-library-grid .rdg-checkbox {
   accent-color: var(--accent-9);
   cursor: pointer;
+  width: 16px;
+  height: 16px;
 }
 
 .media-library-grid .rdg-checkbox:focus-visible {
   outline: 2px solid var(--accent-8);
   outline-offset: 2px;
+  border-radius: var(--radius-1);
 }
 
 /* Sort indicator styling */
@@ -101,22 +159,23 @@
 
 /* Scrollbar styling */
 .media-library-grid ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 .media-library-grid ::-webkit-scrollbar-track {
   background: var(--gray-a2);
+  border-radius: var(--radius-2);
 }
 
 .media-library-grid ::-webkit-scrollbar-thumb {
   background: var(--gray-a6);
   border-radius: var(--radius-2);
-  border: 2px solid var(--color-panel);
+  border: 2px solid var(--color-surface);
 }
 
 .media-library-grid ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-a7);
+  background: var(--gray-a8);
 }
 
 /* Column resize handle */
@@ -131,6 +190,6 @@
 
 /* Empty state styling */
 .media-library-grid .rdg-empty-row {
-  color: var(--gray-a9);
+  color: var(--gray-a10);
   font-style: italic;
 }

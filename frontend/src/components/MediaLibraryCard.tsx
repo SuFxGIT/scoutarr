@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { DataGrid, Column, SelectColumn, SortColumn } from 'react-data-grid';
+import { DataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
 import {
@@ -40,6 +40,12 @@ import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
 import { APP_TYPES, AppType } from '../utils/constants';
+
+// Extended row type with formatted dates for the grid
+type MediaLibraryRow = MediaLibraryItem & {
+  formattedLastSearched: string;
+  formattedDateImported: string;
+};
 
 // Helper functions for status icons
 function getStatusIcon(status: string) {
@@ -89,10 +95,7 @@ function getStatusTooltip(status: string): string {
 
 // Cell renderer components
 interface TitleCellProps {
-  row: MediaLibraryItem & {
-    formattedLastSearched: string;
-    formattedDateImported: string;
-  };
+  row: MediaLibraryRow;
 }
 
 function TitleCell({ row }: TitleCellProps) {
@@ -121,12 +124,9 @@ function TitleCell({ row }: TitleCellProps) {
       </Flex>
       <Text
         size="2"
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
+        weight="medium"
+        truncate
+        style={{ flex: 1 }}
       >
         {row.title}
       </Text>
@@ -158,6 +158,175 @@ function CFScoreCell({ row }: TitleCellProps) {
   return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
 }
 
+// Filter state interface
+interface ColumnFilters {
+  title: string;
+  qualityProfileName: string; // 'all' or specific profile
+}
+
+// Text filter header cell component
+interface TextFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
+  filterValue: string;
+  onFilterChange: (value: string) => void;
+}
+
+function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: TextFilterHeaderCellProps) {
+  return (
+    <Flex direction="column" gap="1" style={{ width: '100%' }}>
+      <Flex align="center" gap="1" justify="between">
+        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {column.name}
+        </Text>
+        {sortDirection && (
+          <Flex align="center" gap="1">
+            {priority !== undefined && priority > 0 && (
+              <Text size="1" color="gray">{priority + 1}</Text>
+            )}
+            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          </Flex>
+        )}
+      </Flex>
+      <TextField.Root
+        size="1"
+        placeholder={`Filter ${column.name}...`}
+        value={filterValue}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          e.stopPropagation();
+          onFilterChange(e.target.value);
+        }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      />
+    </Flex>
+  );
+}
+
+// Dropdown filter header cell component
+interface DropdownFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
+  filterValue: string;
+  onFilterChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}
+
+function DropdownFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange, options }: DropdownFilterHeaderCellProps) {
+  return (
+    <Flex direction="column" gap="1" style={{ width: '100%' }}>
+      <Flex align="center" gap="1" justify="between">
+        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {column.name}
+        </Text>
+        {sortDirection && (
+          <Flex align="center" gap="1">
+            {priority !== undefined && priority > 0 && (
+              <Text size="1" color="gray">{priority + 1}</Text>
+            )}
+            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          </Flex>
+        )}
+      </Flex>
+      <Select.Root
+        value={filterValue}
+        onValueChange={onFilterChange}
+        size="1"
+      >
+        <Select.Trigger 
+          placeholder="All"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        />
+        <Select.Content
+          position="popper"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          {options.map(option => (
+            <Select.Item key={option.value} value={option.value}>
+              {option.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Flex>
+  );
+}
+
+// Toggle filter header cell component for boolean filters
+interface ToggleFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
+  filterValue: string;
+  onFilterChange: (value: string) => void;
+}
+
+function ToggleFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: ToggleFilterHeaderCellProps) {
+  // Cycle through: all -> true -> false -> all
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (filterValue === 'all') {
+      onFilterChange('true');
+    } else if (filterValue === 'true') {
+      onFilterChange('false');
+    } else {
+      onFilterChange('all');
+    }
+  };
+
+  const getFilterLabel = () => {
+    if (filterValue === 'true') return 'Monitored';
+    if (filterValue === 'false') return 'Not Monitored';
+    return 'All';
+  };
+
+  const getFilterColor = () => {
+    if (filterValue === 'true') return 'green';
+    if (filterValue === 'false') return 'red';
+    return 'gray';
+  };
+
+  return (
+    <Flex direction="column" gap="1" style={{ width: '100%' }}>
+      <Flex align="center" gap="1" justify="between">
+        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {column.name}
+        </Text>
+        {sortDirection && (
+          <Flex align="center" gap="1">
+            {priority !== undefined && priority > 0 && (
+              <Text size="1" color="gray">{priority + 1}</Text>
+            )}
+            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          </Flex>
+        )}
+      </Flex>
+      <Button
+        size="1"
+        variant="soft"
+        color={getFilterColor()}
+        onClick={handleToggle}
+        style={{ width: '100%', cursor: 'pointer' }}
+      >
+        {getFilterLabel()}
+      </Button>
+    </Flex>
+  );
+}
+
+// Standard header cell component for columns without filters
+function StandardHeaderCell({ column, sortDirection, priority }: RenderHeaderCellProps<MediaLibraryRow>) {
+  return (
+    <Flex direction="column" gap="1" style={{ width: '100%' }}>
+      <Flex align="center" gap="1" justify="between">
+        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {column.name}
+        </Text>
+        {sortDirection && (
+          <Flex align="center" gap="1">
+            {priority !== undefined && priority > 0 && (
+              <Text size="1" color="gray">{priority + 1}</Text>
+            )}
+            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          </Flex>
+        )}
+      </Flex>
+    </Flex>
+  );
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
 }
@@ -174,6 +343,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>([
     { columnKey: 'title', direction: 'ASC' }
   ]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>({
+    title: '',
+    qualityProfileName: 'all'
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const showAllParam = searchParams.get('showAll');
   const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
@@ -257,15 +430,44 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     searchMutation.mutate();
   }, [selectedMediaIds.size, searchMutation]);
 
+  // Extract unique values for dropdown filters
+  const filterOptions = useMemo(() => {
+    if (!mediaData?.media) return { qualityProfiles: [] };
+
+    const qualityProfiles = Array.from(new Set(
+      mediaData.media
+        .map(item => item.qualityProfileName)
+        .filter((name): name is string => !!name)
+    )).sort();
+
+    return { qualityProfiles };
+  }, [mediaData?.media]);
+
+  // Column filter handlers
+  const handleFilterChange = useCallback((columnKey: keyof ColumnFilters, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [columnKey]: value }));
+  }, []);
+
   // Filter and sort media, pre-compute formatted dates
   const filteredAndSortedMedia = useMemo(() => {
     if (!mediaData?.media) return [];
 
-    // Filter media based on search query
+    // Filter media based on search query and column filters
     let filtered = mediaData.media;
+    
+    // Apply column filters
+    if (columnFilters.title.trim()) {
+      const query = columnFilters.title.toLowerCase();
+      filtered = filtered.filter(item => item.title.toLowerCase().includes(query));
+    }
+    if (columnFilters.qualityProfileName !== 'all') {
+      filtered = filtered.filter(item => item.qualityProfileName === columnFilters.qualityProfileName);
+    }
+
+    // Apply global search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = mediaData.media.filter(item => {
+      filtered = filtered.filter(item => {
         // Search in title
         if (item.title.toLowerCase().includes(query)) return true;
 
@@ -330,7 +532,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
       formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : ''
     }));
-  }, [mediaData?.media, sortColumns, searchQuery]);
+  }, [mediaData?.media, sortColumns, searchQuery, columnFilters]);
 
   // Check if any instances are configured
   const hasAnyInstances = useMemo(() => {
@@ -341,48 +543,65 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     });
   }, [config]);
 
+  // Memoized rowKeyGetter for performance
+  const rowKeyGetter = useCallback((row: MediaLibraryRow) => row.id, []);
+
   // Column configuration for DataGrid
-  const columns: readonly Column<MediaLibraryItem & {
-    formattedLastSearched: string;
-    formattedDateImported: string;
-  }>[] = useMemo(() => [
+  // Note: sortable and resizable are set via defaultColumnOptions, no need to repeat
+  const columns: readonly Column<MediaLibraryRow>[] = useMemo(() => [
     SelectColumn,
     {
       key: 'title',
       name: 'Title',
-      sortable: true,
-      resizable: true,
-      renderCell: (props) => <TitleCell row={props.row} />
+      minWidth: 200,
+      renderCell: (props) => <TitleCell row={props.row} />,
+      renderHeaderCell: (props) => (
+        <TextFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.title}
+          onFilterChange={(value) => handleFilterChange('title', value)}
+        />
+      )
     },
     {
       key: 'qualityProfileName',
       name: 'Quality Profile',
-      sortable: true,
-      resizable: true,
-      renderCell: (props) => <QualityProfileCell row={props.row} />
+      minWidth: 150,
+      renderCell: (props) => <QualityProfileCell row={props.row} />,
+      renderHeaderCell: (props) => (
+        <DropdownFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.qualityProfileName}
+          onFilterChange={(value) => handleFilterChange('qualityProfileName', value)}
+          options={[
+            { value: 'all', label: 'All' },
+            ...filterOptions.qualityProfiles.map(profile => ({ value: profile, label: profile }))
+          ]}
+        />
+      )
     },
     {
       key: 'lastSearched',
       name: 'Last Searched',
-      sortable: true,
-      resizable: true,
-      renderCell: (props) => <LastSearchedCell row={props.row} />
+      minWidth: 180,
+      renderCell: (props) => <LastSearchedCell row={props.row} />,
+      renderHeaderCell: StandardHeaderCell
     },
     {
       key: 'dateImported',
       name: 'Date Imported',
-      sortable: true,
-      resizable: true,
-      renderCell: (props) => <LastImportedCell row={props.row} />
+      minWidth: 180,
+      renderCell: (props) => <LastImportedCell row={props.row} />,
+      renderHeaderCell: StandardHeaderCell
     },
     {
       key: 'customFormatScore',
       name: 'CF Score',
-      sortable: true,
-      resizable: true,
-      renderCell: (props) => <CFScoreCell row={props.row} />
+      minWidth: 100,
+      renderCell: (props) => <CFScoreCell row={props.row} />,
+      renderHeaderCell: StandardHeaderCell
     }
-  ], []);
+  ], [columnFilters, handleFilterChange, filterOptions]);
 
   return (
     <Card>
@@ -511,14 +730,16 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
             <Box style={{ height: '900px' }}>
               <DataGrid
                 className="media-library-grid"
+                aria-label="Media Library"
                 columns={columns}
                 rows={filteredAndSortedMedia}
-                rowKeyGetter={(row: MediaLibraryItem & { formattedLastSearched: string; formattedDateImported: string }) => row.id}
+                rowKeyGetter={rowKeyGetter}
                 selectedRows={selectedMediaIds}
                 onSelectedRowsChange={setSelectedMediaIds}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
                 rowHeight={55}
+                headerRowHeight={80}
                 defaultColumnOptions={{
                   sortable: true,
                   resizable: true
