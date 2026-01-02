@@ -21,7 +21,9 @@ function ThemedApp() {
 
   return (
     <Theme appearance={resolvedTheme} accentColor="amber" radius="medium">
-      <App />
+      <div className="app-shell">
+        <App />
+      </div>
       <Toaster position="top-center" />
     </Theme>
   );

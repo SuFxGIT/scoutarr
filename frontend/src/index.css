@@ -10,12 +10,16 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--color-background, #0c1424);
 }
 
-#root,
-.radix-themes,
-body {
-  /* Accent-synced background that adapts to the current Radix theme colors */
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  /* Accent-synced background scoped to the app surface only */
   --bg-base: var(--color-background, #0c1424);
   --bg-accent-strong: color-mix(in srgb, var(--accent-9, #f59e0b) 12%, transparent);
   --bg-accent-soft: color-mix(in srgb, var(--accent-11, #b45309) 10%, transparent);
@@ -30,10 +34,6 @@ body {
       color-mix(in srgb, var(--bg-base) 70%, #000000 30%) 100%
     );
   background-attachment: fixed;
-}
-
-#root {
-  min-height: 100vh;
 }
 
 /* Smaller toast notifications */
