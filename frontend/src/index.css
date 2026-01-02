@@ -12,6 +12,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+#root,
+.radix-themes,
+body {
+  /* Accent-synced background that adapts to the current Radix theme colors */
+  --bg-base: var(--color-background, #0c1424);
+  --bg-accent-strong: color-mix(in srgb, var(--accent-9, #f59e0b) 12%, transparent);
+  --bg-accent-soft: color-mix(in srgb, var(--accent-11, #b45309) 10%, transparent);
+
+  background-color: var(--bg-base);
+  background-image: radial-gradient(circle at 18% 78%, var(--bg-accent-strong), transparent 54%),
+    radial-gradient(circle at 82% 18%, var(--bg-accent-soft), transparent 56%),
+    linear-gradient(
+      160deg,
+      var(--bg-base) 0%,
+      color-mix(in srgb, var(--bg-base) 90%, #05070f 10%) 45%,
+      color-mix(in srgb, var(--bg-base) 70%, #000000 30%) 100%
+    );
+  background-attachment: fixed;
+}
+
 #root {
   min-height: 100vh;
 }
