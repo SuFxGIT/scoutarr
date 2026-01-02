@@ -162,6 +162,9 @@ function CFScoreCell({ row }: TitleCellProps) {
 interface ColumnFilters {
   title: string;
   qualityProfileName: string; // 'all' or specific profile
+  cfScore: string;
+  lastSearched: string;
+  dateImported: string;
 }
 
 // Text filter header cell component
@@ -195,6 +198,48 @@ function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, on
           onFilterChange(e.target.value);
         }}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+        onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
+      />
+    </Flex>
+  );
+}
+
+// Numeric filter header cell component
+interface NumericFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
+  filterValue: string;
+  onFilterChange: (value: string) => void;
+}
+
+function NumericFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: NumericFilterHeaderCellProps) {
+  return (
+    <Flex direction="column" gap="1" style={{ width: '100%' }}>
+      <Flex align="center" gap="1" justify="between">
+        <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {column.name}
+        </Text>
+        {sortDirection && (
+          <Flex align="center" gap="1">
+            {priority !== undefined && priority > 0 && (
+              <Text size="1" color="gray">{priority + 1}</Text>
+            )}
+            <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          </Flex>
+        )}
+      </Flex>
+      <TextField.Root
+        size="1"
+        type="number"
+        inputMode="numeric"
+        placeholder={`Min ${column.name}`}
+        value={filterValue}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          e.stopPropagation();
+          onFilterChange(e.target.value);
+        }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+        onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
       />
     </Flex>
   );
@@ -345,7 +390,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>({
     title: '',
-    qualityProfileName: 'all'
+    qualityProfileName: 'all',
+    cfScore: '',
+    lastSearched: '',
+    dateImported: ''
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const showAllParam = searchParams.get('showAll');
@@ -462,6 +510,26 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     }
     if (columnFilters.qualityProfileName !== 'all') {
       filtered = filtered.filter(item => item.qualityProfileName === columnFilters.qualityProfileName);
+    }
+    if (columnFilters.cfScore.trim()) {
+      const minScore = Number(columnFilters.cfScore);
+      if (!Number.isNaN(minScore)) {
+        filtered = filtered.filter(item => (item.customFormatScore ?? -Infinity) >= minScore);
+      }
+    }
+    if (columnFilters.lastSearched.trim()) {
+      const query = columnFilters.lastSearched.toLowerCase();
+      filtered = filtered.filter(item => {
+        const formatted = item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never';
+        return formatted.toLowerCase().includes(query);
+      });
+    }
+    if (columnFilters.dateImported.trim()) {
+      const query = columnFilters.dateImported.toLowerCase();
+      filtered = filtered.filter(item => {
+        const formatted = item.dateImported ? format(new Date(item.dateImported), 'PPp') : '';
+        return formatted.toLowerCase().includes(query);
+      });
     }
 
     // Apply global search query
@@ -582,24 +650,42 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     },
     {
       key: 'lastSearched',
-      name: 'Last Searched',
+      name: 'Searched',
       minWidth: 180,
       renderCell: (props) => <LastSearchedCell row={props.row} />,
-      renderHeaderCell: StandardHeaderCell
+      renderHeaderCell: (props) => (
+        <TextFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.lastSearched}
+          onFilterChange={(value) => handleFilterChange('lastSearched', value)}
+        />
+      )
     },
     {
       key: 'dateImported',
-      name: 'Date Imported',
+      name: 'Imported',
       minWidth: 180,
       renderCell: (props) => <LastImportedCell row={props.row} />,
-      renderHeaderCell: StandardHeaderCell
+      renderHeaderCell: (props) => (
+        <TextFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.dateImported}
+          onFilterChange={(value) => handleFilterChange('dateImported', value)}
+        />
+      )
     },
     {
       key: 'customFormatScore',
       name: 'CF Score',
       minWidth: 100,
       renderCell: (props) => <CFScoreCell row={props.row} />,
-      renderHeaderCell: StandardHeaderCell
+      renderHeaderCell: (props) => (
+        <NumericFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.cfScore}
+          onFilterChange={(value) => handleFilterChange('cfScore', value)}
+        />
+      )
     }
   ], [columnFilters, handleFilterChange, filterOptions]);
 
@@ -677,7 +763,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         {/* Search Bar */}
         {mediaData && mediaData.media.length > 0 && (
           <TextField.Root
-            placeholder="Search by title, status, quality profile, last searched, or date imported..."
+              placeholder="Search by title, status, quality profile, searched date, or imported date..."
             value={searchQuery}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
             size="2"
