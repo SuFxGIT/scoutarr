@@ -16,6 +16,7 @@ import {
   Callout,
   TextField,
   Tooltip,
+  Badge,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -26,8 +27,7 @@ import {
   CheckCircledIcon,
   ClockIcon,
   DotFilledIcon,
-  CalendarIcon,
-  BadgeIcon
+  CalendarIcon
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -98,8 +98,6 @@ interface TitleCellProps {
 }
 
 function TitleCell({ row }: TitleCellProps) {
-  const tagsList = row.tags && row.tags.length > 0 ? row.tags.join(', ') : null;
-
   return (
     <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
       <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
@@ -113,13 +111,6 @@ function TitleCell({ row }: TitleCellProps) {
             {getMonitoredIcon(row.monitored)}
           </Box>
         </Tooltip>
-        {tagsList && (
-          <Tooltip content={tagsList}>
-            <Box style={{ display: 'flex', alignItems: 'center' }}>
-              <BadgeIcon width="16" height="16" />
-            </Box>
-          </Tooltip>
-        )}
       </Flex>
       <Text
         size="2"
@@ -155,6 +146,22 @@ function LastImportedCell({ row }: TitleCellProps) {
 
 function CFScoreCell({ row }: TitleCellProps) {
   return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
+}
+
+function TagsCell({ row }: TitleCellProps) {
+  if (!row.tags || row.tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <Flex gap="1" wrap="wrap" style={{ maxWidth: '100%' }}>
+      {row.tags.map((tag, index) => (
+        <Badge key={index} size="1" variant="soft" color="blue">
+          {tag}
+        </Badge>
+      ))}
+    </Flex>
+  );
 }
 
 // Filter state interface
@@ -554,6 +561,19 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           {...props}
           filterValue={columnFilters.cfScore}
           onFilterChange={(value) => handleFilterChange('cfScore', value)}
+        />
+      )
+    },
+    {
+      key: 'tags',
+      name: 'Tags',
+      minWidth: 150,
+      renderCell: (props) => <TagsCell row={props.row} />,
+      renderHeaderCell: (props) => (
+        <TextFilterHeaderCell
+          {...props}
+          filterValue={columnFilters.title}
+          onFilterChange={() => {}}
         />
       )
     }
