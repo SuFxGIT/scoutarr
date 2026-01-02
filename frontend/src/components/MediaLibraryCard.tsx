@@ -395,7 +395,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     lastSearched: '',
     dateImported: ''
   });
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const showAllParam = searchParams.get('showAll');
   const [showAll, setShowAll] = useState<boolean>(showAllParam === 'true');
 
@@ -532,35 +531,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       });
     }
 
-    // Apply global search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => {
-        // Search in title
-        if (item.title.toLowerCase().includes(query)) return true;
-
-        // Search in status
-        if (item.status.toLowerCase().includes(query)) return true;
-
-        // Search in quality profile
-        if (item.qualityProfileName?.toLowerCase().includes(query)) return true;
-
-        // Search in formatted last searched date
-        if (item.lastSearched) {
-          const formattedDate = format(new Date(item.lastSearched), 'PPp').toLowerCase();
-          if (formattedDate.includes(query)) return true;
-        }
-
-        // Search in formatted date imported
-        if (item.dateImported) {
-          const formattedDate = format(new Date(item.dateImported), 'PPp').toLowerCase();
-          if (formattedDate.includes(query)) return true;
-        }
-
-        return false;
-      });
-    }
-
     // Sort filtered results based on react-data-grid sort columns
     const sorted = [...filtered];
     if (sortColumns.length > 0) {
@@ -600,7 +570,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PPp') : 'Never',
       formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PPp') : ''
     }));
-  }, [mediaData?.media, sortColumns, searchQuery, columnFilters]);
+  }, [mediaData?.media, sortColumns, columnFilters]);
 
   // Check if any instances are configured
   const hasAnyInstances = useMemo(() => {
@@ -758,20 +728,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
               </Flex>
             )}
           </>
-        )}
-
-        {/* Search Bar */}
-        {mediaData && mediaData.media.length > 0 && (
-          <TextField.Root
-              placeholder="Search by title, status, quality profile, searched date, or imported date..."
-            value={searchQuery}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-            size="2"
-          >
-            <TextField.Slot>
-              <MagnifyingGlassIcon height="16" width="16" />
-            </TextField.Slot>
-          </TextField.Root>
         )}
 
         {/* Loading State */}
