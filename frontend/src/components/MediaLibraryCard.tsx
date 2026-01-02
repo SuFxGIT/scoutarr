@@ -621,7 +621,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'title',
       name: 'Title',
-      minWidth: 200,
+      minWidth: 170,
       renderCell: (props) => <TitleCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -634,7 +634,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'qualityProfileName',
       name: 'Quality Profile',
-      minWidth: 150,
+      minWidth: 130,
       renderCell: (props) => <QualityProfileCell row={props.row} />,
       renderHeaderCell: (props) => (
         <DropdownFilterHeaderCell
@@ -651,7 +651,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'lastSearched',
       name: 'Searched',
-      minWidth: 180,
+      minWidth: 140,
       renderCell: (props) => <LastSearchedCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -664,7 +664,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'dateImported',
       name: 'Imported',
-      minWidth: 180,
+      minWidth: 140,
       renderCell: (props) => <LastImportedCell row={props.row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -677,7 +677,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     {
       key: 'customFormatScore',
       name: 'CF Score',
-      minWidth: 100,
+      minWidth: 90,
       renderCell: (props) => <CFScoreCell row={props.row} />,
       renderHeaderCell: (props) => (
         <NumericFilterHeaderCell
@@ -824,8 +824,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 onSelectedRowsChange={setSelectedMediaIds}
                 sortColumns={sortColumns}
                 onSortColumnsChange={setSortColumns}
-                rowHeight={55}
-                headerRowHeight={80}
+                rowHeight={48}
+                headerRowHeight={68}
                 defaultColumnOptions={{
                   sortable: true,
                   resizable: true

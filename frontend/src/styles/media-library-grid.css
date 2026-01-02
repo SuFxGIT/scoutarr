@@ -8,6 +8,7 @@
   --rdg-border-color: var(--gray-a5);
   --rdg-color: var(--gray-12);
   --rdg-font-size: 0.875rem;
+  --rdg-cell-padding: 0.5rem;
   --rdg-selection-color: transparent;
   --rdg-checkbox-focus-color: var(--accent-9);
 
@@ -18,8 +19,8 @@
 }
 
 .media-library-grid .rdg-cell {
-  padding-block: 0.75rem;
-  padding-inline: 1rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
   border-bottom: 1px solid var(--gray-a3);
   border-right: none;
   display: flex;
@@ -41,8 +42,8 @@
 }
 
 .media-library-grid .rdg-header-cell {
-  padding-block: 0.75rem;
-  padding-inline: 1rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
   border-right: none;
   user-select: none;
   align-items: start;
@@ -51,7 +52,7 @@
 /* Header cell with filter - needs more padding */
 .media-library-grid .rdg-header-cell > div {
   width: 100%;
-  min-height: 52px; /* Ensures consistent height across all headers */
+  min-height: 48px; /* Ensures consistent height across all headers */
 }
 
 /* Filter input and select styling inside headers */
@@ -103,7 +104,7 @@
 }
 
 .media-library-grid .rdg-row {
-  min-height: 55px;
+  min-height: 48px;
   transition: background-color 0.1s ease;
 }
 
