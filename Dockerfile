@@ -34,17 +34,18 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files (including shared for workspace resolution)
 COPY package*.json ./
+COPY shared/package*.json ./shared/
 COPY backend/package*.json ./backend/
 
 # Install production dependencies only (with cache optimization)
 RUN npm ci --production --prefer-offline --no-audit
 
 # Copy built files
+COPY --from=builder /app/shared/dist ./shared/dist
 COPY --from=builder /app/backend/dist ./backend/dist
 COPY --from=builder /app/frontend/dist ./frontend/dist
-COPY --from=builder /app/backend/node_modules ./backend/node_modules
 
 # Create config and data directories
 RUN mkdir -p /app/config /app/data
