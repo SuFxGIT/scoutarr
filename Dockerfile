@@ -9,8 +9,8 @@ COPY shared/package*.json ./shared/
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
 
-# Install dependencies
-RUN npm install
+# Install dependencies (with cache optimization)
+RUN npm ci --prefer-offline --no-audit
 
 # Copy source files
 COPY shared ./shared
@@ -38,8 +38,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 
-# Install production dependencies only
-RUN npm install --production
+# Install production dependencies only (with cache optimization)
+RUN npm ci --production --prefer-offline --no-audit
 
 # Copy built files
 COPY --from=builder /app/backend/dist ./backend/dist
