@@ -14,6 +14,7 @@ services:
       - ./shared/src:/app/shared/src
       - ./shared/tsconfig.json:/app/shared/tsconfig.json
       - ./frontend/src:/app/frontend/src
+      - ./frontend/public:/app/frontend/public
       - ./backend/src:/app/backend/src
       - ./frontend/index.html:/app/frontend/index.html
       - ./frontend/vite.config.ts:/app/frontend/vite.config.ts
