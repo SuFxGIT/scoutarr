@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY shared/package*.json ./shared/
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
 
@@ -12,8 +13,13 @@ COPY backend/package*.json ./backend/
 RUN npm install
 
 # Copy source files
+COPY shared ./shared
 COPY frontend ./frontend
 COPY backend ./backend
+
+# Build shared package
+WORKDIR /app/shared
+RUN npm run build
 
 # Build frontend
 WORKDIR /app/frontend

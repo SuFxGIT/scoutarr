@@ -1,6 +1,8 @@
 services:
   scoutarr-dev:
-    image: node:22-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: scoutarr-dev
     working_dir: /app
     restart: unless-stopped
@@ -9,11 +11,12 @@ services:
       - "7291:7291"  # Vite dev server
     volumes:
       # Mount source code for hot reloading (exclude node_modules)
-      - ./package.json:/app/package.json
-      - ./package-lock.json:/app/package-lock.json
-      - ./frontend:/app/frontend
-      - ./backend:/app/backend
-      - ./shared:/app/shared
+      - ./shared/src:/app/shared/src
+      - ./frontend/src:/app/frontend/src
+      - ./backend/src:/app/backend/src
+      - ./frontend/index.html:/app/frontend/index.html
+      - ./frontend/vite.config.ts:/app/frontend/vite.config.ts
+      - ./frontend/tsconfig.json:/app/frontend/tsconfig.json
 
       # Use named volumes for node_modules to avoid conflicts
       - node_modules:/app/node_modules
@@ -29,7 +32,6 @@ services:
       - LOG_LEVEL=debug
     networks:
       - scoutarr-network
-    command: sh -c "npm install -g npm@11.7.0 && apk add --no-cache python3 make g++ && npm install && npm run dev"
     stdin_open: true
     tty: true
 
