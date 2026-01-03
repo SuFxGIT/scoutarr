@@ -9,10 +9,10 @@ COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
-COPY tsconfig.json ./
 
 # Install all dependencies
 RUN npm install
 
 # Build shared package once on startup
-CMD sh -c "npm run build:shared && npm run dev"
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["npm run build:shared && npm run dev"]

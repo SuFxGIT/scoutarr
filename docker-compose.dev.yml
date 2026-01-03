@@ -12,6 +12,8 @@ services:
     volumes:
       # Mount source code for hot reloading (exclude node_modules)
       - ./shared/src:/app/shared/src
+      - ./shared/tsconfig.json:/app/shared/tsconfig.json
+      - ./shared/dist:/app/shared/dist
       - ./frontend/src:/app/frontend/src
       - ./backend/src:/app/backend/src
       - ./frontend/index.html:/app/frontend/index.html
