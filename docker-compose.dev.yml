@@ -18,6 +18,9 @@ services:
       - ./frontend/index.html:/app/frontend/index.html
       - ./frontend/vite.config.ts:/app/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/app/frontend/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/frontend/tsconfig.node.json
+      - ./frontend/postcss.config.js:/app/frontend/postcss.config.js
+      - ./frontend/tailwind.config.js:/app/frontend/tailwind.config.js
       - ./backend/tsconfig.json:/app/backend/tsconfig.json
 
       # Use named volumes for build outputs and node_modules
