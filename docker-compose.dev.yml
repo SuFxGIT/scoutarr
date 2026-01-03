@@ -10,21 +10,23 @@ services:
       - "5839:5839"  # Backend API
       - "7291:7291"  # Vite dev server
     volumes:
-      # Mount source code for hot reloading (exclude node_modules)
+      # Mount source code for hot reloading
       - ./shared/src:/app/shared/src
       - ./shared/tsconfig.json:/app/shared/tsconfig.json
-      - ./shared/dist:/app/shared/dist
       - ./frontend/src:/app/frontend/src
       - ./backend/src:/app/backend/src
       - ./frontend/index.html:/app/frontend/index.html
       - ./frontend/vite.config.ts:/app/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/app/frontend/tsconfig.json
+      - ./backend/tsconfig.json:/app/backend/tsconfig.json
 
-      # Use named volumes for node_modules to avoid conflicts
+      # Use named volumes for build outputs and node_modules
       - node_modules:/app/node_modules
+      - shared_dist:/app/shared/dist
       - frontend_node_modules:/app/frontend/node_modules
+      - frontend_dist:/app/frontend/dist
       - backend_node_modules:/app/backend/node_modules
-      - shared_node_modules:/app/shared/node_modules
+      - backend_dist:/app/backend/dist
 
       # Mount config directory
       - ./config:/app/config
@@ -43,6 +45,8 @@ networks:
 
 volumes:
   node_modules:
+  shared_dist:
   frontend_node_modules:
+  frontend_dist:
   backend_node_modules:
-  shared_node_modules:
+  backend_dist:
