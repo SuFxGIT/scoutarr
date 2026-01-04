@@ -4,6 +4,7 @@ import path from 'path';
 import logger from '../utils/logger.js';
 import { getConfigDir } from '../utils/paths.js';
 import { getErrorMessage } from '../utils/errorUtils.js';
+import { extractFileInfoForDb } from '../utils/mediaFileUtils.js';
 
 const CONFIG_DIR = getConfigDir();
 const DB_FILE = path.join(CONFIG_DIR, 'scoutarr.db');
