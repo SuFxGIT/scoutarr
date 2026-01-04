@@ -99,7 +99,9 @@ function Settings() {
         });
       }
     });
-  }, [config]);
+    // Only run when loadedConfig changes (on initial load and config refetch), not on every config state update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedConfig]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback((): boolean => {

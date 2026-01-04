@@ -122,10 +122,10 @@ class SyncSchedulerService {
 
       // Sync to database
       await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
-      logger.info(`✅ Synced ${allMedia.length} items for ${appType} instance: ${instance.name || instance.id}`);
+      logger.info(`✅ Synced ${mediaWithTagNames.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
-      endOp({ syncedCount: allMedia.length }, true);
-      return allMedia.length;
+      endOp({ syncedCount: mediaWithTagNames.length }, true);
+      return mediaWithTagNames.length;
     } catch (error: unknown) {
       const errMsg = getErrorMessage(error);
       logger.error(`❌ syncSingleInstance failed for ${appType} ${instance.id}`, { error: errMsg });
