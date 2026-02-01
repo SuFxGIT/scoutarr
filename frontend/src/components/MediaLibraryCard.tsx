@@ -347,6 +347,23 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     ])
   );
 
+  // Auto-select first available instance if none is selected
+  useEffect(() => {
+    if (selectedInstance || !config) return;
+
+    // Find the first available instance
+    for (const appType of APP_TYPES) {
+      const instances = config.applications[appType] || [];
+      if (instances.length > 0) {
+        const firstInstance = instances[0];
+        const instanceValue = `${appType}-${firstInstance.id}`;
+        setSelectedInstance(instanceValue);
+        setSearchParams({ instance: instanceValue });
+        break;
+      }
+    }
+  }, [config, selectedInstance, setSearchParams]);
+
   // Update lastLibraryUrl whenever the location changes
   useEffect(() => {
     setLastLibraryUrl(location.pathname + location.search);
@@ -745,11 +762,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           </Callout.Root>
         )}
 
-        {/* No Instance Selected */}
+        {/* No Instances Configured */}
         {!selectedInstance && !isLoading && (
           <Box p="6">
             <Text size="2" color="gray" align="center">
-              Select an instance to view media
+              No instances configured. Add an instance in Settings to view media.
             </Text>
           </Box>
         )}
