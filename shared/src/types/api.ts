@@ -72,11 +72,16 @@ export interface MediaLibraryItem {
   monitored: boolean;
   status: string;
   qualityProfileName?: string;
-  tags: string[]; // Tag names, not IDs
+  tags: string[];
   lastSearched?: string;
   dateImported?: string;
   customFormatScore?: number;
   hasFile?: boolean;
+  seriesId?: number;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }
 
 export interface MediaLibraryResponse {

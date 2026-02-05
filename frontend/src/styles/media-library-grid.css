@@ -194,3 +194,128 @@
   color: var(--gray-a10);
   font-style: italic;
 }
+
+/* ===== Master Detail (Sonarr episode panels) ===== */
+
+/* Expand/collapse button */
+.cell-expander {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border-radius: var(--radius-2);
+  transition: background-color 0.1s ease;
+}
+
+.cell-expander:hover {
+  background-color: var(--gray-a3);
+}
+
+.cell-expander:focus-visible {
+  outline: 2px solid var(--accent-8);
+  outline-offset: -2px;
+  border-radius: var(--radius-2);
+}
+
+.cell-expander svg {
+  color: var(--gray-11);
+}
+
+/* Detail cell — spans full row */
+.detail-cell {
+  padding: 0 !important;
+  background-color: var(--gray-a2);
+  border-bottom: 1px solid var(--gray-a5);
+}
+
+/* Episode detail panel */
+.episode-detail-panel {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.episode-season-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.episode-season-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: var(--gray-a3);
+  border-radius: var(--radius-2);
+  margin-bottom: 2px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Episode table */
+.episode-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.episode-table td {
+  padding: 2px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.episode-table tr {
+  transition: background-color 0.1s ease;
+}
+
+.episode-table tr:hover {
+  background-color: var(--gray-a3);
+}
+
+.episode-table tr.has-file {
+  color: var(--gray-12);
+}
+
+.episode-table tr.missing-file {
+  color: var(--gray-a10);
+}
+
+/* Episode table columns */
+.ep-number {
+  width: 70px;
+  font-family: var(--code-font-family, monospace);
+}
+
+.ep-title {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ep-status {
+  width: 24px;
+  text-align: center;
+}
+
+.ep-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ep-score {
+  width: 50px;
+  text-align: right;
+}
+
+.ep-date {
+  width: 100px;
+  text-align: right;
+}

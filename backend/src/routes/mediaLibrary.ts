@@ -1,13 +1,30 @@
 import express from 'express';
+import { capitalize } from 'es-toolkit';
 import { configService } from '../services/configService.js';
 import { statsService } from '../services/statsService.js';
 import logger, { startOperation } from '../utils/logger.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { getErrorMessage, handleRouteError } from '../utils/errorUtils.js';
-import { extractFileInfo } from '../utils/mediaFileUtils.js';
+import { extractFileInfo, type MediaWithFiles } from '../utils/mediaFileUtils.js';
 import { syncInstanceMedia } from '../utils/mediaSync.js';
 import type { StarrInstanceConfig } from '@scoutarr/shared';
+
+type MediaItem = MediaWithFiles & {
+  id: number;
+  title: string;
+  monitored: boolean;
+  tags: string[];
+  qualityProfileId?: number;
+  qualityProfileName?: string;
+  status: string;
+  lastSearchTime?: string;
+  seriesId?: number;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
+};
 
 export const mediaLibraryRouter = express.Router();
 
@@ -51,7 +68,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     });
 
     // Check if we should sync from API or use database
-    let allMedia;
+    let allMedia: MediaItem[];
     let fromCache = false;
 
     if (shouldSync) {
@@ -63,7 +80,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         instance
       });
       
-      allMedia = syncResult.mediaWithTags;
+      allMedia = syncResult.mediaWithTags as MediaItem[];
       
       // Sync to database
       logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
@@ -82,25 +99,27 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         title: m.title,
         monitored: m.monitored,
         tags: m.tags,
-        qualityProfileName: m.quality_profile_name || undefined,
+        qualityProfileName: m.quality_profile_name ?? undefined,
         status: m.status,
-        lastSearchTime: m.last_search_time || undefined,
+        lastSearchTime: m.last_search_time ?? undefined,
         movieFile: m.date_imported ? {
           dateAdded: m.date_imported,
-          customFormatScore: m.custom_format_score
+          customFormatScore: m.custom_format_score ?? undefined
         } : undefined,
         episodeFile: m.date_imported ? {
           dateAdded: m.date_imported,
-          customFormatScore: m.custom_format_score
+          customFormatScore: m.custom_format_score ?? undefined
         } : undefined,
+        seriesId: m.series_id ?? undefined,
+        seriesTitle: m.series_title ?? undefined,
+        seasonNumber: m.season_number ?? undefined,
+        episodeNumber: m.episode_number ?? undefined,
       }));
 
     }
 
     // Transform media to response format
-    // Use native lastSearchTime from the API (more accurate than our database)
     const mediaWithDates = allMedia.map(m => {
-      // Extract file information using centralized utility
       const fileInfo = extractFileInfo(m);
 
       return {
@@ -113,7 +132,12 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         lastSearched: m.lastSearchTime,
         dateImported: fileInfo.dateImported,
         customFormatScore: fileInfo.customFormatScore,
-        hasFile: fileInfo.hasFile
+        hasFile: fileInfo.hasFile,
+        seriesId: (m as any).seriesId,
+        seriesTitle: (m as any).seriesTitle,
+        seasonNumber: (m as any).seasonNumber,
+        episodeNumber: (m as any).episodeNumber,
+        episodeTitle: (m as any).episodeTitle,
       };
     });
 

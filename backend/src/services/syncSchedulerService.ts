@@ -5,6 +5,7 @@ import { statsService } from './statsService.js';
 import { syncInstanceMedia } from '../utils/mediaSync.js';
 import { APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getErrorMessage, getErrorDetails } from '../utils/errorUtils.js';
+import type { StarrInstanceConfig } from '@scoutarr/shared';
 
 /**
  * Import CommonJS modules using createRequire
@@ -102,11 +103,11 @@ class SyncSchedulerService {
       const syncResult = await syncInstanceMedia({
         instanceId: instance.id,
         appType: appType as AppType,
-        instance
+        instance: instance as StarrInstanceConfig
       });
-      
-      const mediaWithTagNames = syncResult.mediaWithTags;
-      
+
+      const mediaWithTagNames = syncResult.mediaWithTags as Array<{ tags: string[]; [key: string]: unknown }>;
+
       // Count unique tags found
       const allTagNames = new Set<string>();
       mediaWithTagNames.forEach(item => {
@@ -121,7 +122,7 @@ class SyncSchedulerService {
       });
 
       // Sync to database
-      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames);
+      await statsService.syncMediaToDatabase(instance.id, mediaWithTagNames as any);
       logger.info(`✅ Synced ${mediaWithTagNames.length} items for ${appType} instance: ${instance.name || instance.id}`);
 
       endOp({ syncedCount: mediaWithTagNames.length }, true);

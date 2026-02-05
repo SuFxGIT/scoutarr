@@ -1,5 +1,5 @@
 import { radarrService, RadarrMovie } from '../services/radarrService.js';
-import { sonarrService, SonarrSeries } from '../services/sonarrService.js';
+import { sonarrService, SonarrEpisode } from '../services/sonarrService.js';
 import { lidarrService, LidarrArtist } from '../services/lidarrService.js';
 import { readarrService, ReadarrAuthor } from '../services/readarrService.js';
 import { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '@scoutarr/shared';
@@ -43,10 +43,10 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
   },
   sonarr: {
     getMedia: (config: SonarrInstance) => sonarrService.getMedia(config),
-    filterMedia: (config: SonarrInstance, media: SonarrSeries[]) => sonarrService.filterMedia(config, media),
+    filterMedia: (config: SonarrInstance, media: SonarrEpisode[]) => sonarrService.filterMedia(config, media),
     searchMedia: (config: SonarrInstance, mediaIds: number[]) => sonarrService.searchMedia(config, mediaIds),
-    getMediaId: (s: SonarrSeries) => sonarrService.getMediaId(s),
-    getMediaTitle: (s: SonarrSeries) => sonarrService.getMediaTitle(s),
+    getMediaId: (e: SonarrEpisode) => sonarrService.getMediaId(e),
+    getMediaTitle: (e: SonarrEpisode) => sonarrService.getMediaTitle(e),
     getTagId: (config: SonarrInstance, tagName: string) => sonarrService.getTagId(config, tagName),
     getQualityProfiles: (config: SonarrInstance) => sonarrService.getQualityProfiles(config),
     addTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>

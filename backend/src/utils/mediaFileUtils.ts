@@ -9,7 +9,7 @@ interface FileInfo {
   customFormatScore: number | undefined;
 }
 
-interface MediaWithFiles {
+export interface MediaWithFiles {
   movieFile?: { dateAdded?: string; customFormatScore?: number };
   episodeFile?: { dateAdded?: string; customFormatScore?: number };
   trackFiles?: Array<{ dateAdded?: string; customFormatScore?: number }>;

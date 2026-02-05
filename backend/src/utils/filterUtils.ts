@@ -8,6 +8,7 @@ export interface FilterableMedia {
   id: number;
   monitored: boolean;
   tags: string[]; // Tag names, not IDs
+  qualityProfileId?: number; // Profile ID from *arr API
   qualityProfileName?: string; // Profile name for filtering
   status: string;
   lastSearchTime?: string;
