@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { DataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
+import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY, renderToggleGroup } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
 import {
@@ -28,8 +28,6 @@ import {
   ClockIcon,
   DotFilledIcon,
   CalendarIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -42,25 +40,13 @@ import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
 import { APP_TYPES, AppType } from '../utils/constants';
 
-// Extended row type with formatted dates for the grid
+// Extended row type with formatted dates and computed grouping field
 type MediaLibraryRow = MediaLibraryItem & {
   formattedLastSearched: string;
   formattedDateImported: string;
+  seriesKey: string;
+  seasonLabel: string;
 };
-
-// Master Detail row types
-type GridRow =
-  | (MediaLibraryRow & {
-      type: 'MASTER';
-      expanded?: boolean;
-      episodeCount?: number;
-      downloadedCount?: number;
-    })
-  | {
-      type: 'DETAIL';
-      id: number;
-      parentSeriesId: number;
-    };
 
 // Helper functions for status icons
 function getStatusIcon(status: string) {
@@ -101,15 +87,7 @@ function getStatusTooltip(status: string): string {
 }
 
 // Cell renderer components
-interface MasterCellProps {
-  row: GridRow & { type: 'MASTER' };
-}
-
-interface TagsCellProps extends MasterCellProps {
-  scoutarrTags?: string[];
-}
-
-function TitleCell({ row }: MasterCellProps) {
+function TitleCell({ row }: { row: MediaLibraryRow }) {
   return (
     <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
       <Flex gap="1" align="center" style={{ flexShrink: 0 }}>
@@ -126,16 +104,26 @@ function TitleCell({ row }: MasterCellProps) {
       </Flex>
       <Text size="2" weight="medium" truncate style={{ flex: 1 }}>
         {row.title}
-        {row.episodeCount !== undefined && (
-          <Text size="1" color="gray"> ({row.downloadedCount}/{row.episodeCount})</Text>
-        )}
       </Text>
     </Flex>
   );
 }
 
-function QualityProfileCell({ row }: MasterCellProps) {
-  return <Text size="2">{row.qualityProfileName || 'N/A'}</Text>;
+function EpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
+  const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
+  return (
+    <Flex gap="2" align="center" style={{ overflow: 'hidden' }}>
+      {row.hasFile ? (
+        <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
+      ) : (
+        <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
+      )}
+      <Text size="1" color="gray" style={{ fontFamily: 'var(--code-font-family, monospace)', flexShrink: 0 }}>
+        {epNum}
+      </Text>
+      <Text size="2" truncate>{row.episodeTitle || row.title}</Text>
+    </Flex>
+  );
 }
 
 function DateCell({ value }: { value: string }) {
@@ -146,11 +134,7 @@ function DateCell({ value }: { value: string }) {
   );
 }
 
-function CFScoreCell({ row }: MasterCellProps) {
-  return <Text size="2">{row.customFormatScore ?? '-'}</Text>;
-}
-
-function TagsCell({ row, scoutarrTags = [] }: TagsCellProps) {
+function TagsCell({ row, scoutarrTags = [] }: { row: MediaLibraryRow; scoutarrTags?: string[] }) {
   if (!row.tags || row.tags.length === 0) {
     return null;
   }
@@ -174,89 +158,17 @@ function TagsCell({ row, scoutarrTags = [] }: TagsCellProps) {
   );
 }
 
-// Episode Detail Panel for expanded Sonarr series
-function EpisodeDetailPanel({ episodes }: { episodes: MediaLibraryItem[] }) {
-  // Group episodes by season
-  const seasonMap = new Map<number, MediaLibraryItem[]>();
-  for (const ep of episodes) {
-    const season = ep.seasonNumber ?? 0;
-    if (!seasonMap.has(season)) seasonMap.set(season, []);
-    seasonMap.get(season)!.push(ep);
-  }
-
-  const sortedSeasons = Array.from(seasonMap.entries()).sort((a, b) => a[0] - b[0]);
-
-  return (
-    <div className="episode-detail-panel" onClick={(e) => e.stopPropagation()}>
-      {sortedSeasons.map(([seasonNum, seasonEps]) => {
-        const downloaded = seasonEps.filter(e => e.hasFile).length;
-        return (
-          <div key={seasonNum} className="episode-season-group">
-            <div className="episode-season-header">
-              <Text size="2" weight="bold">
-                {seasonNum === 0 ? 'Specials' : `Season ${seasonNum}`}
-              </Text>
-              <Text size="1" color="gray"> ({downloaded}/{seasonEps.length})</Text>
-            </div>
-            <table className="episode-table">
-              <tbody>
-                {seasonEps
-                  .sort((a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0))
-                  .map(ep => (
-                    <tr key={ep.id} className={ep.hasFile ? 'has-file' : 'missing-file'}>
-                      <td className="ep-number">
-                        <Text size="1" color="gray">
-                          S{String(ep.seasonNumber ?? 0).padStart(2, '0')}E{String(ep.episodeNumber ?? 0).padStart(2, '0')}
-                        </Text>
-                      </td>
-                      <td className="ep-title">
-                        <Text size="1" truncate>{ep.episodeTitle || ep.title}</Text>
-                      </td>
-                      <td className="ep-status">
-                        {ep.hasFile ? (
-                          <CheckCircledIcon color="var(--green-9)" />
-                        ) : (
-                          <CrossCircledIcon color="var(--red-9)" />
-                        )}
-                      </td>
-                      <td className="ep-score">
-                        <Text size="1" color="gray">{ep.customFormatScore ?? '-'}</Text>
-                      </td>
-                      <td className="ep-date">
-                        <Text size="1" color="gray">
-                          {ep.dateImported ? format(new Date(ep.dateImported), 'PP') : ''}
-                        </Text>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
-    </div>
-  );
+// Group cell renderers for Sonarr TreeDataGrid
+// Wraps the library's default renderToggleGroup with a cleaned-up groupKey
+function SeriesGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
+  const downloadedCount = props.childRows.filter(e => e.hasFile).length;
+  const displayTitle = String(props.groupKey).replace(/^\d+__/, '');
+  return renderToggleGroup({ ...props, groupKey: `${displayTitle} (${downloadedCount}/${props.childRows.length})` });
 }
 
-// Expand/collapse button for series rows
-function CellExpanderFormatter({ expanded, onCellExpand }: { expanded: boolean; onCellExpand: () => void }) {
-  return (
-    <div
-      className="cell-expander"
-      onClick={(e) => { e.stopPropagation(); onCellExpand(); }}
-      onKeyDown={(e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          onCellExpand();
-        }
-      }}
-      tabIndex={0}
-      role="button"
-      aria-expanded={expanded}
-    >
-      {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-    </div>
-  );
+function SeasonGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
+  const downloadedCount = props.childRows.filter(e => e.hasFile).length;
+  return renderToggleGroup({ ...props, groupKey: `${props.groupKey} (${downloadedCount}/${props.childRows.length})` });
 }
 
 // Filter state interface
@@ -295,7 +207,7 @@ function HeaderCellTitle({ column, sortDirection, priority }: HeaderCellTitlePro
 }
 
 // Text filter header cell component
-interface TextFilterHeaderCellProps extends RenderHeaderCellProps<GridRow> {
+interface TextFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
   filterValue: string;
   onFilterChange: (value: string) => void;
 }
@@ -321,7 +233,7 @@ function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, on
 }
 
 // Numeric filter header cell component
-interface NumericFilterHeaderCellProps extends RenderHeaderCellProps<GridRow> {
+interface NumericFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
   filterValue: string;
   onFilterChange: (value: string) => void;
 }
@@ -349,7 +261,7 @@ function NumericFilterHeaderCell({ column, sortDirection, priority, filterValue,
 }
 
 // Dropdown filter header cell component
-interface DropdownFilterHeaderCellProps extends RenderHeaderCellProps<GridRow> {
+interface DropdownFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
   filterValue: string;
   onFilterChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
@@ -416,7 +328,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const initialInstance = searchParams.get('instance');
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
-  const [expandedSeriesIds, setExpandedSeriesIds] = useState<Set<number>>(new Set());
+  const [expandedGroupIds, setExpandedGroupIds] = useState<ReadonlySet<unknown>>(new Set());
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -492,14 +404,41 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     staleTime: 30000,
   });
 
+  // Map episode IDs to series IDs for Sonarr search
+  const episodeToSeriesMap = useMemo(() => {
+    if (!isSonarr || !mediaData?.media) return new Map<number, number>();
+    const map = new Map<number, number>();
+    for (const item of mediaData.media) {
+      if (item.seriesId !== undefined) {
+        map.set(item.id, item.seriesId);
+      }
+    }
+    return map;
+  }, [isSonarr, mediaData?.media]);
+
   // Manual search mutation
   const searchMutation = useMutation({
     mutationFn: async () => {
       if (!instanceInfo) throw new Error('No instance selected');
+
+      let idsToSend = Array.from(selectedMediaIds);
+
+      // For Sonarr: convert episode IDs to unique series IDs
+      if (isSonarr) {
+        const seriesIdSet = new Set<number>();
+        for (const episodeId of idsToSend) {
+          const seriesId = episodeToSeriesMap.get(episodeId);
+          if (seriesId !== undefined) {
+            seriesIdSet.add(seriesId);
+          }
+        }
+        idsToSend = Array.from(seriesIdSet);
+      }
+
       return searchMedia(
         instanceInfo.appType,
         instanceInfo.instanceId,
-        Array.from(selectedMediaIds)
+        idsToSend
       );
     },
     onSuccess: (data) => {
@@ -515,7 +454,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const handleInstanceChange = (value: string) => {
     setSelectedInstance(value);
     setSelectedMediaIds(new Set());
-    setExpandedSeriesIds(new Set());
+    setExpandedGroupIds(new Set());
     setSearchParams({ instance: value });
   };
 
@@ -523,18 +462,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     if (selectedMediaIds.size === 0) return;
     searchMutation.mutate();
   }, [selectedMediaIds.size, searchMutation]);
-
-  const toggleExpand = useCallback((seriesId: number) => {
-    setExpandedSeriesIds(prev => {
-      const next = new Set(prev);
-      if (next.has(seriesId)) {
-        next.delete(seriesId);
-      } else {
-        next.add(seriesId);
-      }
-      return next;
-    });
-  }, []);
 
   // Extract unique values for dropdown filters
   const filterOptions = useMemo(() => {
@@ -561,20 +488,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     setColumnFilters(prev => ({ ...prev, [columnKey]: value }));
   }, []);
 
-  // Build episode map for Sonarr detail panels
-  const episodesBySeriesId = useMemo(() => {
-    if (!isSonarr || !mediaData?.media) return new Map<number, MediaLibraryItem[]>();
-    const map = new Map<number, MediaLibraryItem[]>();
-    for (const item of mediaData.media) {
-      if (item.seriesId === undefined) continue;
-      if (!map.has(item.seriesId)) map.set(item.seriesId, []);
-      map.get(item.seriesId)!.push(item);
-    }
-    return map;
-  }, [isSonarr, mediaData?.media]);
-
-  // Build grid rows: flat for Radarr, grouped master-detail for Sonarr
-  const gridRows = useMemo((): GridRow[] => {
+  // Build grid rows: flat MediaLibraryRow[] for all app types
+  const gridRows = useMemo((): MediaLibraryRow[] => {
     if (!mediaData?.media) return [];
 
     // Apply filters to raw data
@@ -582,7 +497,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
-      // For Sonarr, filter matches series title; for others, media title
       filtered = filtered.filter(item => item.title.toLowerCase().includes(query));
     }
     if (columnFilters.qualityProfileName !== 'all') {
@@ -614,139 +528,86 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       });
     }
 
-    if (isSonarr) {
-      // Group episodes by series, build MASTER + DETAIL rows
-      const seriesMap = new Map<number, MediaLibraryItem[]>();
-      for (const item of filtered) {
-        const sid = item.seriesId!;
-        if (!seriesMap.has(sid)) seriesMap.set(sid, []);
-        seriesMap.get(sid)!.push(item);
-      }
+    // Sort rows
+    const sorted = [...filtered];
+    if (sortColumns.length > 0) {
+      const { columnKey, direction } = sortColumns[0];
+      const multiplier = direction === 'ASC' ? 1 : -1;
 
-      // Build series-level MASTER rows with aggregated data
-      const seriesRows: Array<GridRow & { type: 'MASTER' }> = [];
-      for (const [seriesId, episodes] of seriesMap) {
-        const first = episodes[0];
-        const downloadedCount = episodes.filter(e => e.hasFile).length;
-        const mostRecentImport = episodes
-          .map(e => e.dateImported)
-          .filter((d): d is string => !!d)
-          .sort()
-          .reverse()[0];
-        const minCfScore = episodes
-          .map(e => e.customFormatScore)
-          .filter((s): s is number => s !== undefined)
-          .sort((a, b) => a - b)[0];
-
-        seriesRows.push({
-          type: 'MASTER',
-          id: seriesId,
-          title: first.seriesTitle || first.title,
-          monitored: first.monitored,
-          status: first.status,
-          qualityProfileName: first.qualityProfileName,
-          tags: first.tags,
-          lastSearched: first.lastSearched,
-          dateImported: mostRecentImport,
-          customFormatScore: minCfScore,
-          hasFile: downloadedCount > 0,
-          seriesId: seriesId,
-          seriesTitle: first.seriesTitle,
-          expanded: expandedSeriesIds.has(seriesId),
-          episodeCount: episodes.length,
-          downloadedCount,
-          formattedLastSearched: first.lastSearched ? format(new Date(first.lastSearched), 'PP') : 'Never',
-          formattedDateImported: mostRecentImport ? format(new Date(mostRecentImport), 'PP') : '',
-        });
-      }
-
-      // Sort series rows
-      if (sortColumns.length > 0) {
-        const { columnKey, direction } = sortColumns[0];
-        const multiplier = direction === 'ASC' ? 1 : -1;
-        seriesRows.sort((a, b) => {
-          let cmp = 0;
-          if (columnKey === 'title') {
-            cmp = a.title.localeCompare(b.title);
-          } else if (columnKey === 'qualityProfileName') {
-            cmp = (a.qualityProfileName || '').localeCompare(b.qualityProfileName || '');
-          } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
-            const aDate = a[columnKey] ? new Date(a[columnKey]!) : new Date(0);
-            const bDate = b[columnKey] ? new Date(b[columnKey]!) : new Date(0);
-            cmp = compareAsc(aDate, bDate);
-          } else if (columnKey === 'customFormatScore') {
-            cmp = (a.customFormatScore ?? -Infinity) - (b.customFormatScore ?? -Infinity);
-          } else if (columnKey === 'tags') {
-            const aTag = a.tags?.length > 0 ? a.tags[0] : '\uffff';
-            const bTag = b.tags?.length > 0 ? b.tags[0] : '\uffff';
-            cmp = aTag.localeCompare(bTag);
-          }
-          return cmp * multiplier;
-        });
-      }
-
-      // Interleave DETAIL rows for expanded series
-      const rows: GridRow[] = [];
-      for (const sr of seriesRows) {
-        rows.push(sr);
-        if (expandedSeriesIds.has(sr.id)) {
-          rows.push({
-            type: 'DETAIL',
-            id: -(sr.id),
-            parentSeriesId: sr.id,
-          });
-        }
-      }
-      return rows;
-
-    } else {
-      // Non-Sonarr: flat MASTER rows (same as before)
-      const sorted = [...filtered];
-      if (sortColumns.length > 0) {
-        const { columnKey, direction } = sortColumns[0];
-        const multiplier = direction === 'ASC' ? 1 : -1;
-
-        const compareDates = (dateField: 'lastSearched' | 'dateImported') => {
-          return (a: MediaLibraryItem, b: MediaLibraryItem) => {
-            const aDate = a[dateField] ? new Date(a[dateField]!) : new Date(0);
-            const bDate = b[dateField] ? new Date(b[dateField]!) : new Date(0);
-            return compareAsc(aDate, bDate);
-          };
+      const compareDates = (dateField: 'lastSearched' | 'dateImported') => {
+        return (a: MediaLibraryItem, b: MediaLibraryItem) => {
+          const aDate = a[dateField] ? new Date(a[dateField]!) : new Date(0);
+          const bDate = b[dateField] ? new Date(b[dateField]!) : new Date(0);
+          return compareAsc(aDate, bDate);
         };
+      };
 
-        sorted.sort((a, b) => {
-          let comparison = 0;
-          if (columnKey === 'title') {
-            comparison = a.title.localeCompare(b.title);
-          } else if (columnKey === 'qualityProfileName') {
-            comparison = (a.qualityProfileName || '').localeCompare(b.qualityProfileName || '');
-          } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
-            comparison = compareDates(columnKey)(a, b);
-          } else if (columnKey === 'customFormatScore') {
-            comparison = (a.customFormatScore ?? -Infinity) - (b.customFormatScore ?? -Infinity);
-          } else if (columnKey === 'tags') {
-            const aTag = a.tags?.length > 0 ? a.tags[0] : '\uffff';
-            const bTag = b.tags?.length > 0 ? b.tags[0] : '\uffff';
-            comparison = aTag.localeCompare(bTag);
-          }
-          return comparison * multiplier;
-        });
-      }
-
-      return sorted.map(item => ({
-        ...item,
-        type: 'MASTER' as const,
-        formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PP') : 'Never',
-        formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PP') : '',
-      }));
+      sorted.sort((a, b) => {
+        let comparison = 0;
+        if (columnKey === 'title') {
+          comparison = a.title.localeCompare(b.title);
+        } else if (columnKey === 'qualityProfileName') {
+          comparison = (a.qualityProfileName || '').localeCompare(b.qualityProfileName || '');
+        } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
+          comparison = compareDates(columnKey)(a, b);
+        } else if (columnKey === 'customFormatScore') {
+          comparison = (a.customFormatScore ?? -Infinity) - (b.customFormatScore ?? -Infinity);
+        } else if (columnKey === 'tags') {
+          const aTag = a.tags?.length > 0 ? a.tags[0] : '\uffff';
+          const bTag = b.tags?.length > 0 ? b.tags[0] : '\uffff';
+          comparison = aTag.localeCompare(bTag);
+        }
+        return comparison * multiplier;
+      });
     }
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, expandedSeriesIds]);
 
-  // Count of MASTER rows for display
-  const masterRowCount = useMemo(
-    () => gridRows.filter(r => r.type === 'MASTER').length,
-    [gridRows]
+    return sorted.map(item => ({
+      ...item,
+      formattedLastSearched: item.lastSearched ? format(new Date(item.lastSearched), 'PP') : 'Never',
+      formattedDateImported: item.dateImported ? format(new Date(item.dateImported), 'PP') : '',
+      seriesKey: item.seriesId !== undefined
+        ? `${item.seriesId}__${item.seriesTitle || item.title}`
+        : '',
+      seasonLabel: item.seasonNumber !== undefined
+        ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
+        : '',
+    }));
+  }, [mediaData?.media, sortColumns, columnFilters]);
+
+  // Row grouper for TreeDataGrid
+  const rowGrouper = useCallback(
+    (rows: readonly MediaLibraryRow[], columnKey: string): Record<string, readonly MediaLibraryRow[]> => {
+      const groups: Record<string, MediaLibraryRow[]> = {};
+      for (const row of rows) {
+        const key = String((row as unknown as Record<string, unknown>)[columnKey] ?? '');
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+      }
+      return groups;
+    },
+    []
   );
+
+  const sonarrGroupBy = useMemo((): readonly string[] => ['seriesKey', 'seasonLabel'], []);
+
+  // Display count for header
+  const displayCount = useMemo(() => {
+    if (isSonarr) {
+      return new Set(gridRows.map(r => r.seriesKey)).size;
+    }
+    return gridRows.length;
+  }, [gridRows, isSonarr]);
+
+  // Series count from selected episodes (for Sonarr search button)
+  const selectedSeriesCount = useMemo(() => {
+    if (!isSonarr) return 0;
+    const seriesIds = new Set<number>();
+    for (const episodeId of selectedMediaIds) {
+      const seriesId = episodeToSeriesMap.get(episodeId);
+      if (seriesId !== undefined) seriesIds.add(seriesId);
+    }
+    return seriesIds.size;
+  }, [isSonarr, selectedMediaIds, episodeToSeriesMap]);
 
   const hasAnyInstances = useMemo(() => {
     if (!config) return false;
@@ -756,12 +617,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     });
   }, [config]);
 
-  const rowKeyGetter = useCallback((row: GridRow) => row.id, []);
+  const rowKeyGetter = useCallback((row: MediaLibraryRow) => row.id, []);
 
   const handleColumnsReorder = useCallback((sourceKey: string, targetKey: string) => {
     if (sourceKey === 'title' || targetKey === 'title' ||
-        sourceKey === SELECT_COLUMN_KEY || targetKey === SELECT_COLUMN_KEY ||
-        sourceKey === 'expanded' || targetKey === 'expanded') {
+        sourceKey === SELECT_COLUMN_KEY || targetKey === SELECT_COLUMN_KEY) {
       return;
     }
 
@@ -776,20 +636,14 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     });
   }, []);
 
-  // Total column count for colSpan on DETAIL rows
-  const totalColumnCount = useMemo(() => {
-    // select + expand (if sonarr) + title + reorderable columns
-    return (isSonarr ? 1 : 0) + 1 + 1 + columnOrder.length;
-  }, [isSonarr, columnOrder.length]);
-
   // Column configuration
-  const columns: readonly Column<GridRow>[] = useMemo(() => {
-    const allColumns: Record<string, Column<GridRow>> = {
+  const columns: readonly Column<MediaLibraryRow>[] = useMemo(() => {
+    const allColumns: Record<string, Column<MediaLibraryRow>> = {
       qualityProfileName: {
         key: 'qualityProfileName',
         name: 'Quality Profile',
         width: 130,
-        renderCell: (props) => props.row.type === 'DETAIL' ? null : <QualityProfileCell row={props.row} />,
+        renderCell: ({ row }) => <Text size="2">{row.qualityProfileName || 'N/A'}</Text>,
         renderHeaderCell: (props) => (
           <DropdownFilterHeaderCell
             {...props}
@@ -807,7 +661,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         name: 'Searched',
         width: 115,
         sortable: true,
-        renderCell: (props) => props.row.type === 'DETAIL' ? null : <DateCell value={props.row.formattedLastSearched} />,
+        renderCell: ({ row }) => <DateCell value={row.formattedLastSearched} />,
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
             {...props}
@@ -821,7 +675,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         name: 'Imported',
         width: 115,
         sortable: true,
-        renderCell: (props) => props.row.type === 'DETAIL' ? null : <DateCell value={props.row.formattedDateImported} />,
+        renderCell: ({ row }) => <DateCell value={row.formattedDateImported} />,
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
             {...props}
@@ -834,7 +688,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         key: 'customFormatScore',
         name: 'CF Score',
         width: 100,
-        renderCell: (props) => props.row.type === 'DETAIL' ? null : <CFScoreCell row={props.row} />,
+        renderCell: ({ row }) => <Text size="2">{row.customFormatScore ?? '-'}</Text>,
         renderHeaderCell: (props) => (
           <NumericFilterHeaderCell
             {...props}
@@ -848,7 +702,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         name: 'Tags',
         width: 136,
         sortable: true,
-        renderCell: (props) => props.row.type === 'DETAIL' ? null : <TagsCell row={props.row} scoutarrTags={mediaData?.scoutarrTags} />,
+        renderCell: ({ row }) => <TagsCell row={row} scoutarrTags={mediaData?.scoutarrTags} />,
         renderHeaderCell: (props) => (
           <DropdownFilterHeaderCell
             {...props}
@@ -863,51 +717,33 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       }
     };
 
-    const cols: Column<GridRow>[] = [];
+    const cols: Column<MediaLibraryRow>[] = [];
 
-    // Expand column (Sonarr only)
+    // Grouping columns for Sonarr TreeDataGrid (required for groupBy to work)
+    // These columns are auto-frozen and render nothing in data rows (library overrides renderCell to null)
     if (isSonarr) {
       cols.push({
-        key: 'expanded',
-        name: '',
-        width: 36,
-        minWidth: 36,
-        maxWidth: 36,
+        key: 'seriesKey',
+        name: 'Series',
+        minWidth: 200,
         resizable: false,
         sortable: false,
         draggable: false,
-        colSpan(args) {
-          if (args.type === 'ROW' && args.row.type === 'DETAIL') {
-            return totalColumnCount;
-          }
-          return undefined;
-        },
-        cellClass(row) {
-          return row.type === 'DETAIL' ? 'detail-cell' : undefined;
-        },
-        renderCell({ row }) {
-          if (row.type === 'DETAIL') {
-            const episodes = episodesBySeriesId.get(row.parentSeriesId) || [];
-            return <EpisodeDetailPanel episodes={episodes} />;
-          }
-          return (
-            <CellExpanderFormatter
-              expanded={!!row.expanded}
-              onCellExpand={() => toggleExpand(row.id)}
-            />
-          );
-        }
+        renderGroupCell: (props) => <SeriesGroupCell {...props} />,
+      });
+      cols.push({
+        key: 'seasonLabel',
+        name: 'Season',
+        width: 200,
+        resizable: false,
+        sortable: false,
+        draggable: false,
+        renderGroupCell: (props) => <SeasonGroupCell {...props} />,
       });
     }
 
     // SelectColumn
-    cols.push({
-      ...SelectColumn,
-      renderCell(props) {
-        if (props.row.type === 'DETAIL') return null;
-        return SelectColumn.renderCell!(props);
-      }
-    } as Column<GridRow>);
+    cols.push(SelectColumn as Column<MediaLibraryRow>);
 
     // Title column
     cols.push({
@@ -915,7 +751,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       name: 'Title',
       minWidth: 100,
       draggable: false,
-      renderCell: (props) => props.row.type === 'DETAIL' ? null : <TitleCell row={props.row} />,
+      renderCell: isSonarr
+        ? ({ row }) => <EpisodeTitleCell row={row} />
+        : ({ row }) => <TitleCell row={row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
           {...props}
@@ -929,28 +767,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     cols.push(...columnOrder.map(key => allColumns[key]));
 
     return cols;
-  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, totalColumnCount, expandedSeriesIds, episodesBySeriesId, toggleExpand]);
+  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr]);
 
-  // Custom selection handler that ignores DETAIL rows
   const handleSelectedRowsChange = useCallback((newSelection: Set<number>) => {
-    // Filter out negative IDs (DETAIL rows)
-    const filtered = new Set<number>();
-    for (const id of newSelection) {
-      if (id >= 0) filtered.add(id);
-    }
-    setSelectedMediaIds(filtered);
+    setSelectedMediaIds(newSelection);
   }, []);
-
-  // Dynamic row height: DETAIL rows are taller
-  const getRowHeight = useCallback((row: GridRow) => {
-    if (row.type === 'DETAIL') {
-      const episodes = episodesBySeriesId.get(row.parentSeriesId) || [];
-      // Estimate: ~24px per episode + ~32px per season header + 16px padding
-      const seasonCount = new Set(episodes.map(e => e.seasonNumber ?? 0)).size;
-      return Math.min(Math.max(episodes.length * 24 + seasonCount * 32 + 16, 100), 500);
-    }
-    return 48;
-  }, [episodesBySeriesId]);
 
   return (
     <Card>
@@ -961,7 +782,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           <Flex align="center" gap="3">
             {mediaData && (
               <Text size="2" color="gray">
-                {masterRowCount} of {isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`} ({selectedMediaIds.size} selected)
+                {displayCount} of {isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`} ({selectedMediaIds.size} selected)
               </Text>
             )}
             {config && hasAnyInstances && (
@@ -1038,32 +859,63 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         {mediaData && mediaData.media.length > 0 && (
           <>
             <Box style={{ height: '900px' }}>
-              <DataGrid
-                className="media-library-grid"
-                aria-label="Media Library"
-                columns={columns}
-                rows={gridRows}
-                rowKeyGetter={rowKeyGetter}
-                selectedRows={selectedMediaIds}
-                onSelectedRowsChange={handleSelectedRowsChange}
-                sortColumns={sortColumns}
-                onSortColumnsChange={setSortColumns}
-                onColumnsReorder={handleColumnsReorder}
-                rowHeight={getRowHeight}
-                headerRowHeight={68}
-                defaultColumnOptions={{
-                  sortable: true,
-                  resizable: true,
-                  draggable: true
-                }}
-                style={{ height: '100%' }}
-                enableVirtualization={!isSonarr || expandedSeriesIds.size === 0}
-                onCellKeyDown={(_, event) => {
-                  if (event.isDefaultPrevented()) {
-                    event.preventGridDefault();
-                  }
-                }}
-              />
+              {isSonarr ? (
+                <TreeDataGrid
+                  className="media-library-grid"
+                  aria-label="Media Library"
+                  columns={columns}
+                  rows={gridRows}
+                  rowKeyGetter={rowKeyGetter}
+                  groupBy={sonarrGroupBy}
+                  rowGrouper={rowGrouper}
+                  expandedGroupIds={expandedGroupIds}
+                  onExpandedGroupIdsChange={setExpandedGroupIds}
+                  selectedRows={selectedMediaIds}
+                  onSelectedRowsChange={handleSelectedRowsChange}
+                  sortColumns={sortColumns}
+                  onSortColumnsChange={setSortColumns}
+                  onColumnsReorder={handleColumnsReorder}
+                  rowHeight={48}
+                  headerRowHeight={68}
+                  defaultColumnOptions={{
+                    sortable: true,
+                    resizable: true,
+                    draggable: true
+                  }}
+                  style={{ height: '100%' }}
+                  onCellKeyDown={(_, event) => {
+                    if (event.isDefaultPrevented()) {
+                      event.preventGridDefault();
+                    }
+                  }}
+                />
+              ) : (
+                <DataGrid
+                  className="media-library-grid"
+                  aria-label="Media Library"
+                  columns={columns}
+                  rows={gridRows}
+                  rowKeyGetter={rowKeyGetter}
+                  selectedRows={selectedMediaIds}
+                  onSelectedRowsChange={handleSelectedRowsChange}
+                  sortColumns={sortColumns}
+                  onSortColumnsChange={setSortColumns}
+                  onColumnsReorder={handleColumnsReorder}
+                  rowHeight={48}
+                  headerRowHeight={68}
+                  defaultColumnOptions={{
+                    sortable: true,
+                    resizable: true,
+                    draggable: true
+                  }}
+                  style={{ height: '100%' }}
+                  onCellKeyDown={(_, event) => {
+                    if (event.isDefaultPrevented()) {
+                      event.preventGridDefault();
+                    }
+                  }}
+                />
+              )}
             </Box>
 
             <Flex justify="end" gap="2" pt="3">
@@ -1086,7 +938,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 ) : (
                   <>
                     <MagnifyingGlassIcon />
-                    Search {selectedMediaIds.size} Selected
+                    {isSonarr
+                      ? `Search ${selectedSeriesCount} Series (${selectedMediaIds.size} episodes)`
+                      : `Search ${selectedMediaIds.size} Selected`
+                    }
                   </>
                 )}
               </Button>
