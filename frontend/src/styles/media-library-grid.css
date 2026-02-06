@@ -205,3 +205,10 @@
 .media-library-grid .rdg-group-row:hover {
   background-color: var(--gray-a3);
 }
+
+/* Group cell content - keep text and caret on same line */
+.media-library-grid .rdg-group-row span[class*="rdg-group-cell-content"] {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}

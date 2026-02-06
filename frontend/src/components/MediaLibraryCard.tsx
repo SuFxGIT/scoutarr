@@ -112,16 +112,13 @@ function TitleCell({ row }: { row: MediaLibraryRow }) {
 function EpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
   const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
   return (
-    <Flex gap="2" align="center" style={{ overflow: 'hidden' }}>
+    <Flex gap="2" align="center">
       {row.hasFile ? (
         <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
       ) : (
         <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
       )}
-      <Text size="1" color="gray" style={{ fontFamily: 'var(--code-font-family, monospace)', flexShrink: 0 }}>
-        {epNum}
-      </Text>
-      <Text size="2" truncate>{row.episodeTitle || row.title}</Text>
+      <Text size="2">{epNum}</Text>
     </Flex>
   );
 }
@@ -497,7 +494,16 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
-      filtered = filtered.filter(item => item.title.toLowerCase().includes(query));
+      filtered = filtered.filter(item => {
+        // Match series/media title
+        if (item.title.toLowerCase().includes(query)) return true;
+        // For Sonarr: also match S##E## format
+        if (item.seasonNumber !== undefined && item.episodeNumber !== undefined) {
+          const epNum = `s${String(item.seasonNumber).padStart(2, '0')}e${String(item.episodeNumber).padStart(2, '0')}`;
+          if (epNum.includes(query)) return true;
+        }
+        return false;
+      });
     }
     if (columnFilters.qualityProfileName !== 'all') {
       filtered = filtered.filter(item => item.qualityProfileName === columnFilters.qualityProfileName);
