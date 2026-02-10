@@ -187,12 +187,18 @@
   background-color: var(--gray-a3);
 }
 
-/* Allow group cell content to overflow narrow grouping columns */
-.media-library-grid .rdg-group-row .rdg-cell {
-  overflow: visible;
+/* Zero-width grouping columns — no padding so they take no space */
+.media-library-grid .grouping-col {
+  padding: 0;
 }
 
-/* Group cell overflow label — extends beyond narrow column */
+/* Allow group cell content to overflow zero-width grouping columns */
+.media-library-grid .rdg-group-row .rdg-cell {
+  overflow: visible;
+  background: transparent;
+}
+
+/* Group cell overflow label — extends from zero-width column */
 .media-library-grid .group-cell-overflow {
   display: inline-flex;
   align-items: center;
