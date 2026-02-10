@@ -17,6 +17,7 @@ import {
   TextField,
   Tooltip,
   Badge,
+  SegmentedControl,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -119,6 +120,22 @@ function EpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
         <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
       )}
       <Text size="2">{epNum}</Text>
+    </Flex>
+  );
+}
+
+function FlatEpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
+  const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
+  return (
+    <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
+      {row.hasFile ? (
+        <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
+      ) : (
+        <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
+      )}
+      <Text size="2" truncate>
+        {row.seriesTitle || row.title} - {epNum}
+      </Text>
     </Flex>
   );
 }
@@ -352,6 +369,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const [selectedInstance, setSelectedInstance] = useState<string | null>(initialInstance);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
   const [expandedGroupIds, setExpandedGroupIds] = useState<ReadonlySet<unknown>>(new Set());
+  const [episodeMode, setEpisodeMode] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -592,7 +610,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
     const SERIES_LEVEL_FIELDS = ['title', 'qualityProfileName', 'tags'];
 
-    if (sortColumns.length > 0 && isSonarr) {
+    if (sortColumns.length > 0 && isSonarr && !episodeMode) {
+      // Sonarr grouped mode: scoped sorting preserving hierarchy
       const { columnKey, direction } = sortColumns[0];
       const multiplier = direction === 'ASC' ? 1 : -1;
 
@@ -615,7 +634,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         });
       }
     } else if (sortColumns.length > 0) {
-      // Non-Sonarr: global sort
+      // Episode mode or non-Sonarr: global sort across all rows
       const { columnKey, direction } = sortColumns[0];
       const multiplier = direction === 'ASC' ? 1 : -1;
       sorted.sort((a, b) => compareField(a, b, columnKey) * multiplier);
@@ -635,7 +654,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -784,7 +803,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
     // Grouping columns for Sonarr TreeDataGrid (required for groupBy to work)
     // These columns are auto-frozen and render nothing in data rows (library overrides renderCell to null)
-    if (isSonarr) {
+    // Skipped in episode mode since we use a flat DataGrid
+    if (isSonarr && !episodeMode) {
       cols.push({
         key: 'seriesKey',
         name: '',
@@ -817,7 +837,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       minWidth: 100,
       draggable: false,
       renderCell: isSonarr
-        ? ({ row }) => <EpisodeTitleCell row={row} />
+        ? (episodeMode
+          ? ({ row }) => <FlatEpisodeTitleCell row={row} />
+          : ({ row }) => <EpisodeTitleCell row={row} />)
         : ({ row }) => <TitleCell row={row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -832,7 +854,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     cols.push(...columnOrder.map(key => allColumns[key]));
 
     return cols;
-  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr]);
+  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode]);
 
   const handleSelectedRowsChange = useCallback((newSelection: Set<number>) => {
     setSelectedMediaIds(newSelection);
@@ -847,8 +869,21 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
           <Flex align="center" gap="3">
             {mediaData && (
               <Text size="2" color="gray">
-                {displayCount} of {isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`} ({selectedMediaIds.size} selected)
+                {episodeMode
+                  ? `${gridRows.length} episodes`
+                  : `${displayCount} of ${isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`}`
+                } ({selectedMediaIds.size} selected)
               </Text>
+            )}
+            {isSonarr && mediaData && (
+              <SegmentedControl.Root
+                size="1"
+                value={episodeMode ? 'episodes' : 'series'}
+                onValueChange={(value) => setEpisodeMode(value === 'episodes')}
+              >
+                <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
+                <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
+              </SegmentedControl.Root>
             )}
             {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
@@ -924,7 +959,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         {mediaData && mediaData.media.length > 0 && (
           <>
             <Box style={{ height: '900px' }}>
-              {isSonarr ? (
+              {isSonarr && !episodeMode ? (
                 <TreeDataGrid
                   className="media-library-grid"
                   aria-label="Media Library"
