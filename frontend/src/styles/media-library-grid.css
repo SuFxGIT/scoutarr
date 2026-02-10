@@ -11,6 +11,7 @@
   --rdg-cell-padding: 0.5rem;
   --rdg-selection-color: transparent;
   --rdg-checkbox-focus-color: var(--accent-9);
+  --rdg-cell-frozen-box-shadow: none;
 
   border: 1px solid var(--gray-a5);
   border-radius: var(--radius-3);
@@ -151,7 +152,7 @@
 }
 
 /* Ensure icons are vertically centered */
-.media-library-grid svg {
+.media-library-grid svg:not(.group-caret) {
   display: block;
   width: 16px;
   height: 16px;
@@ -206,9 +207,41 @@
   background-color: var(--gray-a3);
 }
 
-/* Group cell content - keep text and caret on same line */
-.media-library-grid .rdg-group-row span[class*="rdg-group-cell-content"] {
+/* Allow group cell content to overflow narrow grouping columns */
+.media-library-grid .rdg-group-row .rdg-cell {
+  overflow: visible;
+}
+
+/* Group cell overflow label — extends beyond narrow column */
+.media-library-grid .group-cell-overflow {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   white-space: nowrap;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+  outline: none;
+}
+
+.media-library-grid .group-cell-overflow:focus-visible {
+  outline: 2px solid var(--accent-8);
+  outline-offset: 2px;
+  border-radius: var(--radius-1);
+}
+
+/* Group expand/collapse caret */
+.media-library-grid .group-caret {
+  flex-shrink: 0;
+  width: 14px;
+  height: 8px;
+  stroke: var(--gray-11);
+  stroke-width: 1.5px;
+  fill: transparent;
+}
+
+/* Download count next to group label */
+.media-library-grid .group-cell-count {
+  font-weight: 400;
+  color: var(--gray-a11);
 }

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY, renderToggleGroup } from 'react-data-grid';
+import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
 import {
@@ -156,16 +156,42 @@ function TagsCell({ row, scoutarrTags = [] }: { row: MediaLibraryRow; scoutarrTa
 }
 
 // Group cell renderers for Sonarr TreeDataGrid
-// Wraps the library's default renderToggleGroup with a cleaned-up groupKey
+// Custom renderers with overflow support for narrow grouping columns
 function SeriesGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
   const downloadedCount = props.childRows.filter(e => e.hasFile).length;
   const displayTitle = String(props.groupKey).replace(/^\d+__/, '');
-  return renderToggleGroup({ ...props, groupKey: `${displayTitle} (${downloadedCount}/${props.childRows.length})` });
+  const d = props.isExpanded ? 'M1 1 L 7 7 L 13 1' : 'M1 7 L 7 1 L 13 7';
+  return (
+    <span
+      className="group-cell-overflow"
+      tabIndex={props.tabIndex}
+      onKeyDown={(e) => { if (e.key === 'Enter') props.toggleGroup(); }}
+    >
+      <svg viewBox="0 0 14 8" width="14" height="8" className="group-caret" aria-hidden="true">
+        <path d={d} />
+      </svg>
+      <strong>{displayTitle}</strong>
+      <span className="group-cell-count">({downloadedCount}/{props.childRows.length})</span>
+    </span>
+  );
 }
 
 function SeasonGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
   const downloadedCount = props.childRows.filter(e => e.hasFile).length;
-  return renderToggleGroup({ ...props, groupKey: `${props.groupKey} (${downloadedCount}/${props.childRows.length})` });
+  const d = props.isExpanded ? 'M1 1 L 7 7 L 13 1' : 'M1 7 L 7 1 L 13 7';
+  return (
+    <span
+      className="group-cell-overflow"
+      tabIndex={props.tabIndex}
+      onKeyDown={(e) => { if (e.key === 'Enter') props.toggleGroup(); }}
+    >
+      <svg viewBox="0 0 14 8" width="14" height="8" className="group-caret" aria-hidden="true">
+        <path d={d} />
+      </svg>
+      {String(props.groupKey)}
+      <span className="group-cell-count">({downloadedCount}/{props.childRows.length})</span>
+    </span>
+  );
 }
 
 // Filter state interface
@@ -534,37 +560,68 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       });
     }
 
-    // Sort rows
+    // Sort rows — scoped for Sonarr to preserve Series → Season → Episode hierarchy
     const sorted = [...filtered];
-    if (sortColumns.length > 0) {
+
+    const compareField = (a: MediaLibraryItem, b: MediaLibraryItem, columnKey: string): number => {
+      if (columnKey === 'title') {
+        return (a.seriesTitle || a.title).localeCompare(b.seriesTitle || b.title);
+      } else if (columnKey === 'qualityProfileName') {
+        return (a.qualityProfileName || '').localeCompare(b.qualityProfileName || '');
+      } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
+        const aDate = a[columnKey] ? new Date(a[columnKey]!) : new Date(0);
+        const bDate = b[columnKey] ? new Date(b[columnKey]!) : new Date(0);
+        return compareAsc(aDate, bDate);
+      } else if (columnKey === 'customFormatScore') {
+        return (a.customFormatScore ?? -Infinity) - (b.customFormatScore ?? -Infinity);
+      } else if (columnKey === 'tags') {
+        const aTag = a.tags?.length > 0 ? a.tags[0] : '\uffff';
+        const bTag = b.tags?.length > 0 ? b.tags[0] : '\uffff';
+        return aTag.localeCompare(bTag);
+      }
+      return 0;
+    };
+
+    const naturalOrder = (a: MediaLibraryItem, b: MediaLibraryItem): number => {
+      let cmp = (a.seriesTitle || a.title).localeCompare(b.seriesTitle || b.title);
+      if (cmp !== 0) return cmp;
+      cmp = (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0);
+      if (cmp !== 0) return cmp;
+      return (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0);
+    };
+
+    const SERIES_LEVEL_FIELDS = ['title', 'qualityProfileName', 'tags'];
+
+    if (sortColumns.length > 0 && isSonarr) {
       const { columnKey, direction } = sortColumns[0];
       const multiplier = direction === 'ASC' ? 1 : -1;
 
-      const compareDates = (dateField: 'lastSearched' | 'dateImported') => {
-        return (a: MediaLibraryItem, b: MediaLibraryItem) => {
-          const aDate = a[dateField] ? new Date(a[dateField]!) : new Date(0);
-          const bDate = b[dateField] ? new Date(b[dateField]!) : new Date(0);
-          return compareAsc(aDate, bDate);
-        };
-      };
-
-      sorted.sort((a, b) => {
-        let comparison = 0;
-        if (columnKey === 'title') {
-          comparison = a.title.localeCompare(b.title);
-        } else if (columnKey === 'qualityProfileName') {
-          comparison = (a.qualityProfileName || '').localeCompare(b.qualityProfileName || '');
-        } else if (columnKey === 'lastSearched' || columnKey === 'dateImported') {
-          comparison = compareDates(columnKey)(a, b);
-        } else if (columnKey === 'customFormatScore') {
-          comparison = (a.customFormatScore ?? -Infinity) - (b.customFormatScore ?? -Infinity);
-        } else if (columnKey === 'tags') {
-          const aTag = a.tags?.length > 0 ? a.tags[0] : '\uffff';
-          const bTag = b.tags?.length > 0 ? b.tags[0] : '\uffff';
-          comparison = aTag.localeCompare(bTag);
-        }
-        return comparison * multiplier;
-      });
+      if (SERIES_LEVEL_FIELDS.includes(columnKey)) {
+        // Series-level sort: reorder series groups, keep natural order within
+        sorted.sort((a, b) => {
+          const fieldCmp = compareField(a, b, columnKey) * multiplier;
+          if (fieldCmp !== 0) return fieldCmp;
+          return naturalOrder(a, b);
+        });
+      } else {
+        // Episode-level sort: keep series + seasons in natural order,
+        // reorder episodes within each season
+        sorted.sort((a, b) => {
+          let cmp = (a.seriesTitle || a.title).localeCompare(b.seriesTitle || b.title);
+          if (cmp !== 0) return cmp;
+          cmp = (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0);
+          if (cmp !== 0) return cmp;
+          return compareField(a, b, columnKey) * multiplier;
+        });
+      }
+    } else if (sortColumns.length > 0) {
+      // Non-Sonarr: global sort
+      const { columnKey, direction } = sortColumns[0];
+      const multiplier = direction === 'ASC' ? 1 : -1;
+      sorted.sort((a, b) => compareField(a, b, columnKey) * multiplier);
+    } else if (isSonarr) {
+      // No sort column active for Sonarr: natural order
+      sorted.sort(naturalOrder);
     }
 
     return sorted.map(item => ({
@@ -578,7 +635,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -730,8 +787,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     if (isSonarr) {
       cols.push({
         key: 'seriesKey',
-        name: 'Series',
-        minWidth: 200,
+        name: '',
+        width: 40,
+        minWidth: 40,
         resizable: false,
         sortable: false,
         draggable: false,
@@ -739,8 +797,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       });
       cols.push({
         key: 'seasonLabel',
-        name: 'Season',
-        width: 200,
+        name: '',
+        width: 40,
+        minWidth: 40,
         resizable: false,
         sortable: false,
         draggable: false,
