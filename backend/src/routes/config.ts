@@ -96,6 +96,9 @@ configRouter.post('/test/:app', async (req, res) => {
     // If test successful and instanceId provided, sync quality profiles to database
     if (testResult.success && instanceId) {
       try {
+        // Ensure the instance row exists (FK constraint on quality_profiles)
+        await statsService.upsertInstance(instanceId, app, testResult.appName);
+
         logger.debug(`📡 [${app}] Fetching quality profiles for sync`);
         const service = getServiceForApp(app as AppType);
         const profiles = await service.getQualityProfiles(appConfig as StarrInstanceConfig);

@@ -211,17 +211,6 @@
   outline: none;
 }
 
-/* Extend clickable area across the full row */
-.media-library-grid .group-cell-overflow::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  bottom: -50%;
-  left: -8px;
-  width: 200vw;
-  z-index: -1;
-}
-
 .media-library-grid .group-cell-overflow:focus-visible {
   outline: 2px solid var(--accent-8);
   outline-offset: 2px;
