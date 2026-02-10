@@ -158,13 +158,15 @@ function TagsCell({ row, scoutarrTags = [] }: { row: MediaLibraryRow; scoutarrTa
 
 // Group cell renderer for Sonarr TreeDataGrid
 // Custom renderer with overflow support for narrow grouping columns
-function GroupCell({ label, props }: { label: string; props: RenderGroupCellProps<MediaLibraryRow> }) {
+// level 0 = series, level 1 = season (indented with accent border)
+function GroupCell({ label, props, level }: { label: string; props: RenderGroupCellProps<MediaLibraryRow>; level: 0 | 1 }) {
   const downloadedCount = props.childRows.filter(e => e.hasFile).length;
   const d = props.isExpanded ? 'M1 1 L 7 7 L 13 1' : 'M1 7 L 7 1 L 13 7';
   return (
     <span
-      className="group-cell-overflow"
+      className={`group-cell-overflow ${level === 1 ? 'group-cell-season' : ''}`}
       tabIndex={props.tabIndex}
+      onClick={() => props.toggleGroup()}
       onKeyDown={(e) => { if (e.key === 'Enter') props.toggleGroup(); }}
     >
       <svg viewBox="0 0 14 8" width="14" height="8" className="group-caret" aria-hidden="true">
@@ -753,7 +755,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         resizable: false,
         sortable: false,
         draggable: false,
-        renderGroupCell: (props) => <GroupCell props={props} label={String(props.groupKey).replace(/^\d+__/, '')} />,
+        renderGroupCell: (props) => <GroupCell props={props} level={0} label={String(props.groupKey).replace(/^\d+__/, '')} />,
       });
       cols.push({
         key: 'seasonLabel',
@@ -765,7 +767,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         resizable: false,
         sortable: false,
         draggable: false,
-        renderGroupCell: (props) => <GroupCell props={props} label={String(props.groupKey)} />,
+        renderGroupCell: (props) => <GroupCell props={props} level={1} label={String(props.groupKey)} />,
       });
     }
 
