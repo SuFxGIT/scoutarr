@@ -89,20 +89,6 @@
   text-align: left;
 }
 
-/* Toggle filter button styling */
-.media-library-grid .rdg-header-cell button[type="button"] {
-  width: 100%;
-  transition: all 0.15s ease;
-}
-
-.media-library-grid .rdg-header-cell button[type="button"]:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.media-library-grid .rdg-header-cell button[type="button"]:active {
-  transform: translateY(0);
-}
 
 .media-library-grid .rdg-row {
   min-height: 48px;
@@ -134,12 +120,6 @@
   outline: 2px solid var(--accent-8);
   outline-offset: 2px;
   border-radius: var(--radius-1);
-}
-
-/* Sort indicator styling */
-.media-library-grid .rdg-sort-arrow {
-  fill: var(--accent-9);
-  margin-left: 0.5rem;
 }
 
 /* Header sort hover effect */

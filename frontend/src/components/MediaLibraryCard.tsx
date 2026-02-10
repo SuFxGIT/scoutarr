@@ -110,32 +110,16 @@ function TitleCell({ row }: { row: MediaLibraryRow }) {
   );
 }
 
-function EpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
+function EpisodeTitleCell({ row, flat }: { row: MediaLibraryRow; flat?: boolean }) {
   const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
+  const fileIcon = row.hasFile
+    ? <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
+    : <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />;
+  const label = flat ? `${row.seriesTitle || row.title} - ${epNum}` : epNum;
   return (
-    <Flex gap="2" align="center">
-      {row.hasFile ? (
-        <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
-      ) : (
-        <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
-      )}
-      <Text size="2">{epNum}</Text>
-    </Flex>
-  );
-}
-
-function FlatEpisodeTitleCell({ row }: { row: MediaLibraryRow }) {
-  const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
-  return (
-    <Flex gap="2" align="center" style={{ width: '100%', overflow: 'hidden' }}>
-      {row.hasFile ? (
-        <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
-      ) : (
-        <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />
-      )}
-      <Text size="2" truncate>
-        {row.seriesTitle || row.title} - {epNum}
-      </Text>
+    <Flex gap="2" align="center" style={flat ? { width: '100%', overflow: 'hidden' } : undefined}>
+      {fileIcon}
+      <Text size="2" truncate={flat}>{label}</Text>
     </Flex>
   );
 }
@@ -172,28 +156,9 @@ function TagsCell({ row, scoutarrTags = [] }: { row: MediaLibraryRow; scoutarrTa
   );
 }
 
-// Group cell renderers for Sonarr TreeDataGrid
-// Custom renderers with overflow support for narrow grouping columns
-function SeriesGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
-  const downloadedCount = props.childRows.filter(e => e.hasFile).length;
-  const displayTitle = String(props.groupKey).replace(/^\d+__/, '');
-  const d = props.isExpanded ? 'M1 1 L 7 7 L 13 1' : 'M1 7 L 7 1 L 13 7';
-  return (
-    <span
-      className="group-cell-overflow"
-      tabIndex={props.tabIndex}
-      onKeyDown={(e) => { if (e.key === 'Enter') props.toggleGroup(); }}
-    >
-      <svg viewBox="0 0 14 8" width="14" height="8" className="group-caret" aria-hidden="true">
-        <path d={d} />
-      </svg>
-      <strong>{displayTitle}</strong>
-      <span className="group-cell-count">({downloadedCount}/{props.childRows.length})</span>
-    </span>
-  );
-}
-
-function SeasonGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
+// Group cell renderer for Sonarr TreeDataGrid
+// Custom renderer with overflow support for narrow grouping columns
+function GroupCell({ label, props }: { label: string; props: RenderGroupCellProps<MediaLibraryRow> }) {
   const downloadedCount = props.childRows.filter(e => e.hasFile).length;
   const d = props.isExpanded ? 'M1 1 L 7 7 L 13 1' : 'M1 7 L 7 1 L 13 7';
   return (
@@ -205,7 +170,7 @@ function SeasonGroupCell(props: RenderGroupCellProps<MediaLibraryRow>) {
       <svg viewBox="0 0 14 8" width="14" height="8" className="group-caret" aria-hidden="true">
         <path d={d} />
       </svg>
-      {String(props.groupKey)}
+      <strong>{label}</strong>
       <span className="group-cell-count">({downloadedCount}/{props.childRows.length})</span>
     </span>
   );
@@ -246,47 +211,22 @@ function HeaderCellTitle({ column, sortDirection, priority }: HeaderCellTitlePro
   );
 }
 
-// Text filter header cell component
-interface TextFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
+// Text/numeric filter header cell component
+interface FilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
   filterValue: string;
   onFilterChange: (value: string) => void;
+  numeric?: boolean;
 }
 
-function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: TextFilterHeaderCellProps) {
+function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange, numeric }: FilterHeaderCellProps) {
   return (
     <Flex direction="column" gap="1" style={{ width: '100%' }}>
       <HeaderCellTitle column={column} sortDirection={sortDirection} priority={priority} />
       <TextField.Root
         size="1"
-        placeholder={`Filter ${column.name}...`}
-        value={filterValue}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          e.stopPropagation();
-          onFilterChange(e.target.value);
-        }}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
-        onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
-      />
-    </Flex>
-  );
-}
-
-// Numeric filter header cell component
-interface NumericFilterHeaderCellProps extends RenderHeaderCellProps<MediaLibraryRow> {
-  filterValue: string;
-  onFilterChange: (value: string) => void;
-}
-
-function NumericFilterHeaderCell({ column, sortDirection, priority, filterValue, onFilterChange }: NumericFilterHeaderCellProps) {
-  return (
-    <Flex direction="column" gap="1" style={{ width: '100%' }}>
-      <HeaderCellTitle column={column} sortDirection={sortDirection} priority={priority} />
-      <TextField.Root
-        size="1"
-        type="number"
-        inputMode="numeric"
-        placeholder={`Min ${column.name}`}
+        type={numeric ? 'number' : undefined}
+        inputMode={numeric ? 'numeric' : undefined}
+        placeholder={numeric ? `Min ${column.name}` : `Filter ${column.name}...`}
         value={filterValue}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           e.stopPropagation();
@@ -626,11 +566,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         // Episode-level sort: keep series + seasons in natural order,
         // reorder episodes within each season
         sorted.sort((a, b) => {
-          let cmp = (a.seriesTitle || a.title).localeCompare(b.seriesTitle || b.title);
-          if (cmp !== 0) return cmp;
-          cmp = (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0);
-          if (cmp !== 0) return cmp;
-          return compareField(a, b, columnKey) * multiplier;
+          const nat = naturalOrder(a, b);
+          // Same series+season? Sort by the selected field within
+          const sameSeason = (a.seriesTitle || a.title) === (b.seriesTitle || b.title)
+            && (a.seasonNumber ?? 0) === (b.seasonNumber ?? 0);
+          return sameSeason ? compareField(a, b, columnKey) * multiplier : nat;
         });
       }
     } else if (sortColumns.length > 0) {
@@ -742,7 +682,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         key: 'lastSearched',
         name: 'Searched',
         width: 115,
-        sortable: true,
         renderCell: ({ row }) => <DateCell value={row.formattedLastSearched} />,
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
@@ -756,7 +695,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         key: 'dateImported',
         name: 'Imported',
         width: 115,
-        sortable: true,
         renderCell: ({ row }) => <DateCell value={row.formattedDateImported} />,
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
@@ -772,10 +710,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         width: 100,
         renderCell: ({ row }) => <Text size="2">{row.customFormatScore ?? '-'}</Text>,
         renderHeaderCell: (props) => (
-          <NumericFilterHeaderCell
+          <TextFilterHeaderCell
             {...props}
+            numeric
             filterValue={columnFilters.cfScore}
-            onFilterChange={(value) => handleFilterChange('cfScore', value)}
+            onFilterChange={(value: string) => handleFilterChange('cfScore', value)}
           />
         )
       },
@@ -783,7 +722,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         key: 'tags',
         name: 'Tags',
         width: 136,
-        sortable: true,
         renderCell: ({ row }) => <TagsCell row={row} scoutarrTags={mediaData?.scoutarrTags} />,
         renderHeaderCell: (props) => (
           <DropdownFilterHeaderCell
@@ -813,7 +751,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         resizable: false,
         sortable: false,
         draggable: false,
-        renderGroupCell: (props) => <SeriesGroupCell {...props} />,
+        renderGroupCell: (props) => <GroupCell props={props} label={String(props.groupKey).replace(/^\d+__/, '')} />,
       });
       cols.push({
         key: 'seasonLabel',
@@ -823,7 +761,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         resizable: false,
         sortable: false,
         draggable: false,
-        renderGroupCell: (props) => <SeasonGroupCell {...props} />,
+        renderGroupCell: (props) => <GroupCell props={props} label={String(props.groupKey)} />,
       });
     }
 
@@ -837,9 +775,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       minWidth: 100,
       draggable: false,
       renderCell: isSonarr
-        ? (episodeMode
-          ? ({ row }) => <FlatEpisodeTitleCell row={row} />
-          : ({ row }) => <EpisodeTitleCell row={row} />)
+        ? ({ row }) => <EpisodeTitleCell row={row} flat={episodeMode} />
         : ({ row }) => <TitleCell row={row} />,
       renderHeaderCell: (props) => (
         <TextFilterHeaderCell
@@ -856,9 +792,25 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     return cols;
   }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode]);
 
-  const handleSelectedRowsChange = useCallback((newSelection: Set<number>) => {
-    setSelectedMediaIds(newSelection);
-  }, []);
+  const sharedGridProps = {
+    className: 'media-library-grid',
+    'aria-label': 'Media Library',
+    columns,
+    rows: gridRows,
+    rowKeyGetter,
+    selectedRows: selectedMediaIds,
+    onSelectedRowsChange: setSelectedMediaIds,
+    sortColumns,
+    onSortColumnsChange: setSortColumns,
+    onColumnsReorder: handleColumnsReorder,
+    rowHeight: 48,
+    headerRowHeight: 68,
+    defaultColumnOptions: { sortable: true, resizable: true, draggable: true },
+    style: { height: '100%' } as const,
+    onCellKeyDown: (_: unknown, event: { isDefaultPrevented: () => boolean; preventGridDefault: () => void }) => {
+      if (event.isDefaultPrevented()) event.preventGridDefault();
+    },
+  };
 
   return (
     <Card>
@@ -887,7 +839,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
             )}
             {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
-                  <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
+                <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
                 <Select.Content position="popper">
                   {APP_TYPES.map((appType) => {
                     const instances = config.applications[appType] || [];
@@ -961,60 +913,14 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
             <Box style={{ height: '900px' }}>
               {isSonarr && !episodeMode ? (
                 <TreeDataGrid
-                  className="media-library-grid"
-                  aria-label="Media Library"
-                  columns={columns}
-                  rows={gridRows}
-                  rowKeyGetter={rowKeyGetter}
+                  {...sharedGridProps}
                   groupBy={sonarrGroupBy}
                   rowGrouper={rowGrouper}
                   expandedGroupIds={expandedGroupIds}
                   onExpandedGroupIdsChange={setExpandedGroupIds}
-                  selectedRows={selectedMediaIds}
-                  onSelectedRowsChange={handleSelectedRowsChange}
-                  sortColumns={sortColumns}
-                  onSortColumnsChange={setSortColumns}
-                  onColumnsReorder={handleColumnsReorder}
-                  rowHeight={48}
-                  headerRowHeight={68}
-                  defaultColumnOptions={{
-                    sortable: true,
-                    resizable: true,
-                    draggable: true
-                  }}
-                  style={{ height: '100%' }}
-                  onCellKeyDown={(_, event) => {
-                    if (event.isDefaultPrevented()) {
-                      event.preventGridDefault();
-                    }
-                  }}
                 />
               ) : (
-                <DataGrid
-                  className="media-library-grid"
-                  aria-label="Media Library"
-                  columns={columns}
-                  rows={gridRows}
-                  rowKeyGetter={rowKeyGetter}
-                  selectedRows={selectedMediaIds}
-                  onSelectedRowsChange={handleSelectedRowsChange}
-                  sortColumns={sortColumns}
-                  onSortColumnsChange={setSortColumns}
-                  onColumnsReorder={handleColumnsReorder}
-                  rowHeight={48}
-                  headerRowHeight={68}
-                  defaultColumnOptions={{
-                    sortable: true,
-                    resizable: true,
-                    draggable: true
-                  }}
-                  style={{ height: '100%' }}
-                  onCellKeyDown={(_, event) => {
-                    if (event.isDefaultPrevented()) {
-                      event.preventGridDefault();
-                    }
-                  }}
-                />
+                <DataGrid {...sharedGridProps} />
               )}
             </Box>
 
