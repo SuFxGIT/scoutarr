@@ -35,7 +35,7 @@ import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
-import { fetchMediaLibrary, searchMedia } from '../services/mediaLibraryService';
+import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
 import type { Config } from '../types/config';
@@ -228,7 +228,7 @@ function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, on
         size="1"
         type={numeric ? 'number' : undefined}
         inputMode={numeric ? 'numeric' : undefined}
-        placeholder={numeric ? `Min ${column.name}` : `Filter...`}
+        placeholder={numeric ? 'Min...' : 'Filter...'}
         value={filterValue}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           e.stopPropagation();
@@ -442,6 +442,21 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));
+    },
+  });
+
+  // Sync mutation — fetches fresh data from *arr API into database
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!instanceInfo) throw new Error('No instance selected');
+      return syncMediaLibrary(instanceInfo.appType, instanceInfo.instanceId);
+    },
+    onSuccess: () => {
+      toast.success('Media library synced successfully');
+      refetch();
+    },
+    onError: (error: unknown) => {
+      toast.error('Sync failed: ' + getErrorMessage(error));
     },
   });
 
@@ -919,9 +934,22 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
         {mediaData && mediaData.media.length === 0 && (
           <Box p="6">
-            <Text size="2" color="gray" align="center">
-              No media found for this instance
-            </Text>
+            <Flex direction="column" align="center" gap="4">
+              {syncMutation.isPending ? (
+                <>
+                  <Spinner size="3" />
+                  <Text size="2" weight="medium">Syncing media library...</Text>
+                </>
+              ) : (
+                <>
+                  <Text size="2" color="gray">No media found for this instance.</Text>
+                  <Text size="1" color="gray">Sync from your *arr instance to populate the library.</Text>
+                  <Button variant="solid" onClick={() => syncMutation.mutate()}>
+                    Sync Now
+                  </Button>
+                </>
+              )}
+            </Flex>
           </Box>
         )}
 

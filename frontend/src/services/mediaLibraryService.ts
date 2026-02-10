@@ -11,6 +11,16 @@ export async function fetchMediaLibrary(
   return response.data;
 }
 
+export async function syncMediaLibrary(
+  appType: string,
+  instanceId: string
+): Promise<MediaLibraryResponse> {
+  const response = await apiClient.get<MediaLibraryResponse>(
+    `/media-library/${appType}/${instanceId}?sync=true`
+  );
+  return response.data;
+}
+
 export async function searchMedia(
   appType: string,
   instanceId: string,
