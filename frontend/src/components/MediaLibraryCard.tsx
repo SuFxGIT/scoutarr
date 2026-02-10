@@ -197,8 +197,8 @@ interface HeaderCellTitleProps {
 
 function HeaderCellTitle({ column, sortDirection, priority }: HeaderCellTitleProps) {
   return (
-    <Flex align="center" gap="1" justify="between">
-      <Text size="1" weight="medium" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <Flex align="center" gap="1" justify="between" style={{ lineHeight: 1 }}>
+      <Text size="1" weight="medium" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
         {column.name}
       </Text>
       {sortDirection && (
@@ -206,7 +206,7 @@ function HeaderCellTitle({ column, sortDirection, priority }: HeaderCellTitlePro
           {priority !== undefined && priority > 0 && (
             <Text size="1" color="gray">{priority + 1}</Text>
           )}
-          <Text size="1">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
+          <Text size="1" color="gray">{sortDirection === 'ASC' ? '\u2191' : '\u2193'}</Text>
         </Flex>
       )}
     </Flex>
@@ -228,7 +228,7 @@ function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, on
         size="1"
         type={numeric ? 'number' : undefined}
         inputMode={numeric ? 'numeric' : undefined}
-        placeholder={numeric ? `Min ${column.name}` : `Filter ${column.name}...`}
+        placeholder={numeric ? `Min ${column.name}` : `Filter...`}
         value={filterValue}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
           e.stopPropagation();
@@ -236,7 +236,6 @@ function TextFilterHeaderCell({ column, sortDirection, priority, filterValue, on
         }}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
         onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
-        onKeyUp={(e: React.KeyboardEvent) => e.stopPropagation()}
       />
     </Flex>
   );
@@ -262,10 +261,7 @@ function DropdownFilterHeaderCell({ column, sortDirection, priority, filterValue
           placeholder="All"
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         />
-        <Select.Content
-          position="popper"
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        >
+        <Select.Content position="popper">
           {options.map(option => (
             <Select.Item key={option.value} value={option.value}>
               {option.label}
@@ -716,7 +712,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
             {...props}
             numeric
             filterValue={columnFilters.cfScore}
-            onFilterChange={(value: string) => handleFilterChange('cfScore', value)}
+            onFilterChange={(value) => handleFilterChange('cfScore', value)}
           />
         )
       },
@@ -810,7 +806,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     onSortColumnsChange: setSortColumns,
     onColumnsReorder: handleColumnsReorder,
     rowHeight: 48,
-    headerRowHeight: 68,
+    headerRowHeight: 60,
     defaultColumnOptions: { sortable: true, resizable: true, draggable: true },
     style: { height: '100%' } as const,
     onCellKeyDown: (_: unknown, event: { isDefaultPrevented: () => boolean; preventGridDefault: () => void }) => {
@@ -916,7 +912,16 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
         {mediaData && mediaData.media.length > 0 && (
           <>
-            <Box style={{ height: '900px' }}>
+            <Box
+              style={{ height: '900px' }}
+              onClick={isSonarr && !episodeMode ? (e: React.MouseEvent) => {
+                const target = e.target as HTMLElement;
+                const groupRow = target.closest('.rdg-group-row');
+                if (!groupRow) return;
+                const toggle = groupRow.querySelector('.group-cell-overflow') as HTMLElement | null;
+                if (toggle && !toggle.contains(target)) toggle.click();
+              } : undefined}
+            >
               {isSonarr && !episodeMode ? (
                 <TreeDataGrid
                   {...sharedGridProps}

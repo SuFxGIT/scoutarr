@@ -19,6 +19,7 @@
   box-shadow: var(--shadow-1);
 }
 
+/* Data cells */
 .media-library-grid .rdg-cell {
   padding-block: 0.5rem;
   padding-inline: 0.75rem;
@@ -28,70 +29,42 @@
   align-items: center;
 }
 
+/* Header row */
 .media-library-grid .rdg-header-row {
-  font-weight: 500;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   color: var(--gray-11);
   background-color: var(--gray-2);
   border-bottom: 1px solid var(--gray-a6);
-  position: sticky;
-  top: 0;
-  z-index: 10;
   user-select: none;
 }
 
+/* Header cells */
 .media-library-grid .rdg-header-cell {
-  padding-block: 0.5rem;
+  padding-block: 0.375rem;
   padding-inline: 0.75rem;
   border-right: none;
   user-select: none;
   align-items: start;
 }
 
-/* Header cell with filter - needs more padding */
-.media-library-grid .rdg-header-cell > div {
-  width: 100%;
-  min-height: 48px; /* Ensures consistent height across all headers */
-}
-
-/* Filter input and select styling inside headers */
-.media-library-grid .rdg-header-cell input,
-.media-library-grid .rdg-header-cell button[role="combobox"] {
-  width: 100%;
-  background-color: var(--color-panel);
-  border: 1px solid var(--gray-a6);
-  border-radius: var(--radius-2);
-  color: var(--gray-12);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.media-library-grid .rdg-header-cell input:hover,
-.media-library-grid .rdg-header-cell button[role="combobox"]:hover {
-  border-color: var(--gray-a7);
-}
-
-.media-library-grid .rdg-header-cell input:focus,
-.media-library-grid .rdg-header-cell button[role="combobox"]:focus {
-  outline: none;
-  border-color: var(--accent-8);
-  box-shadow: 0 0 0 1px var(--accent-8);
+/* Filter inputs — smaller text with subtle placeholders */
+.media-library-grid .rdg-header-cell input {
+  font-size: 0.75rem;
 }
 
 .media-library-grid .rdg-header-cell input::placeholder {
-  color: var(--gray-a10);
+  color: var(--gray-a8);
+  font-size: 0.7rem;
 }
 
-/* Ensure select trigger doesn't get cut off */
+/* Filter dropdowns */
 .media-library-grid .rdg-header-cell button[role="combobox"] {
+  font-size: 0.75rem;
   justify-content: space-between;
   text-align: left;
 }
 
-
+/* Data rows */
 .media-library-grid .rdg-row {
-  min-height: 48px;
   transition: background-color 0.1s ease;
 }
 
@@ -108,7 +81,7 @@
   background-color: var(--accent-a4);
 }
 
-/* Checkbox styling */
+/* Checkbox */
 .media-library-grid .rdg-checkbox {
   accent-color: var(--accent-9);
   cursor: pointer;
@@ -122,16 +95,7 @@
   border-radius: var(--radius-1);
 }
 
-/* Header sort hover effect */
-.media-library-grid .rdg-header-cell[aria-sort] {
-  cursor: pointer;
-}
-
-.media-library-grid .rdg-header-cell[aria-sort]:hover {
-  background-color: var(--gray-a3);
-}
-
-/* Ensure icons are vertically centered */
+/* Icons — vertically centered, exclude group caret */
 .media-library-grid svg:not(.group-caret) {
   display: block;
   width: 16px;
@@ -139,7 +103,7 @@
   flex-shrink: 0;
 }
 
-/* Scrollbar styling */
+/* Scrollbar */
 .media-library-grid ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -160,17 +124,7 @@
   background: var(--gray-a8);
 }
 
-/* Column resize handle */
-.media-library-grid .rdg-cell-resizer {
-  background-color: var(--gray-a6);
-  width: 2px;
-}
-
-.media-library-grid .rdg-cell-resizer:hover {
-  background-color: var(--accent-9);
-}
-
-/* Empty state styling */
+/* Empty state */
 .media-library-grid .rdg-empty-row {
   color: var(--gray-a10);
   font-style: italic;
@@ -207,7 +161,6 @@
   white-space: nowrap;
   position: relative;
   z-index: 2;
-  cursor: pointer;
   outline: none;
 }
 
