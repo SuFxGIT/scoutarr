@@ -344,6 +344,21 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     }
   }, [config, selectedInstance, setSearchParams]);
 
+  // Clear selection if the selected instance was deleted from config
+  useEffect(() => {
+    if (!selectedInstance || !config) return;
+    const parts = selectedInstance.split('-');
+    const appType = parts[0] as AppType;
+    const instanceId = parts.slice(1).join('-');
+    const instances = config.applications[appType] || [];
+    if (!instances.some(inst => inst.id === instanceId)) {
+      setSelectedInstance(null);
+      setSelectedMediaIds(new Set());
+      setExpandedGroupIds(new Set());
+      setSearchParams({});
+    }
+  }, [config, selectedInstance, setSearchParams]);
+
   useEffect(() => {
     setLastLibraryUrl(location.pathname + location.search);
   }, [location.pathname, location.search, setLastLibraryUrl]);
