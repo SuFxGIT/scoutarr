@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import type { Config } from '../types/config';
-import { configSchema } from '../schemas/configSchema';
+import { configSchema } from '@scoutarr/shared';
 import { ZodError } from 'zod';
 import { getErrorMessage } from '../utils/helpers';
 import { AppType, APP_TYPES, MAX_INSTANCES_PER_APP, AUTO_RELOAD_DELAY_MS } from '../utils/constants';

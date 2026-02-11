@@ -17,6 +17,7 @@ import {
   TextField,
   Tooltip,
   Badge,
+  Switch,
   SegmentedControl,
 } from '@radix-ui/themes';
 import {
@@ -112,13 +113,9 @@ function TitleCell({ row }: { row: MediaLibraryRow }) {
 
 function EpisodeTitleCell({ row, flat }: { row: MediaLibraryRow; flat?: boolean }) {
   const epNum = `S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`;
-  const fileIcon = row.hasFile
-    ? <CheckCircledIcon style={{ color: 'var(--green-9)', flexShrink: 0 }} />
-    : <CrossCircledIcon style={{ color: 'var(--red-9)', flexShrink: 0 }} />;
   const label = flat ? `${row.seriesTitle || row.title} - ${epNum}` : epNum;
   return (
     <Flex gap="2" align="center" style={flat ? { width: '100%', overflow: 'hidden' } : undefined}>
-      {fileIcon}
       <Text size="2" truncate={flat}>{label}</Text>
     </Flex>
   );
@@ -308,6 +305,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<number>>(new Set());
   const [expandedGroupIds, setExpandedGroupIds] = useState<ReadonlySet<unknown>>(new Set());
   const [episodeMode, setEpisodeMode] = useState(false);
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -381,6 +379,14 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   }, [selectedInstance]);
 
   const isSonarr = instanceInfo?.appType === 'sonarr';
+  const isRadarr = instanceInfo?.appType === 'radarr';
+
+  const hideSpecials = useMemo(() => {
+    if (!isSonarr || !config || !instanceInfo) return false;
+    const instances = config.applications.sonarr || [];
+    const inst = instances.find(i => i.id === instanceInfo.instanceId);
+    return inst?.hideSpecials === true;
+  }, [isSonarr, config, instanceInfo]);
 
   // Fetch media library
   const {
@@ -504,6 +510,14 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     // Apply filters to raw data
     let filtered = mediaData.media;
 
+    if (hideSpecials) {
+      filtered = filtered.filter(item => item.seasonNumber !== 0);
+    }
+
+    if (showMissingOnly) {
+      filtered = filtered.filter(item => item.hasFile === false);
+    }
+
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
       filtered = filtered.filter(item => {
@@ -622,7 +636,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -858,6 +872,16 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                   : `${displayCount} of ${isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`}`
                 } ({selectedMediaIds.size} selected)
               </Text>
+            )}
+            {(isSonarr || isRadarr) && mediaData && (
+              <Flex align="center" gap="1">
+                <Text size="1" color="gray">Missing Only</Text>
+                <Switch
+                  size="1"
+                  checked={showMissingOnly}
+                  onCheckedChange={setShowMissingOnly}
+                />
+              </Flex>
             )}
             {isSonarr && mediaData && (
               <SegmentedControl.Root

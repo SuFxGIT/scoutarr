@@ -54,6 +54,7 @@ export const sonarrInstanceSchema = z.object({
   seriesStatus: z.enum(['continuing', 'upcoming', 'ended', ''] as const),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  hideSpecials: z.boolean().optional(),
 });
 
 export const lidarrInstanceSchema = z.object({

@@ -48,9 +48,8 @@ export function InstanceCard({
   clearTagsPending,
 }: InstanceCardProps) {
   const instanceKey = `${appType}-${instance.id}`;
-  const profileKey = `${appType}-${instance.id}`;
-  const profiles = qualityProfiles[profileKey] || [];
-  const isProfilesLoading = loadingProfiles[profileKey];
+  const profiles = qualityProfiles[instanceKey] || [];
+  const isProfilesLoading = loadingProfiles[instanceKey];
 
   return (
     <Card style={{ alignSelf: 'flex-start', width: '100%' }}>
@@ -252,26 +251,41 @@ export function InstanceCard({
               )}
 
               {appType === 'sonarr' && (
-                <Flex direction="column" gap="2">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Series Status</Text>
-                    <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
+                <>
+                  <Flex direction="column" gap="2">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">Series Status</Text>
+                      <Tooltip content="Only series with this status will be considered for upgrades. Leave as 'Any' to include all statuses.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <Select.Root
+                      value={(instance as SonarrInstance).seriesStatus || 'any'}
+                      onValueChange={(value: string) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
+                    >
+                      <Select.Trigger />
+                      <Select.Content position="popper" sideOffset={5}>
+                        <Select.Item value="any">Any</Select.Item>
+                        <Select.Item value="continuing">Continuing</Select.Item>
+                        <Select.Item value="upcoming">Upcoming</Select.Item>
+                        <Select.Item value="ended">Ended</Select.Item>
+                      </Select.Content>
+                    </Select.Root>
                   </Flex>
-                  <Select.Root
-                    value={(instance as SonarrInstance).seriesStatus || 'any'}
-                    onValueChange={(value: string) => updateInstanceConfig('sonarr', instance.id, 'seriesStatus', value === 'any' ? '' : value)}
-                  >
-                    <Select.Trigger />
-                    <Select.Content position="popper" sideOffset={5}>
-                      <Select.Item value="any">Any</Select.Item>
-                      <Select.Item value="continuing">Continuing</Select.Item>
-                      <Select.Item value="upcoming">Upcoming</Select.Item>
-                      <Select.Item value="ended">Ended</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </Flex>
+
+                  <Flex direction="row" align="center" justify="between" gap="2">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">Hide Specials</Text>
+                      <Tooltip content="Hide special episodes (Season 0) from the media library. Specials are still synced and stored, just hidden from view.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <Switch
+                      checked={(instance as SonarrInstance).hideSpecials === true}
+                      onCheckedChange={(checked: boolean) => updateInstanceConfig('sonarr', instance.id, 'hideSpecials', checked)}
+                    />
+                  </Flex>
+                </>
               )}
 
               {(appType === 'lidarr' || appType === 'readarr') && (

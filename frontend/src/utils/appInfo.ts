@@ -61,7 +61,7 @@ export const buildDefaultInstance = (app: AppType, instanceId: number): StarrIns
     case 'radarr':
       return { ...baseConfig, movieStatus: 'any' } as RadarrInstance;
     case 'sonarr':
-      return { ...baseConfig, seriesStatus: '' } as SonarrInstance;
+      return { ...baseConfig, seriesStatus: '', hideSpecials: false } as SonarrInstance;
     case 'lidarr':
       return { ...baseConfig, artistStatus: '' } as LidarrInstance;
     case 'readarr':
