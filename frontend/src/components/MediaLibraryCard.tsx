@@ -379,7 +379,6 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   }, [selectedInstance]);
 
   const isSonarr = instanceInfo?.appType === 'sonarr';
-  const isRadarr = instanceInfo?.appType === 'radarr';
 
   const hideSpecials = useMemo(() => {
     if (!isSonarr || !config || !instanceInfo) return false;
@@ -873,7 +872,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 } ({selectedMediaIds.size} selected)
               </Text>
             )}
-            {(isSonarr || isRadarr) && mediaData && (
+            {mediaData && (
               <Flex align="center" gap="1">
                 <Text size="1" color="gray">Missing Only</Text>
                 <Switch
