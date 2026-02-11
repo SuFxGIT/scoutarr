@@ -31,7 +31,7 @@ import {
   DotFilledIcon,
   CalendarIcon,
 } from '@radix-ui/react-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
@@ -296,6 +296,7 @@ interface MediaLibraryCardProps {
 }
 
 export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const { setLastLibraryUrl } = useNavigation();
@@ -444,6 +445,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       toast.success(data.message);
       setSelectedMediaIds(new Set());
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (error: unknown) => {
       toast.error('Search failed: ' + getErrorMessage(error));

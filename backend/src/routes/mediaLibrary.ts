@@ -238,6 +238,10 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       logger.warn('⚠️  [Scoutarr] Tag not found, skipping tag addition', { tagName });
     }
 
+    // Record in search history
+    const items = await statsService.getMediaTitlesByIds(instanceId, mediaIds);
+    await statsService.addSearch(appType, mediaIds.length, items, instance.name);
+
     // Return success
     res.json({
       success: true,

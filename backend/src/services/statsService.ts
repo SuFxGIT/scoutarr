@@ -794,6 +794,22 @@ class StatsService {
     }
   }
 
+  async getMediaTitlesByIds(instanceId: string, mediaIds: number[]): Promise<Array<{ id: number; title: string }>> {
+    if (!this.db || mediaIds.length === 0) return [];
+
+    try {
+      const placeholders = mediaIds.map(() => '?').join(',');
+      const stmt = this.db.prepare(`
+        SELECT media_id as id, title FROM media_library
+        WHERE instance_id = ? AND media_id IN (${placeholders})
+      `);
+      return stmt.all(instanceId, ...mediaIds) as Array<{ id: number; title: string }>;
+    } catch (error: unknown) {
+      logger.error('❌ Error fetching media titles', { error: getErrorMessage(error) });
+      return [];
+    }
+  }
+
   // ========== Quality Profile Management ==========
 
   async syncQualityProfiles(
