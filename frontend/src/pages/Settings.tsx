@@ -657,25 +657,12 @@ function Settings() {
           </Tabs.Content>
 
           <Tabs.Content value="notifications" style={{ paddingTop: '1rem' }}>
-            <Card>
-              <Flex direction="column" gap="4" p="4">
-                <Heading size="5">Notification Configuration</Heading>
-                <Separator size="4" />
-
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Discord Webhook URL (optional)</Text>
-                    <Tooltip content="Webhook URL where Discord notifications will be sent. Leave empty to disable.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <Flex gap="2" align="center">
-                    <Box style={{ flex: 1 }}>
-                      <TextField.Root
-                        value={config.notifications.discordWebhook}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('discordWebhook', e.target.value)}
-                      />
-                    </Box>
+            <Flex direction="column" gap="3">
+              {/* Discord */}
+              <Card>
+                <Flex direction="column" gap="3" p="4">
+                  <Flex align="center" justify="between">
+                    <Heading size="4">Discord</Heading>
                     <Button
                       variant="soft"
                       size="2"
@@ -692,35 +679,27 @@ function Settings() {
                       Test
                     </Button>
                   </Flex>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Notifiarr Passthrough Webhook (optional)</Text>
-                    <Tooltip content="Notifiarr passthrough webhook for notifications. Leave empty to disable.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
+                  <Separator size="4" />
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">Webhook URL</Text>
+                      <Tooltip content="Webhook URL where Discord notifications will be sent. Leave empty to disable.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <TextField.Root
+                      value={config.notifications.discordWebhook}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('discordWebhook', e.target.value)}
+                    />
                   </Flex>
-                  <TextField.Root
-                    value={config.notifications.notifiarrPassthroughWebhook}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
-                  />
                 </Flex>
+              </Card>
 
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Notifiarr Discord Channel ID (optional)</Text>
-                    <Tooltip content="Discord channel ID for Notifiarr notifications (17–19 digits). Required if a Notifiarr webhook is set.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
-                  </Flex>
-                  <Flex gap="2" align="center">
-                    <Box style={{ flex: 1 }}>
-                      <TextField.Root
-                        value={config.notifications.notifiarrPassthroughDiscordChannelId}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
-                      />
-                    </Box>
+              {/* Notifiarr */}
+              <Card>
+                <Flex direction="column" gap="3" p="4">
+                  <Flex align="center" justify="between">
+                    <Heading size="4">Notifiarr</Heading>
                     <Button
                       variant="soft"
                       size="2"
@@ -737,35 +716,39 @@ function Settings() {
                       Test
                     </Button>
                   </Flex>
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Pushover User Key (optional)</Text>
-                    <Tooltip content="Your Pushover user key for notifications. Leave empty to disable.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
+                  <Separator size="4" />
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">Passthrough Webhook</Text>
+                      <Tooltip content="Notifiarr passthrough webhook for notifications. Leave empty to disable.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <TextField.Root
+                      value={config.notifications.notifiarrPassthroughWebhook}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughWebhook', e.target.value)}
+                    />
                   </Flex>
-                  <TextField.Root
-                    value={config.notifications.pushoverUserKey}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverUserKey', e.target.value)}
-                  />
-                </Flex>
-
-                <Flex direction="column" gap="1">
-                  <Flex align="center" gap="1">
-                    <Text size="2" weight="medium">Pushover API Token (optional)</Text>
-                    <Tooltip content="Your Pushover application API token. Required if a Pushover user key is set.">
-                      <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
-                    </Tooltip>
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">Discord Channel ID</Text>
+                      <Tooltip content="Discord channel ID for Notifiarr notifications (17-19 digits). Required if a Notifiarr webhook is set.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <TextField.Root
+                      value={config.notifications.notifiarrPassthroughDiscordChannelId}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
+                    />
                   </Flex>
-                  <Flex gap="2" align="center">
-                    <Box style={{ flex: 1 }}>
-                      <TextField.Root
-                        value={config.notifications.pushoverApiToken}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverApiToken', e.target.value)}
-                      />
-                    </Box>
+                </Flex>
+              </Card>
+
+              {/* Pushover */}
+              <Card>
+                <Flex direction="column" gap="3" p="4">
+                  <Flex align="center" justify="between">
+                    <Heading size="4">Pushover</Heading>
                     <Button
                       variant="soft"
                       size="2"
@@ -782,9 +765,34 @@ function Settings() {
                       Test
                     </Button>
                   </Flex>
+                  <Separator size="4" />
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">User Key</Text>
+                      <Tooltip content="Your Pushover user key for notifications. Leave empty to disable.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <TextField.Root
+                      value={config.notifications.pushoverUserKey}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverUserKey', e.target.value)}
+                    />
+                  </Flex>
+                  <Flex direction="column" gap="1">
+                    <Flex align="center" gap="1">
+                      <Text size="2" weight="medium">API Token</Text>
+                      <Tooltip content="Your Pushover application API token. Required if a Pushover user key is set.">
+                        <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                      </Tooltip>
+                    </Flex>
+                    <TextField.Root
+                      value={config.notifications.pushoverApiToken}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverApiToken', e.target.value)}
+                    />
+                  </Flex>
                 </Flex>
-              </Flex>
-            </Card>
+              </Card>
+            </Flex>
           </Tabs.Content>
 
           <Tabs.Content value="tasks">
@@ -813,7 +821,7 @@ function Settings() {
                 <Separator size="4" />
 
                 <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">Clear Database</Text>
+                  <Text size="2" weight="medium">Clear Statistics</Text>
                   <Text size="1" color="gray">
                     Delete all search history and CF score history from the database. This resets statistics to zero but keeps your configuration, instances, and media library intact.
                   </Text>
@@ -848,7 +856,7 @@ function Settings() {
                       onClick={() => setConfirmingClearData(true)}
                       disabled={clearDataMutation.isPending}
                     >
-                      Clear Database
+                      Clear Statistics
                     </Button>
                   )}
                 </Flex>
