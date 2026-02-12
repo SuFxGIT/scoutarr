@@ -33,6 +33,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { configService } from '../services/configService';
 import { schedulerService } from '../services/schedulerService';
 import { statsService } from '../services/statsService';
+import { notificationService } from '../services/notificationService';
 import { buildDefaultInstance, getAppInfo, getNextInstanceId, StarrInstanceConfig } from '../utils/appInfo';
 import { InstanceCard } from '../components/InstanceCard';
 
@@ -668,10 +669,29 @@ function Settings() {
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
-                  <TextField.Root
-                    value={config.notifications.discordWebhook}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('discordWebhook', e.target.value)}
-                  />
+                  <Flex gap="2" align="center">
+                    <Box style={{ flex: 1 }}>
+                      <TextField.Root
+                        value={config.notifications.discordWebhook}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('discordWebhook', e.target.value)}
+                      />
+                    </Box>
+                    <Button
+                      variant="soft"
+                      size="2"
+                      disabled={!config.notifications.discordWebhook}
+                      onClick={async () => {
+                        try {
+                          await notificationService.testNotification('discord');
+                          showSuccessToast('Discord test notification sent');
+                        } catch {
+                          // Error toast handled by apiClient interceptor
+                        }
+                      }}
+                    >
+                      Test
+                    </Button>
+                  </Flex>
                 </Flex>
 
                 <Flex direction="column" gap="1">
@@ -694,10 +714,29 @@ function Settings() {
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
-                  <TextField.Root
-                    value={config.notifications.notifiarrPassthroughDiscordChannelId}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
-                  />
+                  <Flex gap="2" align="center">
+                    <Box style={{ flex: 1 }}>
+                      <TextField.Root
+                        value={config.notifications.notifiarrPassthroughDiscordChannelId}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('notifiarrPassthroughDiscordChannelId', e.target.value)}
+                      />
+                    </Box>
+                    <Button
+                      variant="soft"
+                      size="2"
+                      disabled={!config.notifications.notifiarrPassthroughWebhook}
+                      onClick={async () => {
+                        try {
+                          await notificationService.testNotification('notifiarr');
+                          showSuccessToast('Notifiarr test notification sent');
+                        } catch {
+                          // Error toast handled by apiClient interceptor
+                        }
+                      }}
+                    >
+                      Test
+                    </Button>
+                  </Flex>
                 </Flex>
 
                 <Flex direction="column" gap="1">
@@ -720,10 +759,29 @@ function Settings() {
                       <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                     </Tooltip>
                   </Flex>
-                  <TextField.Root
-                    value={config.notifications.pushoverApiToken}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverApiToken', e.target.value)}
-                  />
+                  <Flex gap="2" align="center">
+                    <Box style={{ flex: 1 }}>
+                      <TextField.Root
+                        value={config.notifications.pushoverApiToken}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateNotificationConfig('pushoverApiToken', e.target.value)}
+                      />
+                    </Box>
+                    <Button
+                      variant="soft"
+                      size="2"
+                      disabled={!config.notifications.pushoverUserKey || !config.notifications.pushoverApiToken}
+                      onClick={async () => {
+                        try {
+                          await notificationService.testNotification('pushover');
+                          showSuccessToast('Pushover test notification sent');
+                        } catch {
+                          // Error toast handled by apiClient interceptor
+                        }
+                      }}
+                    >
+                      Test
+                    </Button>
+                  </Flex>
                 </Flex>
               </Flex>
             </Card>

@@ -261,6 +261,51 @@ class NotificationService {
     }
   }
 
+  async sendTestNotification(method: 'discord' | 'notifiarr' | 'pushover'): Promise<void> {
+    const config = configService.getConfig();
+    const nc = config.notifications;
+
+    switch (method) {
+      case 'discord': {
+        if (!nc.discordWebhook) throw new Error('Discord webhook URL is not configured');
+        await axios.post(nc.discordWebhook, {
+          embeds: [{
+            title: 'Scoutarr Test Notification',
+            description: 'If you see this, your Discord notifications are working correctly!',
+            color: 0x3498db,
+            timestamp: new Date().toISOString(),
+          }]
+        });
+        break;
+      }
+      case 'notifiarr': {
+        if (!nc.notifiarrPassthroughWebhook) throw new Error('Notifiarr webhook is not configured');
+        await axios.post(nc.notifiarrPassthroughWebhook, {
+          channel: nc.notifiarrPassthroughDiscordChannelId || undefined,
+          event: 'scoutarr',
+          title: 'Scoutarr Test Notification',
+          message: 'If you see this, your Notifiarr notifications are working correctly!',
+        });
+        break;
+      }
+      case 'pushover': {
+        if (!nc.pushoverUserKey || !nc.pushoverApiToken) throw new Error('Pushover user key and API token are required');
+        const params = new URLSearchParams();
+        params.append('token', nc.pushoverApiToken);
+        params.append('user', nc.pushoverUserKey);
+        params.append('title', 'Scoutarr Test Notification');
+        params.append('message', 'If you see this, your Pushover notifications are working correctly!');
+        params.append('priority', '0');
+        await axios.post('https://api.pushover.net/1/messages.json', params.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        break;
+      }
+      default:
+        throw new Error(`Unknown notification method: ${method}`);
+    }
+  }
+
   private formatAppName(app: string): string {
     // Convert "radarr" -> "Radarr", "sonarr-instance-id" -> "Sonarr (instance-id)"
     const parts = app.split('-');
