@@ -7,17 +7,14 @@ import {
   Text,
   Separator,
   Dialog,
-  Spinner,
   Box,
   Select,
-  Tooltip,
   Badge,
 } from '@radix-ui/themes';
 import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
-import { toast } from 'sonner';
-import { formatAppName, getErrorMessage } from '../utils/helpers';
+import { formatAppName } from '../utils/helpers';
 import { ITEMS_PER_PAGE } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { MediaLibraryCard } from '../components/MediaLibraryCard';
@@ -28,7 +25,6 @@ import { statsService } from '../services/statsService';
 
 function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [confirmingClear, setConfirmingClear] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState<Stats['recentSearches'][number] | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
@@ -42,63 +38,12 @@ function Dashboard() {
 
   // Fetch stats - load from database on mount
   // Stats are persisted in the backend database, so we should load them on mount
-  const { data: stats, refetch: refetchStats } = useQuery<Stats>({
+  const { data: stats } = useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: () => statsService.getStats(),
     enabled: true, // Fetch on mount to load cached stats from database
     staleTime: Infinity, // Stats never go stale - they only change when a run happens
   });
-
-  // Mutation for clearing stats
-  const clearStatsMutation = useMutation({
-    mutationFn: () => statsService.clearAllData(),
-    onSuccess: () => {
-      toast.success('Recent searches and stats cleared');
-      setCurrentPage(1);
-      setConfirmingClear(false);
-      refetchStats();
-    },
-    onError: (error: unknown) => {
-      toast.error('Failed to clear data: ' + getErrorMessage(error));
-      setConfirmingClear(false);
-    },
-  });
-
-  // Render confirmation buttons for clear actions
-  const renderConfirmButtons = (onConfirm: () => void) => {
-    if (!confirmingClear) return null;
-
-    const isPending = clearStatsMutation.isPending;
-
-    return (
-      <Flex gap="2" align="center">
-        <Text size="2" color="gray">Are you sure?</Text>
-        <Button
-          variant="solid"
-          color="red"
-          size="2"
-          onClick={onConfirm}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <>
-              <Spinner size="1" /> Clearing...
-            </>
-          ) : (
-            'Confirm'
-          )}
-        </Button>
-        <Button
-          variant="outline"
-          size="2"
-          onClick={() => setConfirmingClear(false)}
-          disabled={isPending}
-        >
-          Cancel
-        </Button>
-      </Flex>
-    );
-  };
 
   return (
     <Box width="100%" pt="0" mt="0">
@@ -126,23 +71,7 @@ function Dashboard() {
           return (
             <Card>
               <Flex direction="column" gap="3">
-                <Flex align="center" justify="between">
-                  <Heading size="5">Statistics</Heading>
-                  <Tooltip content="Delete all search history and tagged media records from the database. This will reset all statistics to zero.">
-                    <span>
-                      {renderConfirmButtons(() => clearStatsMutation.mutate()) || (
-                        <Button 
-                          variant="outline" 
-                          color="red"
-                          size="2" 
-                          onClick={() => setConfirmingClear(true)}
-                        >
-                          Clear Data
-                        </Button>
-                      )}
-                    </span>
-                  </Tooltip>
-                </Flex>
+                <Heading size="5">Statistics</Heading>
                 <Separator size="4" />
                 <Flex gap="3" wrap="wrap" justify="center">
                   <Card variant="surface" style={{ flex: '1 1 200px', minWidth: '150px' }}>
@@ -424,7 +353,7 @@ function Dashboard() {
                   <Flex
                     direction="column"
                     gap="2"
-                    style={{ maxHeight: '320px', overflowY: 'auto' }}
+                    style={{ maxHeight: 'min(40vh, 400px)', overflowY: 'auto' }}
                     >
                     {selectedSearch.items.map((item) => (
                       <Text

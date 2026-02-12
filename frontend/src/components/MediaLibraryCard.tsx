@@ -36,6 +36,7 @@ import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
+import { CfScoreHistoryDialog } from './CfScoreHistoryDialog';
 import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
@@ -750,8 +751,20 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       customFormatScore: {
         key: 'customFormatScore',
         name: 'CF Score',
-        width: 100,
-        renderCell: ({ row }) => <Text size="2">{row.customFormatScore ?? '-'}</Text>,
+        width: 120,
+        renderCell: ({ row }) => (
+          <Flex align="center" gap="1" style={{ width: '100%' }}>
+            <Text size="2">{row.customFormatScore ?? '-'}</Text>
+            {instanceInfo && (
+              <CfScoreHistoryDialog
+                appType={instanceInfo.appType}
+                instanceId={instanceInfo.instanceId}
+                mediaId={row.id}
+                title={row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title}
+              />
+            )}
+          </Flex>
+        ),
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
             {...props}

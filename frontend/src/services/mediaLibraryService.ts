@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import type { MediaLibraryResponse, MediaSearchResponse } from '@scoutarr/shared';
+import type { MediaLibraryResponse, MediaSearchResponse, CfScoreHistoryResponse } from '@scoutarr/shared';
 
 export async function fetchMediaLibrary(
   appType: string,
@@ -17,6 +17,17 @@ export async function syncMediaLibrary(
 ): Promise<MediaLibraryResponse> {
   const response = await apiClient.get<MediaLibraryResponse>(
     `/media-library/${appType}/${instanceId}?sync=true`
+  );
+  return response.data;
+}
+
+export async function fetchCfScoreHistory(
+  appType: string,
+  instanceId: string,
+  mediaId: number
+): Promise<CfScoreHistoryResponse> {
+  const response = await apiClient.get<CfScoreHistoryResponse>(
+    `/media-library/${appType}/${instanceId}/${mediaId}/cf-history`
   );
   return response.data;
 }

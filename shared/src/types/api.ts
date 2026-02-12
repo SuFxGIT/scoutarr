@@ -103,3 +103,14 @@ export interface MediaSearchResponse {
   searched: number;
   message: string;
 }
+
+export interface CfScoreHistoryEntry {
+  score: number | null;
+  recordedAt: string;
+}
+
+export interface CfScoreHistoryResponse {
+  instanceId: string;
+  mediaId: number;
+  history: CfScoreHistoryEntry[];
+}

@@ -99,6 +99,17 @@ class StatsService {
 
     this.ensureMediaLibraryTable();
 
+    // Create cf_score_history table for tracking CF score changes over time
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cf_score_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id TEXT NOT NULL,
+        media_id INTEGER NOT NULL,
+        score INTEGER,
+        recorded_at TEXT NOT NULL,
+        FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
+      )
+    `);
 
     // Create indexes for better query performance
     this.db.exec(`
@@ -115,6 +126,8 @@ class StatsService {
       CREATE INDEX IF NOT EXISTS idx_media_library_synced_at ON media_library(synced_at DESC);
       CREATE INDEX IF NOT EXISTS idx_media_library_quality_profile ON media_library(quality_profile_id);
       CREATE INDEX IF NOT EXISTS idx_media_library_series_id ON media_library(series_id);
+      CREATE INDEX IF NOT EXISTS idx_cf_history_lookup ON cf_score_history(instance_id, media_id, recorded_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_cf_history_recorded_at ON cf_score_history(recorded_at);
     `);
 
   }
@@ -409,13 +422,16 @@ class StatsService {
     }
 
     try {
-      // Delete all entries from the searches table
-      // This clears recent searches and stats but keeps the database structure
+      // Clear all history data but keep the database structure
       const deleteSearchesStmt = this.db.prepare('DELETE FROM history');
       const searchesResult = deleteSearchesStmt.run();
 
-      logger.info('🗑️  Cleared all search data from stats database', {
-        searchesDeleted: searchesResult.changes
+      const deleteCfHistoryStmt = this.db.prepare('DELETE FROM cf_score_history');
+      const cfHistoryResult = deleteCfHistoryStmt.run();
+
+      logger.info('🗑️  Cleared all data from stats database', {
+        searchesDeleted: searchesResult.changes,
+        cfHistoryDeleted: cfHistoryResult.changes
       });
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -620,6 +636,25 @@ class StatsService {
           episode_file_id = excluded.episode_file_id
       `);
 
+      // Only insert a CF history row when the score differs from the last recorded value.
+      // Uses a subquery to compare against the most recent entry — avoids a separate SELECT round-trip.
+      const insertHistoryStmt = this.db.prepare(`
+        INSERT INTO cf_score_history (instance_id, media_id, score, recorded_at)
+        SELECT ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM cf_score_history
+          WHERE instance_id = ? AND media_id = ?
+          ORDER BY recorded_at DESC
+          LIMIT 1
+        )
+        OR (
+          SELECT score FROM cf_score_history
+          WHERE instance_id = ? AND media_id = ?
+          ORDER BY recorded_at DESC
+          LIMIT 1
+        ) IS NOT ?
+      `);
+
       const transaction = this.db.transaction((items: typeof mediaItems) => {
         for (const item of items) {
           const fileInfo = extractFileInfoForDb(item);
@@ -643,6 +678,14 @@ class StatsService {
             item.seasonNumber ?? null,
             item.episodeNumber ?? null,
             item.episodeFileId ?? null
+          );
+
+          // Record CF score history only when the score changed
+          const score = fileInfo.customFormatScore;
+          insertHistoryStmt.run(
+            instanceId, item.id, score, syncTime,
+            instanceId, item.id,
+            instanceId, item.id, score
           );
         }
       });
@@ -807,6 +850,59 @@ class StatsService {
     } catch (error: unknown) {
       logger.error('❌ Error fetching media titles', { error: getErrorMessage(error) });
       return [];
+    }
+  }
+
+  // ========== CF Score History ==========
+
+  async getCfScoreHistory(
+    instanceId: string,
+    mediaId: number,
+    limit: number = 500
+  ): Promise<Array<{ score: number | null; recorded_at: string }>> {
+    if (!this.db) return [];
+
+    try {
+      const stmt = this.db.prepare(`
+        SELECT score, recorded_at
+        FROM cf_score_history
+        WHERE instance_id = ? AND media_id = ?
+        ORDER BY recorded_at DESC
+        LIMIT ?
+      `);
+      return stmt.all(instanceId, mediaId, limit) as Array<{
+        score: number | null;
+        recorded_at: string;
+      }>;
+    } catch (error: unknown) {
+      logger.error('Error getting CF score history', { error: getErrorMessage(error) });
+      return [];
+    }
+  }
+
+  async pruneCfScoreHistory(retentionDays: number = 90): Promise<number> {
+    if (!this.db) return 0;
+
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - retentionDays);
+      const cutoffIso = cutoff.toISOString();
+
+      const stmt = this.db.prepare(`
+        DELETE FROM cf_score_history WHERE recorded_at < ?
+      `);
+      const result = stmt.run(cutoffIso);
+
+      if (result.changes > 0) {
+        logger.info('Pruned old CF score history', {
+          retentionDays,
+          rowsDeleted: result.changes
+        });
+      }
+      return result.changes;
+    } catch (error: unknown) {
+      logger.error('Error pruning CF score history', { error: getErrorMessage(error) });
+      return 0;
     }
   }
 

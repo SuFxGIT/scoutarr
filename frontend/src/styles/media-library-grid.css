@@ -192,3 +192,13 @@
   font-weight: 400;
   color: var(--gray-a11);
 }
+
+/* CF Score history icon — show on hover */
+.media-library-grid .cf-history-trigger {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.media-library-grid .rdg-row:hover .cf-history-trigger {
+  opacity: 1;
+}

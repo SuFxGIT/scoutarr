@@ -32,6 +32,7 @@ import { AppIcon } from '../components/icons/AppIcon';
 import { useNavigation } from '../contexts/NavigationContext';
 import { configService } from '../services/configService';
 import { schedulerService } from '../services/schedulerService';
+import { statsService } from '../services/statsService';
 import { buildDefaultInstance, getAppInfo, getNextInstanceId, StarrInstanceConfig } from '../utils/appInfo';
 import { InstanceCard } from '../components/InstanceCard';
 
@@ -56,6 +57,7 @@ function Settings() {
   const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
   const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
+  const [confirmingClearData, setConfirmingClearData] = useState<boolean>(false);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -210,6 +212,20 @@ function Settings() {
     if (!configData) return;
     saveConfigMutation.mutate(configData);
   };
+
+  // Clear data mutation (clears search history and CF score history)
+  const clearDataMutation = useMutation({
+    mutationFn: () => statsService.clearAllData(),
+    onSuccess: () => {
+      toast.success('Search history and CF score history cleared');
+      setConfirmingClearData(false);
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to clear data: ' + getErrorMessage(error));
+      setConfirmingClearData(false);
+    },
+  });
 
   // Reset app mutation (clears config, quality profiles database, stats, and localStorage)
   const resetAppMutation = useMutation({
@@ -736,6 +752,49 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>
+                <Separator size="4" />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Clear Database</Text>
+                  <Text size="1" color="gray">
+                    Delete all search history and CF score history from the database. This resets statistics to zero but keeps your configuration, instances, and media library intact.
+                  </Text>
+                  {confirmingClearData ? (
+                    <Flex gap="2" align="center" wrap="wrap">
+                      <Text size="1" color="red" weight="medium">Are you sure?</Text>
+                      <Flex gap="2">
+                        <Button
+                          variant="solid"
+                          size="2"
+                          color="red"
+                          onClick={() => clearDataMutation.mutate()}
+                          disabled={clearDataMutation.isPending}
+                        >
+                          Confirm Clear
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="2"
+                          onClick={() => setConfirmingClearData(false)}
+                          disabled={clearDataMutation.isPending}
+                        >
+                          Cancel
+                        </Button>
+                      </Flex>
+                    </Flex>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      color="red"
+                      size="2"
+                      onClick={() => setConfirmingClearData(true)}
+                      disabled={clearDataMutation.isPending}
+                    >
+                      Clear Database
+                    </Button>
+                  )}
+                </Flex>
+
                 <Separator size="4" />
 
                 <Flex direction="column" gap="2">

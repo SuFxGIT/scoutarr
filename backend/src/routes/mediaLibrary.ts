@@ -169,6 +169,32 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
   }
 });
 
+// GET /api/media-library/:appType/:instanceId/:mediaId/cf-history
+// Fetch CF score history for a specific media item
+mediaLibraryRouter.get('/:appType/:instanceId/:mediaId/cf-history', async (req, res) => {
+  const { appType, instanceId, mediaId: mediaIdParam } = req.params;
+  const mediaId = parseInt(mediaIdParam, 10);
+
+  try {
+    if (!APP_TYPES.includes(appType as AppType)) {
+      return res.status(400).json({ error: 'Invalid app type' });
+    }
+
+    const history = await statsService.getCfScoreHistory(instanceId, mediaId);
+
+    res.json({
+      instanceId,
+      mediaId,
+      history: history.map(h => ({
+        score: h.score,
+        recordedAt: h.recorded_at
+      }))
+    });
+  } catch (error: unknown) {
+    handleRouteError(res, error, 'Failed to fetch CF score history');
+  }
+});
+
 // POST /api/media-library/search
 // Search selected media manually
 mediaLibraryRouter.post('/search', async (req, res) => {

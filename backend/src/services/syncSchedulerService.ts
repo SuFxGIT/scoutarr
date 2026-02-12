@@ -167,6 +167,9 @@ class SyncSchedulerService {
         }
       }
 
+      // Prune old CF score history entries
+      await statsService.pruneCfScoreHistory(90);
+
       logger.info(`✅ Sync completed. Total items synced: ${totalSynced}`);
       endOp({ totalSynced }, true);
     } catch (error: unknown) {
