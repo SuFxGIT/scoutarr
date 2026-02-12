@@ -36,13 +36,11 @@ function Dashboard() {
     staleTime: Infinity,
   });
 
-  // Fetch stats - load from database on mount
-  // Stats are persisted in the backend database, so we should load them on mount
+  // Fetch stats - load from database on mount and poll to catch scheduled runs
   const { data: stats } = useQuery<Stats>({
     queryKey: ['stats'],
     queryFn: () => statsService.getStats(),
-    enabled: true, // Fetch on mount to load cached stats from database
-    staleTime: Infinity, // Stats never go stale - they only change when a run happens
+    refetchInterval: 30000,
   });
 
   return (
