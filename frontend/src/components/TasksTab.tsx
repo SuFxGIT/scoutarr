@@ -14,6 +14,7 @@ import {
   Callout
 } from '@radix-ui/themes';
 import { QuestionMarkCircledIcon, PlayIcon, InfoCircledIcon } from '@radix-ui/react-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { CronExpressionParser } from 'cron-parser';
 import type { Config } from '../types/config';
 import type { SchedulerStatus, SyncSchedulerStatus } from '../types/api';
@@ -189,6 +190,7 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
 }
 
 export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus, onRefreshStatus }: TasksTabProps) {
+  const queryClient = useQueryClient();
   const [countdowns, setCountdowns] = useState<Record<string, number>>({});
 
   // Log scheduler status changes for debugging stuck countdowns
@@ -301,6 +303,7 @@ export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus
                   try {
                     await schedulerService.runUpgradeSearch();
                     showSuccessToast('Upgrade search started');
+                    queryClient.invalidateQueries({ queryKey: ['stats'] });
                   } catch (error) {
                     // Error toast handled by apiClient interceptor
                   }
