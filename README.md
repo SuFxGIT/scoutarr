@@ -26,8 +26,11 @@ Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Li
 - 🧠 **Smart Filtering** – Filter by monitored state, movie/series status (including an **Any** option), quality profile, and tags
 - 🏷️ **Tag-Aware Workflow** – Only search untagged items, then tag everything that was searched to avoid duplicates
 - ⏱️ **Scheduler with Unattended Mode** – Run searches on a schedule; when unattended is enabled, tags are automatically cleared and re-applied when nothing matches, keeping things moving without manual intervention
-- 📊 **Dashboard & Stats** – See recent searches, per-app/instance totals, and a detailed log of what ran and when
-- 🔔 **Notification Hooks** – Optional Discord and Notifiarr webhooks for external notifications
+- 📊 **Dashboard & Stats** – Live-updating dashboard with recent searches, per-app/instance totals, and CF score history tracking
+- 🔔 **Notifications** – Discord, Notifiarr, and Pushover support with in-app test buttons
+- 📦 **Media Library Sync** – Scheduled sync of all media from your *arr instances to a local database for fast filtering
+- 📺 **Sonarr Episode Grid** – Expandable tree grid with episode-level detail and flat episode mode toggle
+- 🔍 **Missing Only Filter** – Filter to only search items missing from your library across all app types
 - 🎨 **Modern UI** – Built with Radix UI Themes
 - 🐳 **Docker Support** – Easy deployment with Docker Compose
 - ⚙️ **Clean Configuration** – Simple JSON-based configuration
@@ -139,6 +142,8 @@ The application uses Winston for structured logging with organized, color-coded 
 - `GET /api/stats/recent` – Get paginated recent searches
 - `POST /api/stats/reset` – Reset all statistics
 - `POST /api/stats/clear-data` – Clear search history while keeping the database structure
+- `POST /api/notifications/test` – Send a test notification (Discord, Notifiarr, or Pushover)
+- `POST /api/sync/all` – Trigger media library sync for all instances
 
 ## License
 
