@@ -8,6 +8,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const MediaLibrary = lazy(() => import('./pages/MediaLibrary'));
 const Settings = lazy(() => import('./pages/Settings'));
+const CfScoreHistory = lazy(() => import('./pages/CfScoreHistory'));
 
 function NavigationLinks() {
   const { handleNavigation } = useNavigation();
@@ -70,6 +71,7 @@ function AppContent() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/library" element={<MediaLibrary />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/cf-history/:appType/:instanceId/:mediaId" element={<CfScoreHistory />} />
           </Routes>
         </Suspense>
       </Box>

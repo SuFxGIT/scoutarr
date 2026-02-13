@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Flex,
   Heading,
@@ -35,6 +36,21 @@ function Dashboard() {
     enabled: true,
     staleTime: Infinity,
   });
+
+  // Resolve instance name to instance ID using config
+  const resolveInstanceId = useCallback((appType: string, instanceName?: string): string | null => {
+    if (!config) return null;
+    const instances = config.applications[appType as keyof typeof config.applications];
+    if (!instances) return null;
+    // Match by name if provided, otherwise fall back to first instance
+    if (instanceName) {
+      const found = instances.find(inst => inst.name === instanceName);
+      if (found) return found.id;
+    }
+    // If only one instance exists for this app type, use it
+    if (instances.length === 1) return instances[0].id;
+    return null;
+  }, [config]);
 
   // Fetch stats - load from database on mount and poll to catch scheduled runs
   const { data: stats } = useQuery<Stats>({
@@ -353,15 +369,38 @@ function Dashboard() {
                     gap="2"
                     style={{ maxHeight: 'min(40vh, 400px)', overflowY: 'auto' }}
                     >
-                    {selectedSearch.items.map((item) => (
-                      <Text
-                        key={item.id}
-                        size="2"
-                        style={{ padding: '0.25rem 0' }}
-                      >
-                        {item.title}
-                      </Text>
-                    ))}
+                    {selectedSearch.items.map((item) => {
+                      const instanceId = resolveInstanceId(
+                        selectedSearch.application,
+                        selectedSearch.instance
+                      );
+                      const cfHistoryUrl = instanceId
+                        ? `/cf-history/${selectedSearch.application}/${instanceId}/${item.id}?title=${encodeURIComponent(item.title)}`
+                        : null;
+
+                      return cfHistoryUrl ? (
+                        <Link
+                          key={item.id}
+                          to={cfHistoryUrl}
+                          onClick={() => setSelectedSearch(null)}
+                          style={{
+                            textDecoration: 'none',
+                            color: 'var(--accent-11)',
+                            padding: '0.25rem 0',
+                          }}
+                        >
+                          <Text size="2">{item.title}</Text>
+                        </Link>
+                      ) : (
+                        <Text
+                          key={item.id}
+                          size="2"
+                          style={{ padding: '0.25rem 0' }}
+                        >
+                          {item.title}
+                        </Text>
+                      );
+                    })}
                   </Flex>
                 )}
               </Flex>

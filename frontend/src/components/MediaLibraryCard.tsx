@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
@@ -19,6 +19,7 @@ import {
   Badge,
   Switch,
   SegmentedControl,
+  IconButton,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -36,7 +37,6 @@ import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
 import { formatAppName, getErrorMessage } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
-import { CfScoreHistoryDialog } from './CfScoreHistoryDialog';
 import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
 import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
@@ -773,12 +773,20 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 </Tooltip>
               )}
               {instanceInfo && (
-                <CfScoreHistoryDialog
-                  appType={instanceInfo.appType}
-                  instanceId={instanceInfo.instanceId}
-                  mediaId={row.id}
-                  title={row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title}
-                />
+                <Link
+                  to={`/cf-history/${instanceInfo.appType}/${instanceInfo.instanceId}/${row.id}?title=${encodeURIComponent(row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title)}`}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  <IconButton
+                    size="1"
+                    variant="ghost"
+                    color="gray"
+                    className="cf-history-trigger"
+                  >
+                    <MagnifyingGlassIcon />
+                  </IconButton>
+                </Link>
               )}
             </Flex>
           );
