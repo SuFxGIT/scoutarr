@@ -5,6 +5,7 @@ import { schedulerService } from '../services/schedulerService.js';
 import { testStarrConnection, getMediaTypeKey, APP_TYPES, AppType } from '../utils/starrUtils.js';
 import { getServiceForApp } from '../utils/serviceRegistry.js';
 import { handleRouteError, getErrorMessage } from '../utils/errorUtils.js';
+import { syncInstanceMedia } from '../utils/mediaSync.js';
 import logger from '../utils/logger.js';
 import { Config, StarrInstanceConfig } from '@scoutarr/shared';
 
@@ -224,6 +225,16 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     // Clear scoutarr_tags list from database
     await statsService.clearScoutarrTagsFromInstance(instanceId);
     logger.debug(`✅ Cleared scoutarr tags from instance database record`);
+
+    // Sync media library so the database reflects the removed tags
+    logger.debug(`🔄 Syncing media library after tag clear`, { app, instanceId });
+    const syncResult = await syncInstanceMedia({
+      instanceId,
+      appType: app as AppType,
+      instance: instanceConfig
+    });
+    await statsService.syncMediaToDatabase(instanceId, syncResult.mediaWithTags as Parameters<typeof statsService.syncMediaToDatabase>[1]);
+    logger.debug(`✅ Media library synced after tag clear`, { count: syncResult.mediaCount });
 
     // Get media type name for logging
     const mediaTypeName = getMediaTypeKey(app as AppType);
