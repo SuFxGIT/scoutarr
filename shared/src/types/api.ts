@@ -76,6 +76,7 @@ export interface MediaLibraryItem {
   lastSearched?: string;
   dateImported?: string;
   customFormatScore?: number;
+  previousCfScore?: number | null;
   hasFile?: boolean;
   seriesId?: number;
   seriesTitle?: string;

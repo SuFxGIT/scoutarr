@@ -880,6 +880,52 @@ class StatsService {
     }
   }
 
+  /**
+   * Get the previous (second-most-recent) CF score for every media item in an instance.
+   * Returns a Map keyed by media_id so callers can look up previous scores in O(1).
+   */
+  async getPreviousCfScores(instanceId: string): Promise<Map<number, number | null>> {
+    if (!this.db) return new Map();
+
+    try {
+      // For each media_id, grab the second row (OFFSET 1) ordered by recorded_at DESC.
+      // This is the score *before* the current one. Only media with >=2 history rows appear.
+      const stmt = this.db.prepare(`
+        SELECT h.media_id, h.score
+        FROM cf_score_history h
+        INNER JOIN (
+          SELECT instance_id, media_id, recorded_at
+          FROM cf_score_history
+          WHERE instance_id = ?
+          GROUP BY media_id
+          HAVING COUNT(*) >= 2
+        ) multi ON h.instance_id = multi.instance_id AND h.media_id = multi.media_id
+        WHERE h.instance_id = ?
+          AND h.recorded_at < (
+            SELECT MAX(h2.recorded_at)
+            FROM cf_score_history h2
+            WHERE h2.instance_id = h.instance_id AND h2.media_id = h.media_id
+          )
+        GROUP BY h.media_id
+        HAVING h.recorded_at = MAX(h.recorded_at)
+      `);
+
+      const rows = stmt.all(instanceId, instanceId) as Array<{
+        media_id: number;
+        score: number | null;
+      }>;
+
+      const map = new Map<number, number | null>();
+      for (const row of rows) {
+        map.set(row.media_id, row.score);
+      }
+      return map;
+    } catch (error: unknown) {
+      logger.error('Error getting previous CF scores', { error: getErrorMessage(error) });
+      return new Map();
+    }
+  }
+
   async pruneCfScoreHistory(retentionDays: number = 90): Promise<number> {
     if (!this.db) return 0;
 

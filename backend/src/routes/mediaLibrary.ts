@@ -118,12 +118,16 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
 
     }
 
+    // Fetch previous CF scores (second-most-recent from history) in one query
+    const previousCfScores = await statsService.getPreviousCfScores(instanceId);
+
     // Transform media to response format
     const mediaWithDates = allMedia.map(m => {
       const fileInfo = extractFileInfo(m);
+      const mediaId = service.getMediaId(m);
 
       return {
-        id: service.getMediaId(m),
+        id: mediaId,
         title: service.getMediaTitle(m),
         monitored: m.monitored,
         status: m.status,
@@ -132,6 +136,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         lastSearched: m.lastSearchTime,
         dateImported: fileInfo.dateImported,
         customFormatScore: fileInfo.customFormatScore,
+        previousCfScore: previousCfScores.has(mediaId) ? previousCfScores.get(mediaId) : undefined,
         hasFile: fileInfo.hasFile,
         seriesId: (m as any).seriesId,
         seriesTitle: (m as any).seriesTitle,

@@ -752,19 +752,37 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         key: 'customFormatScore',
         name: 'CF Score',
         width: 120,
-        renderCell: ({ row }) => (
-          <Flex align="center" gap="1" style={{ width: '100%' }}>
-            <Text size="2">{row.customFormatScore ?? '-'}</Text>
-            {instanceInfo && (
-              <CfScoreHistoryDialog
-                appType={instanceInfo.appType}
-                instanceId={instanceInfo.instanceId}
-                mediaId={row.id}
-                title={row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title}
-              />
-            )}
-          </Flex>
-        ),
+        renderCell: ({ row }) => {
+          const current = row.customFormatScore;
+          const previous = row.previousCfScore;
+          const hasChanged = current != null && previous != null && current !== previous;
+          const increased = hasChanged && current > previous;
+          const decreased = hasChanged && current < previous;
+
+          return (
+            <Flex align="center" gap="1" style={{ width: '100%' }}>
+              <Text size="2">{current ?? '-'}</Text>
+              {increased && (
+                <Tooltip content={`Upgraded from ${previous}`}>
+                  <Text size="1" style={{ color: 'var(--green-11)', lineHeight: 1 }}>▲</Text>
+                </Tooltip>
+              )}
+              {decreased && (
+                <Tooltip content={`Decreased from ${previous}`}>
+                  <Text size="1" style={{ color: 'var(--red-11)', lineHeight: 1 }}>▼</Text>
+                </Tooltip>
+              )}
+              {instanceInfo && (
+                <CfScoreHistoryDialog
+                  appType={instanceInfo.appType}
+                  instanceId={instanceInfo.instanceId}
+                  mediaId={row.id}
+                  title={row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title}
+                />
+              )}
+            </Flex>
+          );
+        },
         renderHeaderCell: (props) => (
           <TextFilterHeaderCell
             {...props}
