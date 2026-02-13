@@ -183,8 +183,24 @@ export function InstanceCard({
                 </Flex>
                 <TextField.Root
                   type="number"
-                  value={(instance.count || 5).toString()}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInstanceConfig(appType, instance.id, 'count', parseInt(e.target.value) || 5)}
+                  min={1}
+                  value={instance.count === '' as unknown ? '' : (instance.count ?? 5).toString()}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      updateInstanceConfig(appType, instance.id, 'count', '' as unknown as number);
+                    } else {
+                      const parsed = parseInt(val);
+                      if (!isNaN(parsed)) {
+                        updateInstanceConfig(appType, instance.id, 'count', parsed);
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!instance.count || typeof instance.count !== 'number' || instance.count < 1) {
+                      updateInstanceConfig(appType, instance.id, 'count', 5);
+                    }
+                  }}
                 />
               </Flex>
 
