@@ -1,21 +1,16 @@
 # scoutarr
 
-Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by performing manual searches for media items that meet your criteria and tagging what was searched, so you can continuously chase better quality releases without babysitting your apps.
+Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by performing manual or automatic searches for media items that meet your criteria and tagging what was searched, so you can continuously chase better quality releases without babysitting your apps.
 
 > **Note:** This project uses [Upgradinatorr](https://github.com/angrycuban13/Just-A-Bunch-Of-Starr-Scripts/tree/main/Upgradinatorr) as its foundation. We've created a modern UI and enhanced the functionality while maintaining the core concept.
 
 ## Screenshots
 
 <div align="center">
-  <img src="screenshots/image.png" alt="Scoutarr Dashboard" width="800">
+  <img src="screenshots/image.png" alt="Scoutarr Dashboard" width="700">
+  <img src="screenshots/image2.png" alt="Scoutarr Settings" width="438">
+  <img src="screenshots/image3.png" alt="Scoutarr Stats" width="1098">
 </div>
-
-<table>
-  <tr>
-    <td><img src="screenshots/image2.png" alt="Scoutarr Settings" width="400"></td>
-    <td><img src="screenshots/image3.png" alt="Scoutarr Stats" width="400"></td>
-  </tr>
-</table>
 
 ## Features
 
@@ -28,9 +23,6 @@ Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Li
 - ⏱️ **Scheduler with Unattended Mode** – Run searches on a schedule; when unattended is enabled, tags are automatically cleared and re-applied when nothing matches, keeping things moving without manual intervention
 - 📊 **Dashboard & Stats** – Live-updating dashboard with recent searches, per-app/instance totals, and CF score history tracking
 - 🔔 **Notifications** – Discord, Notifiarr, and Pushover support with in-app test buttons
-- 📦 **Media Library Sync** – Scheduled sync of all media from your *arr instances to a local database for fast filtering
-- 📺 **Sonarr Episode Grid** – Expandable tree grid with episode-level detail and flat episode mode toggle
-- 🔍 **Missing Only Filter** – Filter to only search items missing from your library across all app types
 - 🎨 **Modern UI** – Built with Radix UI Themes
 - 🐳 **Docker Support** – Easy deployment with Docker Compose
 - ⚙️ **Clean Configuration** – Simple JSON-based configuration
@@ -98,15 +90,7 @@ Configuration is stored in `config/config.json`. On first run, the application w
 ## How It Works
 
 1. **Configure** – Set up your Radarr, Sonarr, Lidarr, and Readarr instances, filters, and scheduler in the Settings page.
-2. **Preview** – The Dashboard shows a live preview of what the next scheduled run will search for each instance.
-3. **Run** – Start a search manually from the Dashboard or let the scheduler run automatically.
-4. **Tag** – Items that are searched are automatically tagged, and future runs only consider untagged items (unless unattended mode clears tags to keep searching).
-
-The application filters items based on:
-- **Monitored status**
-- **Movie/Series status** (or **Any** to skip status filtering)
-- **Quality profile**
-- **Existing tags** (ignores items with the ignore tag, and only searches items without the main tag name)
+2. **Run** – Start a search manually from the Dashboard or let the scheduler run automatically.
 
 ## Logging
 
