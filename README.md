@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="screenshots/logo.png" alt="Scoutarr" width="200">
+</div>
+
 # scoutarr
 
 Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Lidarr, and Readarr) by performing manual or automatic searches for media items that meet your criteria and tagging what was searched, so you can continuously chase better quality releases without babysitting your apps.
