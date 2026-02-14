@@ -1,8 +1,6 @@
 services:
   scoutarr:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/sufxgit/scoutarr:latest
     container_name: scoutarr
     restart: unless-stopped
     ports:

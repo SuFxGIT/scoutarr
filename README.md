@@ -6,11 +6,7 @@ Scoutarr automates media upgrades in your Starr applications (Radarr, Sonarr, Li
 
 ## Screenshots
 
-<div align="center">
-  <img src="screenshots/image.png" alt="Scoutarr Dashboard" width="700">
-  <img src="screenshots/image2.png" alt="Scoutarr Settings" width="438">
-  <img src="screenshots/image3.png" alt="Scoutarr Stats" width="1098">
-</div>
+[Dashboard](screenshots/image.png) | [Settings](screenshots/image2.png) | [Stats](screenshots/image3.png)
 
 ## Features
 
