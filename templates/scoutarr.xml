@@ -13,7 +13,7 @@
   <Overview>Automate media upgrades in Radarr, Sonarr, Lidarr, and Readarr with smart filtering, scheduling, and a modern web UI.</Overview>
   <Category>MediaApp:Other Tools:</Category>
   <WebUI>http://[IP]:[PORT:5839]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/sufxgit/scoutarr/main/scoutarr.xml</TemplateURL>
+  <TemplateURL>https://raw.githubusercontent.com/sufxgit/scoutarr/main/templates/scoutarr.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/SuFxGIT/scoutarr/refs/heads/main/screenshots/unraidicon2.png</Icon>
   <ExtraParams/>
   <PostArgs/>
