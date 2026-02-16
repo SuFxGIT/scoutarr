@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>scoutarr</Name>
+  <Repository>ghcr.io/sufxgit/scoutarr:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/sufxgit/scoutarr/issues</Support>
+  <Project>https://github.com/sufxgit/scoutarr</Project>
+  <ReadMe/>
+  <Overview>Automate media upgrades in Radarr, Sonarr, Lidarr, and Readarr with smart filtering, scheduling, and a modern web UI.</Overview>
+  <Category>MediaApp:Other Tools:</Category>
+  <WebUI>http://[IP]:[PORT:5839]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/sufxgit/scoutarr/main/scoutarr.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/SuFxGIT/scoutarr/refs/heads/main/screenshots/unraidicon2.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled>1771274480</DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Port" Target="5839" Default="5839" Mode="tcp" Description="" Type="Port" Display="always" Required="true" Mask="false">5839</Config>
+  <Config Name="config" Target="/app/config" Default="" Mode="rw" Description="" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/scoutarr</Config>
+  <Config Name="TZ" Target="TZ" Default="" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false">Asia/Kuwait</Config>
+  <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false">info</Config>
+  <TailscaleStateDir/>
+</Container>
