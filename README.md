@@ -58,6 +58,45 @@ docker-compose up -d
 
 2. Open http://localhost:5839 in your browser
 
+#### Docker Compose Example
+
+```yaml
+services:
+  scoutarr:
+    image: ghcr.io/sufxgit/scoutarr:latest
+    container_name: scoutarr
+    restart: unless-stopped
+    ports:
+      - "5839:5839"
+    volumes:
+      - ./config:/app/config
+    environment:
+      - NODE_ENV=production
+      - TZ=America/New_York
+      - LOG_LEVEL=info
+```
+
+### Logging
+
+The application uses Winston for structured logging with organized, color-coded output:
+
+- **Console Output**: Color-coded logs with timestamps for easy debugging
+- **File Logs**: JSON-formatted logs saved to `logs/` directory:
+  - `combined.log` - All logs
+  - `error.log` - Error logs only
+  - `exceptions.log` - Uncaught exceptions
+  - `rejections.log` - Unhandled promise rejections
+
+**Log Levels:**
+- `error` - Errors that need attention
+- `warn` - Warnings
+- `info` - General information
+- `http` - HTTP requests/responses
+- `debug` - Detailed debugging information
+
+**Environment Variable:**
+- `LOG_LEVEL` - Set log level (default: `debug` in development, `info` in production)
+
 ## Configuration
 
 Configuration is stored in `config/config.json`. On first run, the application will create a default configuration file based on `config/config.example.json`.
@@ -91,43 +130,6 @@ Configuration is stored in `config/config.json`. On first run, the application w
 
 1. **Configure** – Set up your Radarr, Sonarr, Lidarr, and Readarr instances, filters, and scheduler in the Settings page.
 2. **Run** – Start a search manually from the Dashboard or let the scheduler run automatically.
-
-## Logging
-
-The application uses Winston for structured logging with organized, color-coded output:
-
-- **Console Output**: Color-coded logs with timestamps for easy debugging
-- **File Logs**: JSON-formatted logs saved to `logs/` directory:
-  - `combined.log` - All logs
-  - `error.log` - Error logs only
-  - `exceptions.log` - Uncaught exceptions
-  - `rejections.log` - Unhandled promise rejections
-
-**Log Levels:**
-- `error` - Errors that need attention
-- `warn` - Warnings
-- `info` - General information
-- `http` - HTTP requests/responses
-- `debug` - Detailed debugging information
-
-**Environment Variable:**
-- `LOG_LEVEL` - Set log level (default: `debug` in development, `info` in production)
-
-## API Endpoints
-
-- `GET /api/config` – Get current configuration
-- `PUT /api/config` – Update configuration
-- `POST /api/config/test/:app` – Test connection to an application
-- `POST /api/config/clear-tags/:app/:instanceId` – Clear tags from all media in a specific instance
-- `GET /api/status` – Get connection status for all applications and scheduler state
-- `POST /api/search/run` – Run the search for all configured instances
-- `POST /api/search/run-preview` – Preview what would be searched for each instance
-- `GET /api/stats` – Get aggregated search statistics
-- `GET /api/stats/recent` – Get paginated recent searches
-- `POST /api/stats/reset` – Reset all statistics
-- `POST /api/stats/clear-data` – Clear search history while keeping the database structure
-- `POST /api/notifications/test` – Send a test notification (Discord, Notifiarr, or Pushover)
-- `POST /api/sync/all` – Trigger media library sync for all instances
 
 ## License
 
