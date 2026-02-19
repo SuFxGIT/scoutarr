@@ -490,7 +490,7 @@ function Settings() {
     }
 
     // Validate URL with validator library
-    if (!validator.isURL(appConfig.url, { require_protocol: true })) {
+    if (!validator.isURL(appConfig.url, { require_protocol: true, require_tld: false })) {
         showErrorToast('Invalid URL format');
       setTestResults(prev => ({
         ...prev,
