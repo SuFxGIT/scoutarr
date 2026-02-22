@@ -24,7 +24,40 @@ type MediaItem = MediaWithFiles & {
   seasonNumber?: number;
   episodeNumber?: number;
   episodeTitle?: string;
+  externalId?: string;
 };
+
+function extractExternalId(appType: AppType, item: Record<string, unknown>): string | undefined {
+  switch (appType) {
+    case 'radarr': {
+      const tmdbId = item.tmdbId;
+      return tmdbId != null ? String(tmdbId) : undefined;
+    }
+    case 'sonarr': {
+      const titleSlug = item.titleSlug;
+      return typeof titleSlug === 'string' && titleSlug ? titleSlug : undefined;
+    }
+    case 'lidarr': {
+      const foreignArtistId = item.foreignArtistId;
+      return foreignArtistId != null ? String(foreignArtistId) : undefined;
+    }
+    case 'readarr': {
+      const foreignAuthorId = item.foreignAuthorId;
+      return foreignAuthorId != null ? String(foreignAuthorId) : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function extractExternalIdFromRawData(appType: AppType, rawData: string | null): string | undefined {
+  if (!rawData) return undefined;
+  try {
+    return extractExternalId(appType, JSON.parse(rawData) as Record<string, unknown>);
+  } catch {
+    return undefined;
+  }
+}
 
 export const mediaLibraryRouter = express.Router();
 
@@ -114,6 +147,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         seriesTitle: m.series_title ?? undefined,
         seasonNumber: m.season_number ?? undefined,
         episodeNumber: m.episode_number ?? undefined,
+        externalId: extractExternalIdFromRawData(appType as AppType, m.raw_data),
       }));
 
     }
@@ -143,6 +177,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         seasonNumber: (m as any).seasonNumber,
         episodeNumber: (m as any).episodeNumber,
         episodeTitle: (m as any).episodeTitle,
+        externalId: (m as any).externalId ?? extractExternalId(appType as AppType, m as unknown as Record<string, unknown>),
       };
     });
 
