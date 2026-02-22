@@ -737,6 +737,7 @@ class StatsService {
     season_number: number | null;
     episode_number: number | null;
     episode_file_id: number | null;
+    raw_data: string | null;
   }>> {
     if (!this.db) return [];
 
@@ -789,6 +790,7 @@ class StatsService {
         season_number: number | null;
         episode_number: number | null;
         episode_file_id: number | null;
+        raw_data: string | null;
       }>;
 
       return results.map(row => ({
@@ -810,7 +812,8 @@ class StatsService {
         series_title: row.series_title,
         season_number: row.season_number,
         episode_number: row.episode_number,
-        episode_file_id: row.episode_file_id
+        episode_file_id: row.episode_file_id,
+        raw_data: row.raw_data
       }));
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
