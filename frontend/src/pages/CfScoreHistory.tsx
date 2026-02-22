@@ -11,10 +11,9 @@ import {
   Button,
   Badge,
 } from '@radix-ui/themes';
-import { ChevronLeftIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import { ChevronLeftIcon } from '@radix-ui/react-icons';
 import { format } from 'date-fns';
 import { fetchCfScoreHistory } from '../services/mediaLibraryService';
-import { configService } from '../services/configService';
 import { useNavigation } from '../contexts/NavigationContext';
 import { formatAppName } from '../utils/helpers';
 import type { CfScoreHistoryEntry } from '@scoutarr/shared';
@@ -111,17 +110,6 @@ function ScoreStats({ history }: { history: CfScoreHistoryEntry[] }) {
   );
 }
 
-function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
-  const base = instanceUrl.replace(/\/$/, '');
-  switch (appType) {
-    case 'radarr': return `${base}/movie/${externalId}`;
-    case 'sonarr': return `${base}/series/${externalId}`;
-    case 'lidarr': return `${base}/artist/${externalId}`;
-    case 'readarr': return `${base}/author/${externalId}`;
-    default: return base;
-  }
-}
-
 function CfScoreHistory() {
   const { appType, instanceId, mediaId } = useParams<{
     appType: string;
@@ -130,7 +118,6 @@ function CfScoreHistory() {
   }>();
   const [searchParams] = useSearchParams();
   const title = searchParams.get('title') || 'Unknown';
-  const externalId = searchParams.get('externalId') || '';
   const { handleNavigation } = useNavigation();
 
   const { data, isLoading, error } = useQuery({
@@ -139,21 +126,6 @@ function CfScoreHistory() {
     enabled: !!appType && !!instanceId && !!mediaId,
     staleTime: 60_000,
   });
-
-  const { data: config } = useQuery({
-    queryKey: ['config'],
-    queryFn: () => configService.getConfig(),
-    staleTime: 5 * 60_000,
-  });
-
-  const arrUrl = (() => {
-    if (!config || !appType || !instanceId || !externalId) return null;
-    const instances = (config.applications as Record<string, Array<{ id: string; url: string }>>)[appType];
-    if (!Array.isArray(instances)) return null;
-    const instance = instances.find(i => i.id === instanceId);
-    if (!instance?.url) return null;
-    return buildArrUrl(appType, instance.url, externalId);
-  })();
 
   return (
     <Box width="100%" pt="0" mt="0">
@@ -177,14 +149,6 @@ function CfScoreHistory() {
                   )}
                 </Flex>
               </Flex>
-              {arrUrl && (
-                <Button variant="soft" size="2" asChild>
-                  <a href={arrUrl} target="_blank" rel="noopener noreferrer">
-                    Open in {formatAppName(appType || '')}
-                    <ExternalLinkIcon />
-                  </a>
-                </Button>
-              )}
             </Flex>
             <Separator size="4" />
 

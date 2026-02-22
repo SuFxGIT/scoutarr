@@ -83,7 +83,6 @@ export interface MediaLibraryItem {
   seasonNumber?: number;
   episodeNumber?: number;
   episodeTitle?: string;
-  externalId?: string;
 }
 
 export interface MediaLibraryResponse {

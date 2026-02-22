@@ -5,7 +5,6 @@ import logger from '../utils/logger.js';
 
 export interface SonarrEpisode extends FilterableMedia {
   title: string;
-  titleSlug?: string;
   seriesId: number;
   seriesTitle: string;
   seasonNumber: number;
@@ -19,7 +18,6 @@ export interface SonarrEpisode extends FilterableMedia {
 interface SonarrApiSeries {
   id: number;
   title: string;
-  titleSlug?: string;
   status: string;
   monitored: boolean;
   qualityProfileId: number;
@@ -114,7 +112,6 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrEpisode> {
           allEpisodes.push({
             id: ep.id,
             title: series.title,
-            titleSlug: series.titleSlug,
             seriesId: series.id,
             seriesTitle: series.title,
             seasonNumber: ep.seasonNumber,
