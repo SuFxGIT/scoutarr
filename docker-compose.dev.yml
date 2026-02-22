@@ -7,8 +7,8 @@ services:
     working_dir: /app
     restart: unless-stopped
     ports:
-      - "5840:5840"  # Backend API
-      - "7292:7292"  # Vite dev server
+      - "5839:5839"  # Backend API
+      - "7291:7291"  # Vite dev server
     volumes:
       # Mount source code for hot reloading
       - ./shared/src:/app/shared/src
@@ -38,7 +38,6 @@ services:
       - NODE_ENV=development
       - TZ=Asia/Kuwait
       - LOG_LEVEL=debug
-      - PORT=5840
     networks:
       - scoutarr-network
     stdin_open: true
