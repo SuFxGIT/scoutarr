@@ -90,6 +90,10 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrEpisode> {
     return episodes.filter(e => e.status === statusValue);
   }
 
+  getMediaId(media: SonarrEpisode): number {
+    return media.seriesId;
+  }
+
   async getMedia(config: SonarrInstance): Promise<SonarrEpisode[]> {
     const client = this.createClient(config);
 

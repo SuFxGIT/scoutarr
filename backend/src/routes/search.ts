@@ -125,6 +125,7 @@ async function processAppInstances<T extends StarrInstanceConfig>(
         qualityProfileName: m.quality_profile_name || undefined,
         status: m.status,
         lastSearchTime: m.last_search_time || undefined,
+        seriesId: m.series_id || undefined,
       }));
     } else {
       logger.warn('⚠️  No cached media found, will fetch from API', { instanceId, appType });
@@ -255,7 +256,7 @@ export async function processApplication<TMedia extends FilterableMedia>(
           return m.monitored === processor.config.monitored && Array.isArray(m.tags) && m.tags.includes(tagName);
         });
         if (mediaWithTag.length > 0) {
-          const mediaIds = mediaWithTag.map(processor.getMediaId);
+          const mediaIds = [...new Set(mediaWithTag.map(processor.getMediaId))];
           await processor.removeTag(processor.config, mediaIds, tagId);
 
           // Re-fetch and re-filter
@@ -287,7 +288,7 @@ export async function processApplication<TMedia extends FilterableMedia>(
     });
 
     // Search media - each service handles its own search strategy
-    const mediaIds = toSearch.map(processor.getMediaId);
+    const mediaIds = [...new Set(toSearch.map(processor.getMediaId))];
     await processor.searchMedia(processor.config, mediaIds);
 
     // Add tag using editor endpoint
