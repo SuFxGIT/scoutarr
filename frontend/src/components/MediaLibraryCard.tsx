@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useSearchParams, useLocation, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
@@ -297,6 +297,17 @@ function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
+function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
+  const base = instanceUrl.replace(/\/$/, '');
+  switch (appType) {
+    case 'radarr': return `${base}/movie/${externalId}`;
+    case 'sonarr': return `${base}/series/${externalId}`;
+    case 'lidarr': return `${base}/artist/${externalId}`;
+    case 'readarr': return `${base}/author/${externalId}`;
+    default: return base;
+  }
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
 }
@@ -377,6 +388,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     saveToStorage('scoutarr_media_library_sort_columns', sortColumns);
   }, [sortColumns]);
 
+  const navigate = useNavigate();
+
   // Parse selected instance
   const instanceInfo = useMemo(() => {
     if (!selectedInstance) return null;
@@ -385,6 +398,13 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     const instanceId = parts.slice(1).join('-');
     return { appType, instanceId };
   }, [selectedInstance]);
+
+  const instanceUrl = useMemo(() => {
+    if (!config || !instanceInfo) return null;
+    const instances = (config.applications as Record<string, Array<{ id: string; url: string }>>)[instanceInfo.appType];
+    const inst = instances?.find(i => i.id === instanceInfo.instanceId);
+    return inst?.url ?? null;
+  }, [config, instanceInfo]);
 
   const isSonarr = instanceInfo?.appType === 'sonarr';
 
@@ -784,7 +804,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
               )}
               {instanceInfo && (
                 <Link
-                  to={`/cf-history/${instanceInfo.appType}/${instanceInfo.instanceId}/${row.id}?title=${encodeURIComponent(row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title)}`}
+                  to={`/cf-history/${instanceInfo.appType}/${instanceInfo.instanceId}/${row.id}?title=${encodeURIComponent(row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title)}${row.externalId ? `&externalId=${encodeURIComponent(row.externalId)}` : ''}`}
                   onClick={(e: React.MouseEvent) => e.stopPropagation()}
                   style={{ display: 'flex', alignItems: 'center' }}
                 >
@@ -885,8 +905,60 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     // Reorderable columns
     cols.push(...columnOrder.map(key => allColumns[key]));
 
+    // Actions column (fixed, always last)
+    cols.push({
+      key: 'actions',
+      name: '',
+      width: 44,
+      minWidth: 44,
+      maxWidth: 44,
+      resizable: false,
+      sortable: false,
+      draggable: false,
+      renderHeaderCell: () => null,
+      renderCell: ({ row }) => {
+        const cfHistoryPath = `/cf-history/${instanceInfo?.appType}/${instanceInfo?.instanceId}/${row.id}?title=${encodeURIComponent(
+          row.seriesTitle
+            ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`
+            : row.title
+        )}${row.externalId ? `&externalId=${encodeURIComponent(row.externalId)}` : ''}`;
+
+        const arrUrl = instanceUrl && row.externalId && instanceInfo
+          ? buildArrUrl(instanceInfo.appType, instanceUrl, row.externalId)
+          : null;
+
+        return (
+          <Flex align="center" justify="center" style={{ width: '100%', height: '100%' }}>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <IconButton size="1" variant="ghost" color="gray">
+                  <DotsHorizontalIcon />
+                </IconButton>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content
+                align="end"
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              >
+                {arrUrl && (
+                  <DropdownMenu.Item onSelect={() => window.open(arrUrl, '_blank', 'noopener,noreferrer')}>
+                    <ExternalLinkIcon />
+                    Open in {formatAppName(instanceInfo!.appType)}
+                  </DropdownMenu.Item>
+                )}
+                {arrUrl && <DropdownMenu.Separator />}
+                <DropdownMenu.Item onSelect={() => navigate(cfHistoryPath)}>
+                  <MagnifyingGlassIcon />
+                  CF History
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Flex>
+        );
+      },
+    });
+
     return cols;
-  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode]);
+  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode, instanceInfo, instanceUrl, navigate]);
 
   const sharedGridProps = {
     className: 'media-library-grid',
