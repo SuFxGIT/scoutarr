@@ -305,7 +305,10 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     }
 
     // Record in search history
-    const items = await statsService.getMediaTitlesByIds(instanceId, mediaIds);
+    // For Sonarr, mediaIds are series IDs (converted on the frontend), so look up by series_id
+    const items = appType === 'sonarr'
+      ? await statsService.getSeriesTitlesByIds(instanceId, mediaIds)
+      : await statsService.getMediaTitlesByIds(instanceId, mediaIds);
     await statsService.addSearch(appType, mediaIds.length, items, instance.name);
 
     // Return success

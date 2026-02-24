@@ -856,6 +856,22 @@ class StatsService {
     }
   }
 
+  async getSeriesTitlesByIds(instanceId: string, seriesIds: number[]): Promise<Array<{ id: number; title: string }>> {
+    if (!this.db || seriesIds.length === 0) return [];
+
+    try {
+      const placeholders = seriesIds.map(() => '?').join(',');
+      const stmt = this.db.prepare(`
+        SELECT DISTINCT series_id as id, title FROM media_library
+        WHERE instance_id = ? AND series_id IN (${placeholders})
+      `);
+      return stmt.all(instanceId, ...seriesIds) as Array<{ id: number; title: string }>;
+    } catch (error: unknown) {
+      logger.error('❌ Error fetching series titles', { error: getErrorMessage(error) });
+      return [];
+    }
+  }
+
   // ========== CF Score History ==========
 
   async getCfScoreHistory(
