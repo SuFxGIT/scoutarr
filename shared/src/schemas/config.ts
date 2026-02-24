@@ -14,7 +14,7 @@ const validateCronExpression = (cron: string) => {
 // Reusable URL validation
 const urlValidation = z.string().refine((val) => {
   if (val === '') return true;
-  return validator.isURL(val, { require_protocol: true });
+  return validator.isURL(val, { require_protocol: true, require_tld: false });
 }, {
   message: 'Invalid URL format',
 });
