@@ -1000,7 +1000,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
               return (
                 <Popover.Root>
                   <Popover.Trigger>
-                    <IconButton
+                    <Button
                       size="2"
                       variant="ghost"
                       color={filtersActive ? 'blue' : 'gray'}
@@ -1008,7 +1008,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                       aria-label="Filters"
                     >
                       <MixerHorizontalIcon />
-                    </IconButton>
+                      Apply Filters
+                    </Button>
                   </Popover.Trigger>
                   <Popover.Content width="220px" align="end">
                     <Flex direction="column" gap="3">
