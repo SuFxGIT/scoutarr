@@ -21,6 +21,7 @@ import {
   SegmentedControl,
   IconButton,
   DropdownMenu,
+  Popover,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -34,6 +35,7 @@ import {
   CalendarIcon,
   DotsHorizontalIcon,
   ExternalLinkIcon,
+  MixerHorizontalIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -322,6 +324,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const [expandedGroupIds, setExpandedGroupIds] = useState<ReadonlySet<unknown>>(new Set());
   const [episodeMode, setEpisodeMode] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -543,6 +546,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       filtered = filtered.filter(item => item.hasFile === false);
     }
 
+    if (showMonitoredOnly) {
+      filtered = filtered.filter(item => item.monitored === true);
+    }
+
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
       filtered = filtered.filter(item => {
@@ -661,7 +668,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -988,26 +995,52 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 } ({selectedMediaIds.size} selected)
               </Text>
             )}
-            {mediaData && (
-              <Flex align="center" gap="1">
-                <Text size="1" color="gray">Missing Only</Text>
-                <Switch
-                  size="1"
-                  checked={showMissingOnly}
-                  onCheckedChange={setShowMissingOnly}
-                />
-              </Flex>
-            )}
-            {isSonarr && mediaData && (
-              <SegmentedControl.Root
-                size="1"
-                value={episodeMode ? 'episodes' : 'series'}
-                onValueChange={(value) => setEpisodeMode(value === 'episodes')}
-              >
-                <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
-                <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
-              </SegmentedControl.Root>
-            )}
+            {mediaData && (() => {
+              const filtersActive = showMonitoredOnly || showMissingOnly || (isSonarr && episodeMode);
+              return (
+                <Popover.Root>
+                  <Popover.Trigger>
+                    <IconButton
+                      size="2"
+                      variant="ghost"
+                      color={filtersActive ? 'blue' : 'gray'}
+                      radius="full"
+                      aria-label="Filters"
+                    >
+                      <MixerHorizontalIcon />
+                    </IconButton>
+                  </Popover.Trigger>
+                  <Popover.Content width="220px" align="end">
+                    <Flex direction="column" gap="3">
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Monitored Only</Text>
+                        <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
+                      </Flex>
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Missing Only</Text>
+                        <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+                      </Flex>
+                      {isSonarr && (
+                        <>
+                          <Separator size="4" />
+                          <Flex direction="column" gap="2">
+                            <Text size="2">View Mode</Text>
+                            <SegmentedControl.Root
+                              size="1"
+                              value={episodeMode ? 'episodes' : 'series'}
+                              onValueChange={(value) => setEpisodeMode(value === 'episodes')}
+                            >
+                              <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
+                              <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
+                            </SegmentedControl.Root>
+                          </Flex>
+                        </>
+                      )}
+                    </Flex>
+                  </Popover.Content>
+                </Popover.Root>
+              );
+            })()}
             {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
                 <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
