@@ -37,3 +37,6 @@ logs/
 
 # Docker
 .dockerignore
+
+# Local helpers
+helper.md

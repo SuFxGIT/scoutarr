@@ -737,6 +737,7 @@ class StatsService {
     season_number: number | null;
     episode_number: number | null;
     episode_file_id: number | null;
+    raw_data: string | null;
   }>> {
     if (!this.db) return [];
 
@@ -789,6 +790,7 @@ class StatsService {
         season_number: number | null;
         episode_number: number | null;
         episode_file_id: number | null;
+        raw_data: string | null;
       }>;
 
       return results.map(row => ({
@@ -810,7 +812,8 @@ class StatsService {
         series_title: row.series_title,
         season_number: row.season_number,
         episode_number: row.episode_number,
-        episode_file_id: row.episode_file_id
+        episode_file_id: row.episode_file_id,
+        raw_data: row.raw_data
       }));
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
@@ -849,6 +852,22 @@ class StatsService {
       return stmt.all(instanceId, ...mediaIds) as Array<{ id: number; title: string }>;
     } catch (error: unknown) {
       logger.error('❌ Error fetching media titles', { error: getErrorMessage(error) });
+      return [];
+    }
+  }
+
+  async getSeriesTitlesByIds(instanceId: string, seriesIds: number[]): Promise<Array<{ id: number; title: string }>> {
+    if (!this.db || seriesIds.length === 0) return [];
+
+    try {
+      const placeholders = seriesIds.map(() => '?').join(',');
+      const stmt = this.db.prepare(`
+        SELECT DISTINCT series_id as id, title FROM media_library
+        WHERE instance_id = ? AND series_id IN (${placeholders})
+      `);
+      return stmt.all(instanceId, ...seriesIds) as Array<{ id: number; title: string }>;
+    } catch (error: unknown) {
+      logger.error('❌ Error fetching series titles', { error: getErrorMessage(error) });
       return [];
     }
   }

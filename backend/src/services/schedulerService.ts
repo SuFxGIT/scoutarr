@@ -75,13 +75,15 @@ class SchedulerService {
 
     this.globalCurrentSchedule = schedule;
 
+    const timezone = process.env.TZ || 'UTC';
+    logger.info('🕐 Scheduling with timezone', { timezone });
     this.globalTask = cron.schedule(
       schedule,
       async () => {
         await this.runGlobalScheduledSearch(schedule);
       },
       {
-        timezone: 'UTC'
+        timezone
       }
     );
 
@@ -151,7 +153,7 @@ class SchedulerService {
 
     try {
       const interval = CronExpressionParser.parse(schedule, {
-        tz: 'UTC'
+        tz: process.env.TZ || 'UTC'
       });
       return interval.next().toDate();
     } catch (error: unknown) {

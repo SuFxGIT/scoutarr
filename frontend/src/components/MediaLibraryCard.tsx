@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useSearchParams, useLocation, Link } from 'react-router-dom';
+import { useSearchParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import '../styles/media-library-grid.css';
@@ -20,6 +20,8 @@ import {
   Switch,
   SegmentedControl,
   IconButton,
+  DropdownMenu,
+  Popover,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -31,6 +33,9 @@ import {
   ClockIcon,
   DotFilledIcon,
   CalendarIcon,
+  DotsHorizontalIcon,
+  ExternalLinkIcon,
+  MixerHorizontalIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -292,6 +297,17 @@ function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
+function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
+  const base = instanceUrl.replace(/\/$/, '');
+  switch (appType) {
+    case 'radarr': return `${base}/movie/${externalId}`;
+    case 'sonarr': return `${base}/series/${externalId}`;
+    case 'lidarr': return `${base}/artist/${externalId}`;
+    case 'readarr': return `${base}/author/${externalId}`;
+    default: return base;
+  }
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
 }
@@ -308,6 +324,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
   const [expandedGroupIds, setExpandedGroupIds] = useState<ReadonlySet<unknown>>(new Set());
   const [episodeMode, setEpisodeMode] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -371,6 +388,8 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     saveToStorage('scoutarr_media_library_sort_columns', sortColumns);
   }, [sortColumns]);
 
+  const navigate = useNavigate();
+
   // Parse selected instance
   const instanceInfo = useMemo(() => {
     if (!selectedInstance) return null;
@@ -379,6 +398,13 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     const instanceId = parts.slice(1).join('-');
     return { appType, instanceId };
   }, [selectedInstance]);
+
+  const instanceUrl = useMemo(() => {
+    if (!config || !instanceInfo) return null;
+    const instances = (config.applications as Record<string, Array<{ id: string; url: string }>>)[instanceInfo.appType];
+    const inst = instances?.find(i => i.id === instanceInfo.instanceId);
+    return inst?.url ?? null;
+  }, [config, instanceInfo]);
 
   const isSonarr = instanceInfo?.appType === 'sonarr';
 
@@ -520,6 +546,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       filtered = filtered.filter(item => item.hasFile === false);
     }
 
+    if (showMonitoredOnly) {
+      filtered = filtered.filter(item => item.monitored === true);
+    }
+
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
       filtered = filtered.filter(item => {
@@ -638,7 +668,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -774,7 +804,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
               )}
               {instanceInfo && (
                 <Link
-                  to={`/cf-history/${instanceInfo.appType}/${instanceInfo.instanceId}/${row.id}?title=${encodeURIComponent(row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title)}`}
+                  to={`/cf-history/${instanceInfo.appType}/${instanceInfo.instanceId}/${row.id}?title=${encodeURIComponent(row.seriesTitle ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}` : row.title)}${row.externalId ? `&externalId=${encodeURIComponent(row.externalId)}` : ''}`}
                   onClick={(e: React.MouseEvent) => e.stopPropagation()}
                   style={{ display: 'flex', alignItems: 'center' }}
                 >
@@ -875,8 +905,60 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     // Reorderable columns
     cols.push(...columnOrder.map(key => allColumns[key]));
 
+    // Actions column (fixed, always last)
+    cols.push({
+      key: 'actions',
+      name: '',
+      width: 44,
+      minWidth: 44,
+      maxWidth: 44,
+      resizable: false,
+      sortable: false,
+      draggable: false,
+      renderHeaderCell: () => null,
+      renderCell: ({ row }) => {
+        const cfHistoryPath = `/cf-history/${instanceInfo?.appType}/${instanceInfo?.instanceId}/${row.id}?title=${encodeURIComponent(
+          row.seriesTitle
+            ? `${row.seriesTitle} - S${String(row.seasonNumber ?? 0).padStart(2, '0')}E${String(row.episodeNumber ?? 0).padStart(2, '0')}`
+            : row.title
+        )}${row.externalId ? `&externalId=${encodeURIComponent(row.externalId)}` : ''}`;
+
+        const arrUrl = instanceUrl && row.externalId && instanceInfo
+          ? buildArrUrl(instanceInfo.appType, instanceUrl, row.externalId)
+          : null;
+
+        return (
+          <Flex align="center" justify="center" style={{ width: '100%', height: '100%' }}>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <IconButton size="1" variant="ghost" color="gray">
+                  <DotsHorizontalIcon />
+                </IconButton>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content
+                align="end"
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              >
+                {arrUrl && (
+                  <DropdownMenu.Item onSelect={() => window.open(arrUrl, '_blank', 'noopener,noreferrer')}>
+                    <ExternalLinkIcon />
+                    Open in {formatAppName(instanceInfo!.appType)}
+                  </DropdownMenu.Item>
+                )}
+                {arrUrl && <DropdownMenu.Separator />}
+                <DropdownMenu.Item onSelect={() => navigate(cfHistoryPath)}>
+                  <MagnifyingGlassIcon />
+                  CF History
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          </Flex>
+        );
+      },
+    });
+
     return cols;
-  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode]);
+  }, [columnFilters, handleFilterChange, filterOptions, mediaData?.scoutarrTags, columnOrder, isSonarr, episodeMode, instanceInfo, instanceUrl, navigate]);
 
   const sharedGridProps = {
     className: 'media-library-grid',
@@ -913,26 +995,53 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 } ({selectedMediaIds.size} selected)
               </Text>
             )}
-            {mediaData && (
-              <Flex align="center" gap="1">
-                <Text size="1" color="gray">Missing Only</Text>
-                <Switch
-                  size="1"
-                  checked={showMissingOnly}
-                  onCheckedChange={setShowMissingOnly}
-                />
-              </Flex>
-            )}
-            {isSonarr && mediaData && (
-              <SegmentedControl.Root
-                size="1"
-                value={episodeMode ? 'episodes' : 'series'}
-                onValueChange={(value) => setEpisodeMode(value === 'episodes')}
-              >
-                <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
-                <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
-              </SegmentedControl.Root>
-            )}
+            {mediaData && (() => {
+              const filtersActive = showMonitoredOnly || showMissingOnly || (isSonarr && episodeMode);
+              return (
+                <Popover.Root>
+                  <Popover.Trigger>
+                    <Button
+                      size="2"
+                      variant="ghost"
+                      color={filtersActive ? 'blue' : 'gray'}
+                      radius="full"
+                      aria-label="Filters"
+                    >
+                      <MixerHorizontalIcon />
+                      Apply Filters
+                    </Button>
+                  </Popover.Trigger>
+                  <Popover.Content width="220px" align="end">
+                    <Flex direction="column" gap="3">
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Monitored Only</Text>
+                        <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
+                      </Flex>
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Missing Only</Text>
+                        <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+                      </Flex>
+                      {isSonarr && (
+                        <>
+                          <Separator size="4" />
+                          <Flex direction="column" gap="2">
+                            <Text size="2">View Mode</Text>
+                            <SegmentedControl.Root
+                              size="1"
+                              value={episodeMode ? 'episodes' : 'series'}
+                              onValueChange={(value) => setEpisodeMode(value === 'episodes')}
+                            >
+                              <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
+                              <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
+                            </SegmentedControl.Root>
+                          </Flex>
+                        </>
+                      )}
+                    </Flex>
+                  </Popover.Content>
+                </Popover.Root>
+              );
+            })()}
             {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
                 <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
