@@ -1145,6 +1145,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                   rowGrouper={rowGrouper}
                   expandedGroupIds={expandedGroupIds}
                   onExpandedGroupIdsChange={setExpandedGroupIds}
+                  groupIdGetter={(groupKey, parentId) =>
+                    parentId !== undefined ? `grp:${parentId}::${groupKey}` : `grp::${groupKey}`
+                  }
                 />
               ) : (
                 <DataGrid {...sharedGridProps} />

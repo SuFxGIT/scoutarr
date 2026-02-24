@@ -127,7 +127,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       const mediaId = service.getMediaId(m);
 
       return {
-        id: mediaId,
+        id: m.id,
         title: service.getMediaTitle(m),
         monitored: m.monitored,
         status: m.status,
