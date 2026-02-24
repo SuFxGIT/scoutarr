@@ -7,7 +7,7 @@ services:
     working_dir: /app
     restart: unless-stopped
     ports:
-      - "5839:5839"  # Backend API
+      - "5840:5839"  # Backend API
       - "7291:7291"  # Vite dev server
     volumes:
       # Mount source code for hot reloading
