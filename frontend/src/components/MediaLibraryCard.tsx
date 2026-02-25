@@ -506,13 +506,11 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
   // Sonarr tag warning dialog state
   const [showSonarrTagDialog, setShowSonarrTagDialog] = useState(false);
-  const [pendingManualSearch, setPendingManualSearch] = useState(false);
 
   const handleManualSearch = useCallback(() => {
     if (selectedMediaIds.size === 0) return;
     if (isSonarr) {
       setShowSonarrTagDialog(true);
-      setPendingManualSearch(true);
     } else {
       searchMutation.mutate();
     }
@@ -520,12 +518,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
 
   const confirmSonarrManualSearch = () => {
     setShowSonarrTagDialog(false);
-    setPendingManualSearch(false);
     searchMutation.mutate();
   };
   const cancelSonarrManualSearch = () => {
     setShowSonarrTagDialog(false);
-    setPendingManualSearch(false);
   };
 
   // Extract unique values for dropdown filters

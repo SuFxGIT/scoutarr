@@ -19,7 +19,6 @@ import { formatAppName } from '../utils/helpers';
 import { ExternalLinkIcon } from '@radix-ui/react-icons';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { APP_TYPES } from '../utils/constants';
 import type { CfScoreHistoryEntry } from '@scoutarr/shared';
 
 const MAX_CHART_BARS = 120;
