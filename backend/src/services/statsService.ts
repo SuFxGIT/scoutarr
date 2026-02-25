@@ -149,6 +149,7 @@ class StatsService {
         date_imported TEXT,
         has_file INTEGER NOT NULL DEFAULT 0,
         custom_format_score INTEGER,
+        external_id TEXT,
         raw_data TEXT,
         synced_at TEXT NOT NULL,
         series_id INTEGER,
@@ -160,6 +161,15 @@ class StatsService {
         FOREIGN KEY (instance_id) REFERENCES instances(instance_id) ON DELETE CASCADE
       )
     `);
+
+    // Migration: Add external_id column if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE media_library ADD COLUMN external_id TEXT`);
+      logger.info('✅ Added external_id column to media_library table');
+    } catch (error) {
+      // Column already exists or other error - ignore
+      // SQLite will throw "duplicate column name" error if column exists
+    }
   }
 
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
@@ -602,6 +612,7 @@ class StatsService {
       seasonNumber?: number;
       episodeNumber?: number;
       episodeFileId?: number;
+      externalId?: string;
       [key: string]: unknown;
     }>
   ): Promise<void> {
@@ -614,9 +625,9 @@ class StatsService {
         INSERT INTO media_library (
           instance_id, media_id, title, monitored, tags, quality_profile_id,
           status, last_search_time, date_imported, has_file,
-          custom_format_score, raw_data, synced_at,
+          custom_format_score, external_id, raw_data, synced_at,
           series_id, series_title, season_number, episode_number, episode_file_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id, media_id) DO UPDATE SET
           title = excluded.title,
           monitored = excluded.monitored,
@@ -627,6 +638,7 @@ class StatsService {
           date_imported = excluded.date_imported,
           has_file = excluded.has_file,
           custom_format_score = excluded.custom_format_score,
+          external_id = excluded.external_id,
           raw_data = excluded.raw_data,
           synced_at = excluded.synced_at,
           series_id = excluded.series_id,
@@ -671,6 +683,7 @@ class StatsService {
             fileInfo.dateImported || null,
             fileInfo.hasFile,
             fileInfo.customFormatScore,
+            item.externalId || null,
             JSON.stringify(item),
             syncTime,
             item.seriesId ?? null,
@@ -731,6 +744,7 @@ class StatsService {
     date_imported: string | null;
     has_file: boolean;
     custom_format_score: number | null;
+    external_id: string | null;
     synced_at: string;
     series_id: number | null;
     series_title: string | null;
@@ -783,6 +797,7 @@ class StatsService {
         date_imported: string | null;
         has_file: number;
         custom_format_score: number | null;
+        external_id: string | null;
         synced_at: string;
         series_id: number | null;
         series_title: string | null;
@@ -805,6 +820,7 @@ class StatsService {
         date_imported: row.date_imported,
         has_file: row.has_file === 1,
         custom_format_score: row.custom_format_score,
+        external_id: row.external_id,
         synced_at: row.synced_at,
         series_id: row.series_id,
         series_title: row.series_title,

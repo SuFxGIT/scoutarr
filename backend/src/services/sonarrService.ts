@@ -130,7 +130,8 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrEpisode> {
             episodeFile: ep.episodeFile ? {
               dateAdded: ep.episodeFile.dateAdded,
               customFormatScore: ep.episodeFile.customFormatScore
-            } : undefined
+            } : undefined,
+            titleSlug: series.titleSlug // <-- crucial for redirect
           });
         }
       } catch (error: unknown) {

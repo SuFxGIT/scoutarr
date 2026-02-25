@@ -19,6 +19,7 @@ type MediaItem = MediaWithFiles & {
   qualityProfileName?: string;
   status: string;
   lastSearchTime?: string;
+  externalId?: string;
   seriesId?: number;
   seriesTitle?: string;
   seasonNumber?: number;
@@ -79,9 +80,27 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         appType: appType as AppType,
         instance
       });
-      
-      allMedia = syncResult.mediaWithTags as MediaItem[];
-      
+      allMedia = (syncResult.mediaWithTags as MediaItem[]).map(m => {
+        const mediaAny = m as any;
+        let externalId: string | undefined;
+        switch (appType) {
+          case 'radarr':
+            externalId = mediaAny.tmdbId ? String(mediaAny.tmdbId) : undefined;
+            break;
+          case 'sonarr':
+            externalId = mediaAny.titleSlug || undefined;
+            break;
+          case 'lidarr':
+            externalId = mediaAny.foreignArtistId || String(m.id);
+            break;
+          case 'readarr':
+            externalId = mediaAny.foreignAuthorId || String(m.id);
+            break;
+          default:
+            externalId = String(m.id);
+        }
+        return { ...m, externalId };
+      });
       // Sync to database
       logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
       await statsService.syncMediaToDatabase(instanceId, allMedia);
@@ -92,8 +111,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
       const dbMedia = await statsService.getMediaFromDatabase(instanceId);
       logger.debug('✅ [Scoutarr DB] Loaded media from database', { count: dbMedia.length });
       fromCache = true;
-
-      // Convert database format to API format
       allMedia = dbMedia.map(m => ({
         id: m.media_id,
         title: m.title,
@@ -102,6 +119,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         qualityProfileName: m.quality_profile_name ?? undefined,
         status: m.status,
         lastSearchTime: m.last_search_time ?? undefined,
+        externalId: m.external_id ?? undefined,
         movieFile: m.date_imported ? {
           dateAdded: m.date_imported,
           customFormatScore: m.custom_format_score ?? undefined
@@ -115,7 +133,6 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         seasonNumber: m.season_number ?? undefined,
         episodeNumber: m.episode_number ?? undefined,
       }));
-
     }
 
     // Fetch previous CF scores (second-most-recent from history) in one query
@@ -125,6 +142,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
     const mediaWithDates = allMedia.map(m => {
       const fileInfo = extractFileInfo(m);
       const mediaId = service.getMediaId(m);
+      const mediaAny = m as any;
 
       return {
         id: m.id,
@@ -138,11 +156,12 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         customFormatScore: fileInfo.customFormatScore,
         previousCfScore: previousCfScores.has(mediaId) ? previousCfScores.get(mediaId) : undefined,
         hasFile: fileInfo.hasFile,
-        seriesId: (m as any).seriesId,
-        seriesTitle: (m as any).seriesTitle,
-        seasonNumber: (m as any).seasonNumber,
-        episodeNumber: (m as any).episodeNumber,
-        episodeTitle: (m as any).episodeTitle,
+        externalId: mediaAny.externalId,
+        seriesId: mediaAny.seriesId,
+        seriesTitle: mediaAny.seriesTitle,
+        seasonNumber: mediaAny.seasonNumber,
+        episodeNumber: mediaAny.episodeNumber,
+        episodeTitle: mediaAny.episodeTitle,
       };
     });
 
