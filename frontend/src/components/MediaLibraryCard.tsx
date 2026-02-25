@@ -14,6 +14,7 @@ import {
   Box,
   Select,
   Callout,
+  AlertDialog,
   TextField,
   Tooltip,
   Badge,
@@ -36,6 +37,7 @@ import {
   DotsHorizontalIcon,
   ExternalLinkIcon,
   MixerHorizontalIcon,
+  ReloadIcon,
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
@@ -501,10 +503,30 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     setSearchParams({ instance: value });
   };
 
-  const handleManualSearch = useCallback(async () => {
+
+  // Sonarr tag warning dialog state
+  const [showSonarrTagDialog, setShowSonarrTagDialog] = useState(false);
+  const [pendingManualSearch, setPendingManualSearch] = useState(false);
+
+  const handleManualSearch = useCallback(() => {
     if (selectedMediaIds.size === 0) return;
+    if (isSonarr) {
+      setShowSonarrTagDialog(true);
+      setPendingManualSearch(true);
+    } else {
+      searchMutation.mutate();
+    }
+  }, [selectedMediaIds.size, isSonarr, searchMutation]);
+
+  const confirmSonarrManualSearch = () => {
+    setShowSonarrTagDialog(false);
+    setPendingManualSearch(false);
     searchMutation.mutate();
-  }, [selectedMediaIds.size, searchMutation]);
+  };
+  const cancelSonarrManualSearch = () => {
+    setShowSonarrTagDialog(false);
+    setPendingManualSearch(false);
+  };
 
   // Extract unique values for dropdown filters
   const filterOptions = useMemo(() => {
@@ -1042,6 +1064,22 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                 </Popover.Root>
               );
             })()}
+            {selectedInstance && (
+              <Tooltip content="Sync from *arr instance to update media list">
+                <Button
+                  size="2"
+                  variant="ghost"
+                  color="gray"
+                  radius="full"
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  aria-label="Sync Library"
+                >
+                  <ReloadIcon />
+                  {syncMutation.isPending ? 'Syncing...' : 'Sync'}
+                </Button>
+              </Tooltip>
+            )}
             {config && hasAnyInstances && (
               <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
                 <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
@@ -1181,6 +1219,28 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
                   </>
                 )}
               </Button>
+
+              {/* Sonarr tag warning popup */}
+              <AlertDialog.Root open={showSonarrTagDialog} onOpenChange={(open) => { if (!open) cancelSonarrManualSearch(); }}>
+                <AlertDialog.Content maxWidth="420px">
+                  <AlertDialog.Title>Sonarr Tagging Warning</AlertDialog.Title>
+                  <AlertDialog.Description size="3" mb="4">
+                    When manually searching in Sonarr, tags are applied at the <b>series</b> level, not per episode, <b>due to upgradiantorr behavior</b>. This means all episodes in the selected series will be tagged. Proceed?
+                  </AlertDialog.Description>
+                  <Flex gap="3" justify="end">
+                    <AlertDialog.Cancel>
+                      <Button variant="soft" color="gray" onClick={cancelSonarrManualSearch}>
+                        Cancel
+                      </Button>
+                    </AlertDialog.Cancel>
+                    <AlertDialog.Action>
+                      <Button variant="solid" color="blue" onClick={confirmSonarrManualSearch}>
+                        Continue
+                      </Button>
+                    </AlertDialog.Action>
+                  </Flex>
+                </AlertDialog.Content>
+              </AlertDialog.Root>
             </Flex>
           </>
         )}

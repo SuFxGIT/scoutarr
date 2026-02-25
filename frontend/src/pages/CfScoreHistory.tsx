@@ -16,6 +16,10 @@ import { format } from 'date-fns';
 import { fetchCfScoreHistory } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
 import { formatAppName } from '../utils/helpers';
+import { ExternalLinkIcon } from '@radix-ui/react-icons';
+import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { APP_TYPES } from '../utils/constants';
 import type { CfScoreHistoryEntry } from '@scoutarr/shared';
 
 const MAX_CHART_BARS = 120;
@@ -110,6 +114,17 @@ function ScoreStats({ history }: { history: CfScoreHistoryEntry[] }) {
   );
 }
 
+function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
+  const base = instanceUrl.replace(/\/$/, '');
+  switch (appType) {
+    case 'radarr': return `${base}/movie/${externalId}`;
+    case 'sonarr': return `${base}/series/${externalId}`;
+    case 'lidarr': return `${base}/artist/${externalId}`;
+    case 'readarr': return `${base}/author/${externalId}`;
+    default: return base;
+  }
+}
+
 function CfScoreHistory() {
   const { appType, instanceId, mediaId } = useParams<{
     appType: string;
@@ -127,13 +142,25 @@ function CfScoreHistory() {
     staleTime: 60_000,
   });
 
+  // Get externalId from search params
+  const externalId = searchParams.get('externalId');
+  // Get instanceUrl from config (via react-query cache)
+  const queryClient = useQueryClient();
+  const config = queryClient.getQueryData(['config']);
+  const instanceUrl = useMemo(() => {
+    if (!config || !instanceId || !appType) return null;
+    const appConfig = (config as any).applications?.[appType] || [];
+    const inst = appConfig.find((i: any) => i.id === instanceId);
+    return inst?.url ?? null;
+  }, [config, instanceId, appType]);
+
   return (
     <Box width="100%" pt="0" mt="0">
       <Flex direction="column" gap="3">
         <Button variant="ghost" style={{ alignSelf: 'flex-start' }} onClick={() => handleNavigation('/')}>
           <ChevronLeftIcon /> Back to Dashboard
         </Button>
-
+        {/* Redirect Link Button removed (duplicate) */}
         <Card>
           <Flex direction="column" gap="3">
             <Flex align="center" justify="between" gap="3">
@@ -149,6 +176,16 @@ function CfScoreHistory() {
                   )}
                 </Flex>
               </Flex>
+              {externalId && instanceUrl && appType && (
+                <Button
+                  variant="outline"
+                  color="gray"
+                  style={{ marginLeft: 16 }}
+                  onClick={() => window.open(buildArrUrl(appType, instanceUrl, externalId), '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLinkIcon /> Open in {formatAppName(appType)}
+                </Button>
+              )}
             </Flex>
             <Separator size="4" />
 
