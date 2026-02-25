@@ -13,11 +13,13 @@ export interface SonarrEpisode extends FilterableMedia {
   episodeFileId?: number;
   episodeFile?: { dateAdded?: string; customFormatScore?: number };
   hasFile: boolean;
+  titleSlug?: string;
 }
 
 interface SonarrApiSeries {
   id: number;
   title: string;
+  titleSlug: string;
   status: string;
   monitored: boolean;
   qualityProfileId: number;
