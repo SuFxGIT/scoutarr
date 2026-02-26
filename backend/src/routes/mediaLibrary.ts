@@ -99,7 +99,7 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
           default:
             externalId = String(m.id);
         }
-        return { ...m, externalId };
+        return { ...m, externalId, title: service.getMediaTitle(m) };
       });
       // Sync to database
       logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
