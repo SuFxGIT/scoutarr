@@ -603,7 +603,9 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
     if (columnFilters.dateImported.trim()) {
       filtered = filtered.filter(filterByDate('dateImported', columnFilters.dateImported));
     }
-    if (columnFilters.tags !== 'all') {
+    if (columnFilters.tags === '__none__') {
+      filtered = filtered.filter(item => !item.tags || !Array.isArray(item.tags) || item.tags.length === 0);
+    } else if (columnFilters.tags !== 'all') {
       filtered = filtered.filter(item => {
         if (!item.tags || !Array.isArray(item.tags)) return false;
         return item.tags.includes(columnFilters.tags);
@@ -860,6 +862,7 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
             onFilterChange={(value) => handleFilterChange('tags', value)}
             options={[
               { value: 'all', label: 'All' },
+              { value: '__none__', label: 'None' },
               ...filterOptions.tags.map(tag => ({ value: tag, label: tag }))
             ]}
           />

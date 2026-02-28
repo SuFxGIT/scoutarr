@@ -206,7 +206,7 @@ export function InstanceCard({
 
               <Flex direction="column" gap="2">
                 <Flex align="center" gap="1">
-                  <Text size="2" weight="medium">Tag Name (optional)</Text>
+                  <Text size="2" weight="medium">Tag Name (required)</Text>
                   <Tooltip content={`The tag name to use for tracking which ${appInfo.mediaTypePlural} have been searched. This tag will be created automatically if it doesn't exist.`}>
                     <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
                   </Tooltip>
