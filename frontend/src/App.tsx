@@ -1,7 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useSearchParams, useLocation } from 'react-router-dom';
 import React, { lazy, Suspense } from 'react';
 import { Flex, Heading, Button, Separator, Box, Spinner, Text } from '@radix-ui/themes';
-import { GearIcon, HomeIcon } from '@radix-ui/react-icons';
+import { GearIcon, HomeIcon, Pencil1Icon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -12,11 +12,25 @@ const CfScoreHistory = lazy(() => import('./pages/CfScoreHistory'));
 
 function NavigationLinks() {
   const { handleNavigation } = useNavigation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+
+  const isOnDashboard = location.pathname === '/';
+  const isEditMode = searchParams.get('edit') === '1';
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     // Always intercept navigation to allow guards to check
     e.preventDefault();
     handleNavigation(path);
+  };
+
+  const toggleEditMode = () => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (isEditMode) next.delete('edit');
+      else next.set('edit', '1');
+      return next;
+    });
   };
 
   return (
@@ -37,6 +51,14 @@ function NavigationLinks() {
             <HomeIcon /> Home
           </Link>
         </Button>
+        {isOnDashboard && (
+          <Button
+            variant={isEditMode ? 'solid' : 'ghost'}
+            onClick={toggleEditMode}
+          >
+            <Pencil1Icon /> Edit Dashboard
+          </Button>
+        )}
         <Button variant="ghost" asChild>
           <Link to="/settings" onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/settings')}>
             <GearIcon /> Settings

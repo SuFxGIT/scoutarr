@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from 'react';
 import { useSearchParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
@@ -312,9 +312,10 @@ function buildArrUrl(appType: string, instanceUrl: string, externalId: string): 
 
 interface MediaLibraryCardProps {
   config?: Config;
+  headerActions?: ReactNode;
 }
 
-export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
+export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProps) {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -1006,7 +1007,10 @@ export function MediaLibraryCard({ config }: MediaLibraryCardProps) {
       <Flex direction="column" gap="3">
         {/* Header */}
         <Flex align="center" justify="between" gap="3">
-          <Heading size="5">Media Library</Heading>
+          <Flex align="center" gap="2">
+            <Heading size="5">Media Library</Heading>
+            {headerActions}
+          </Flex>
           <Flex align="center" gap="3">
             {mediaData && (
               <Text size="2" color="gray">
