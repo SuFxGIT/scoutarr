@@ -16,6 +16,7 @@ export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
   getMediaId: (media: TMedia) => number;
   getMediaTitle: (media: TMedia) => string;
   getTagId: (config: TConfig, tagName: string) => Promise<number | null>;
+  getAllTags: (config: TConfig) => Promise<Array<{ id: number; label: string }>>;
   getQualityProfiles: (config: TConfig) => Promise<Array<{ id: number; name: string }>>;
   addTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
   removeTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
@@ -33,6 +34,7 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaId: (m: RadarrMovie) => radarrService.getMediaId(m),
     getMediaTitle: (m: RadarrMovie) => radarrService.getMediaTitle(m),
     getTagId: (config: RadarrInstance, tagName: string) => radarrService.getTagId(config, tagName),
+    getAllTags: (config: RadarrInstance) => radarrService.getAllTags(config),
     getQualityProfiles: (config: RadarrInstance) => radarrService.getQualityProfiles(config),
     addTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
       radarrService.addTag(config, mediaIds, tagId),
@@ -48,6 +50,7 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaId: (e: SonarrEpisode) => sonarrService.getMediaId(e),
     getMediaTitle: (e: SonarrEpisode) => sonarrService.getMediaTitle(e),
     getTagId: (config: SonarrInstance, tagName: string) => sonarrService.getTagId(config, tagName),
+    getAllTags: (config: SonarrInstance) => sonarrService.getAllTags(config),
     getQualityProfiles: (config: SonarrInstance) => sonarrService.getQualityProfiles(config),
     addTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
       sonarrService.addTag(config, mediaIds, tagId),
@@ -63,6 +66,7 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaId: (a: LidarrArtist) => lidarrService.getMediaId(a),
     getMediaTitle: (a: LidarrArtist) => lidarrService.getMediaTitle(a),
     getTagId: (config: LidarrInstance, tagName: string) => lidarrService.getTagId(config, tagName),
+    getAllTags: (config: LidarrInstance) => lidarrService.getAllTags(config),
     getQualityProfiles: (config: LidarrInstance) => lidarrService.getQualityProfiles(config),
     addTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
       lidarrService.addTag(config, mediaIds, tagId),
@@ -78,6 +82,7 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     getMediaId: (a: ReadarrAuthor) => readarrService.getMediaId(a),
     getMediaTitle: (a: ReadarrAuthor) => readarrService.getMediaTitle(a),
     getTagId: (config: ReadarrInstance, tagName: string) => readarrService.getTagId(config, tagName),
+    getAllTags: (config: ReadarrInstance) => readarrService.getAllTags(config),
     getQualityProfiles: (config: ReadarrInstance) => readarrService.getQualityProfiles(config),
     addTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
       readarrService.addTag(config, mediaIds, tagId),

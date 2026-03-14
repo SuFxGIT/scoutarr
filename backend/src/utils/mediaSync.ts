@@ -22,6 +22,7 @@ interface SyncResult<TMedia = unknown> {
 
 /**
  * Converts tag IDs to tag names for a collection of media items
+ * Fetches the tag list once and reuses it for all media items.
  */
 export async function convertMediaTagsToNames<TMedia extends { tags: number[] }>(
   service: ReturnType<typeof getServiceForApp>,
@@ -29,14 +30,23 @@ export async function convertMediaTagsToNames<TMedia extends { tags: number[] }>
   mediaItems: TMedia[]
 ): Promise<Array<Omit<TMedia, 'tags'> & { tags: string[] }>> {
   logger.debug('🏷️  Converting tag IDs to names', { count: mediaItems.length });
-  
-  const mediaWithTagNames = await Promise.all(
-    mediaItems.map(async (item) => {
-      const tagNames = await service.convertTagIdsToNames(instance, item.tags);
-      return { ...item, tags: tagNames };
-    })
-  );
-  
+
+  // Fetch all tags once to build a lookup map
+  const allTags = await service.getAllTags(instance);
+  const tagMap = new Map(allTags.map((t: { id: number; label: string }) => [t.id, t.label]));
+  logger.debug('🏷️  Fetched tag list', { tagCount: allTags.length });
+
+  const mediaWithTagNames = mediaItems.map((item) => {
+    const tagNames = item.tags.map((id: number) => {
+      const tagName = tagMap.get(id);
+      if (!tagName) {
+        logger.warn(`⚠️  Unknown tag ID during sync`, { tagId: id });
+      }
+      return tagName || `unknown-tag-${id}`;
+    });
+    return { ...item, tags: tagNames };
+  });
+
   logger.debug('✅ Tag IDs converted to names');
   return mediaWithTagNames;
 }
