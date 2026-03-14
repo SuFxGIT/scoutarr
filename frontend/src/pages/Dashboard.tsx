@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import React, { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Flex,
@@ -134,8 +134,6 @@ function Dashboard() {
   const [expandedSearchKeys, setExpandedSearchKeys] = useState<Set<string>>(new Set());
   const [layout, setLayout] = useState<CardLayout[]>(loadLayout);
 
-  const recentSearchesRef = useRef<HTMLDivElement>(null);
-
   const [searchParams] = useSearchParams();
   const isEditMode = searchParams.get('edit') === '1';
 
@@ -228,7 +226,6 @@ function Dashboard() {
     setAppFilter(app);
     setCurrentPage(1);
     setExpandedSearchKeys(new Set());
-    recentSearchesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
   // ─── Derived layout ─────────────────────────────────────────────────────────
@@ -426,7 +423,7 @@ function Dashboard() {
     const currentItems = filteredSearches.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return (
-      <Box ref={recentSearchesRef} key="recent-searches">
+      <Box key="recent-searches">
         <Card>
           <Flex direction="column" gap="3">
             <Flex align="center" justify="between" wrap="wrap" gap="3">
