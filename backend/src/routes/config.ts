@@ -195,21 +195,26 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
 
     // Fetch all media from API to find items with tags
     logger.debug(`📋 Fetching all media from ${app}`);
-    const allMedia = await service.getMedia(instanceConfig);
+    const [allMedia, allTags] = await Promise.all([
+      service.getMedia(instanceConfig),
+      service.getAllTags(instanceConfig),
+    ]);
     logger.debug(`📋 Fetched ${allMedia.length} total media items from ${app}`);
 
-    // Convert tag IDs in media to tag names
-    const mediaWithTagNames = await Promise.all(
-      allMedia.map(async (item) => {
-        const tagNames = await service.convertTagIdsToNames(instanceConfig, item.tags);
-        return { ...item, tagNames };
-      })
-    );
+    // Build a single tag lookup map to avoid repeated API calls
+    const tagIdToName = new Map(allTags.map(t => [t.id, t.label]));
+    const tagNameToId = new Map(allTags.map(t => [t.label, t.id]));
+
+    // Convert tag IDs in media to tag names using the cached map
+    const mediaWithTagNames = allMedia.map(item => ({
+      ...item,
+      tagNames: item.tags.map((id: number) => tagIdToName.get(id) ?? `unknown-tag-${id}`),
+    }));
 
     // Clear each managed tag
     let totalCleared = 0;
     for (const tagName of allManagedTags) {
-      const tagId = await service.getTagId(instanceConfig, tagName);
+      const tagId = tagNameToId.get(tagName) ?? null;
       if (tagId !== null) {
         // Find media with this tag (by name)
         const taggedMedia = mediaWithTagNames.filter(m => m.tagNames.includes(tagName));
