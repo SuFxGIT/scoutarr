@@ -123,7 +123,7 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrEpisode> {
             seasonNumber: ep.seasonNumber,
             episodeNumber: ep.episodeNumber,
             episodeTitle: ep.title || '',
-            monitored: ep.monitored,
+            monitored: series.monitored && ep.monitored,
             tags: series.tags as unknown as string[],
             status: series.status,
             qualityProfileId: series.qualityProfileId,
