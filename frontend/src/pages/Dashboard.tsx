@@ -426,48 +426,46 @@ function Dashboard() {
       <Box key="recent-searches">
         <Card>
           <Flex direction="column" gap="3">
-            <Flex align="center" justify="between" wrap="wrap" gap="3">
+            <Flex align="center" gap="3">
               <Heading size="5">Recent Searches</Heading>
-              <Flex align="center" gap="3" style={{ marginLeft: controls ? undefined : 'auto' }}>
-                <Flex align="center" gap="2">
-                  <Text size="2" weight="medium">App:</Text>
-                  <Select.Root value={appFilter} onValueChange={(value: string) => {
-                    setAppFilter(value as typeof appFilter);
-                    setCurrentPage(1);
-                    setExpandedSearchKeys(new Set());
-                  }}>
-                    <Select.Trigger style={{ minWidth: '110px' }} />
-                    <Select.Content position="popper" sideOffset={5}>
-                      <Select.Item value="all">All Apps</Select.Item>
-                      <Select.Item value="lidarr">Lidarr</Select.Item>
-                      <Select.Item value="radarr">Radarr</Select.Item>
-                      <Select.Item value="sonarr">Sonarr</Select.Item>
-                      <Select.Item value="readarr">Readarr</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </Flex>
-                <Flex align="center" gap="2">
-                  <Text size="2" weight="medium">Filter:</Text>
-                  <Select.Root value={dateFilter} onValueChange={(value: string) => {
-                    setDateFilter(value as typeof dateFilter);
-                    setCurrentPage(1);
-                    setExpandedSearchKeys(new Set());
-                  }}>
-                    <Select.Trigger style={{ minWidth: '120px' }} />
-                    <Select.Content position="popper" sideOffset={5}>
-                      <Select.Item value="all">All Time</Select.Item>
-                      <Select.Item value="today">Today</Select.Item>
-                      <Select.Item value="week">Last 7 Days</Select.Item>
-                      <Select.Item value="month">Last 30 Days</Select.Item>
-                    </Select.Content>
-                  </Select.Root>
-                </Flex>
-                {totalItems > 0 && (
-                  <Text size="2" color="gray">
-                    {totalItems} {totalItems === 1 ? 'search' : 'searches'}
-                  </Text>
-                )}
+              <Flex align="center" gap="2">
+                <Text size="2" weight="medium">App:</Text>
+                <Select.Root value={appFilter} onValueChange={(value: string) => {
+                  setAppFilter(value as typeof appFilter);
+                  setCurrentPage(1);
+                  setExpandedSearchKeys(new Set());
+                }}>
+                  <Select.Trigger style={{ minWidth: '110px' }} />
+                  <Select.Content position="popper" sideOffset={5}>
+                    <Select.Item value="all">All Apps</Select.Item>
+                    <Select.Item value="lidarr">Lidarr</Select.Item>
+                    <Select.Item value="radarr">Radarr</Select.Item>
+                    <Select.Item value="sonarr">Sonarr</Select.Item>
+                    <Select.Item value="readarr">Readarr</Select.Item>
+                  </Select.Content>
+                </Select.Root>
               </Flex>
+              <Flex align="center" gap="2">
+                <Text size="2" weight="medium">Filter:</Text>
+                <Select.Root value={dateFilter} onValueChange={(value: string) => {
+                  setDateFilter(value as typeof dateFilter);
+                  setCurrentPage(1);
+                  setExpandedSearchKeys(new Set());
+                }}>
+                  <Select.Trigger style={{ minWidth: '120px' }} />
+                  <Select.Content position="popper" sideOffset={5}>
+                    <Select.Item value="all">All Time</Select.Item>
+                    <Select.Item value="today">Today</Select.Item>
+                    <Select.Item value="week">Last 7 Days</Select.Item>
+                    <Select.Item value="month">Last 30 Days</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              </Flex>
+              {totalItems > 0 && (
+                <Text size="2" color="gray">
+                  {totalItems} {totalItems === 1 ? 'search' : 'searches'}
+                </Text>
+              )}
               {controls}
             </Flex>
 

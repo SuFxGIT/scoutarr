@@ -1006,109 +1006,105 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     <Card>
       <Flex direction="column" gap="3">
         {/* Header */}
-        <Flex align="center" justify="between" gap="3">
-          <Flex align="center" gap="2">
-            <Heading size="5">Media Library</Heading>
-            {headerActions}
-          </Flex>
-          <Flex align="center" gap="3">
-            {mediaData && (
-              <Text size="2" color="gray">
-                {episodeMode
-                  ? `${gridRows.length} episodes`
-                  : `${displayCount} of ${isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`}`
-                } ({selectedMediaIds.size} selected)
-              </Text>
-            )}
-            {mediaData && (() => {
-              const filtersActive = showMonitoredOnly || showMissingOnly || (isSonarr && episodeMode);
-              return (
-                <Popover.Root>
-                  <Popover.Trigger>
-                    <Button
-                      size="2"
-                      variant="ghost"
-                      color={filtersActive ? 'blue' : 'gray'}
-                      radius="full"
-                      aria-label="Filters"
-                    >
-                      <MixerHorizontalIcon />
-                      Apply Filters
-                    </Button>
-                  </Popover.Trigger>
-                  <Popover.Content width="220px" align="end">
-                    <Flex direction="column" gap="3">
-                      <Flex align="center" justify="between" gap="4">
-                        <Text size="2">Monitored Only</Text>
-                        <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
-                      </Flex>
-                      <Flex align="center" justify="between" gap="4">
-                        <Text size="2">Missing Only</Text>
-                        <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
-                      </Flex>
-                      {isSonarr && (
-                        <>
-                          <Separator size="4" />
-                          <Flex direction="column" gap="2">
-                            <Text size="2">View Mode</Text>
-                            <SegmentedControl.Root
-                              size="1"
-                              value={episodeMode ? 'episodes' : 'series'}
-                              onValueChange={(value) => setEpisodeMode(value === 'episodes')}
-                            >
-                              <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
-                              <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
-                            </SegmentedControl.Root>
-                          </Flex>
-                        </>
-                      )}
-                    </Flex>
-                  </Popover.Content>
-                </Popover.Root>
-              );
-            })()}
-            {selectedInstance && (
-              <Tooltip content="Sync from *arr instance to update media list">
-                <Button
-                  size="2"
-                  variant="ghost"
-                  color="gray"
-                  radius="full"
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending}
-                  aria-label="Sync Library"
-                >
-                  <ReloadIcon />
-                  {syncMutation.isPending ? 'Syncing...' : 'Sync'}
-                </Button>
-              </Tooltip>
-            )}
-            {config && hasAnyInstances && (
-              <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
-                <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
-                <Select.Content position="popper">
-                  {APP_TYPES.map((appType) => {
-                    const instances = config.applications[appType] || [];
-                    if (instances.length === 0) return null;
+        <Flex align="center" gap="3">
+          <Heading size="5">Media Library</Heading>
+          {config && hasAnyInstances && (
+            <Select.Root value={selectedInstance || ''} onValueChange={handleInstanceChange}>
+              <Select.Trigger style={{ width: '220px' }} placeholder="Choose an instance..." />
+              <Select.Content position="popper">
+                {APP_TYPES.map((appType) => {
+                  const instances = config.applications[appType] || [];
+                  if (instances.length === 0) return null;
 
-                    return (
-                      <Select.Group key={appType}>
-                        <Select.Label>{formatAppName(appType)}</Select.Label>
-                        {instances.map((inst) => (
-                          <Select.Item key={`${appType}-${inst.id}`} value={`${appType}-${inst.id}`}>
-                            <Flex align="center" gap="2">
-                              <AppIcon app={appType} size={16} variant="light" />
-                              {inst.name || `${appType}-${inst.id}`}
-                            </Flex>
-                          </Select.Item>
-                        ))}
-                      </Select.Group>
-                    );
-                  })}
-                </Select.Content>
-              </Select.Root>
-            )}
-          </Flex>
+                  return (
+                    <Select.Group key={appType}>
+                      <Select.Label>{formatAppName(appType)}</Select.Label>
+                      {instances.map((inst) => (
+                        <Select.Item key={`${appType}-${inst.id}`} value={`${appType}-${inst.id}`}>
+                          <Flex align="center" gap="2">
+                            <AppIcon app={appType} size={16} variant="light" />
+                            {inst.name || `${appType}-${inst.id}`}
+                          </Flex>
+                        </Select.Item>
+                      ))}
+                    </Select.Group>
+                  );
+                })}
+              </Select.Content>
+            </Select.Root>
+          )}
+          {mediaData && (
+            <Text size="2" color="gray">
+              {episodeMode
+                ? `${gridRows.length} episodes`
+                : `${displayCount} of ${isSonarr ? `${new Set(mediaData.media.map(m => m.seriesId)).size} series` : `${mediaData.total} items`}`
+              } ({selectedMediaIds.size} selected)
+            </Text>
+          )}
+          {mediaData && (() => {
+            const filtersActive = showMonitoredOnly || showMissingOnly || (isSonarr && episodeMode);
+            return (
+              <Popover.Root>
+                <Popover.Trigger>
+                  <Button
+                    size="2"
+                    variant="ghost"
+                    color={filtersActive ? 'blue' : 'gray'}
+                    radius="full"
+                    aria-label="Filters"
+                  >
+                    <MixerHorizontalIcon />
+                    Apply Filters
+                  </Button>
+                </Popover.Trigger>
+                <Popover.Content width="220px" align="end">
+                  <Flex direction="column" gap="3">
+                    <Flex align="center" justify="between" gap="4">
+                      <Text size="2">Monitored Only</Text>
+                      <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
+                    </Flex>
+                    <Flex align="center" justify="between" gap="4">
+                      <Text size="2">Missing Only</Text>
+                      <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+                    </Flex>
+                    {isSonarr && (
+                      <>
+                        <Separator size="4" />
+                        <Flex direction="column" gap="2">
+                          <Text size="2">View Mode</Text>
+                          <SegmentedControl.Root
+                            size="1"
+                            value={episodeMode ? 'episodes' : 'series'}
+                            onValueChange={(value) => setEpisodeMode(value === 'episodes')}
+                          >
+                            <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
+                            <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
+                          </SegmentedControl.Root>
+                        </Flex>
+                      </>
+                    )}
+                  </Flex>
+                </Popover.Content>
+              </Popover.Root>
+            );
+          })()}
+          {selectedInstance && (
+            <Tooltip content="Sync from *arr instance to update media list">
+              <Button
+                size="2"
+                variant="ghost"
+                color="gray"
+                radius="full"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                aria-label="Sync Library"
+              >
+                <ReloadIcon />
+                {syncMutation.isPending ? 'Syncing...' : 'Sync'}
+              </Button>
+            </Tooltip>
+          )}
+          {headerActions}
         </Flex>
         <Separator size="4" />
 
