@@ -19,6 +19,13 @@ type BaseInstanceConfig = {
   enabled: boolean;
 };
 
+export const APP_BADGE_COLORS: Record<AppType, 'cyan' | 'green' | 'red' | 'yellow'> = {
+  sonarr: 'cyan',
+  lidarr: 'green',
+  readarr: 'red',
+  radarr: 'yellow',
+};
+
 export const APP_INFO: Record<AppType, { name: string; mediaType: string; mediaTypePlural: string; defaultPort: string }> = {
   radarr: { name: 'Radarr', mediaType: 'Movies', mediaTypePlural: 'movies', defaultPort: '7878' },
   sonarr: { name: 'Sonarr', mediaType: 'Series', mediaTypePlural: 'series', defaultPort: '8989' },

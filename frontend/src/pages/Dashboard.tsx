@@ -26,6 +26,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
 import { ITEMS_PER_PAGE } from '../utils/constants';
+import { APP_BADGE_COLORS } from '../utils/appInfo';
+import type { AppType } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
 import { MediaLibraryCard } from '../components/MediaLibraryCard';
 import type { Stats } from '../types/api';
@@ -532,7 +534,7 @@ function Dashboard() {
                             >
                               <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0 }}>
                                 <AppIcon app={search.application} size={16} variant="light" />
-                                <Badge size="1" style={{ textTransform: 'capitalize', flexShrink: 0 }}>
+                                <Badge size="1" color={APP_BADGE_COLORS[search.application as AppType] ?? 'indigo'} style={{ textTransform: 'capitalize', flexShrink: 0 }}>
                                   {appName}
                                 </Badge>
                                 <Text size="2" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
