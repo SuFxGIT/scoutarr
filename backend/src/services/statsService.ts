@@ -667,7 +667,16 @@ class StatsService {
         ) IS NOT ?
       `);
 
+      const deleteStaleStmt = this.db.prepare(`
+        DELETE FROM media_library
+        WHERE instance_id = ? AND media_id NOT IN (SELECT value FROM json_each(?))
+      `);
+
       const transaction = this.db.transaction((items: typeof mediaItems) => {
+        // Remove episodes that no longer exist in the *arr instance
+        const currentIds = JSON.stringify(items.map(i => i.id));
+        deleteStaleStmt.run(instanceId, currentIds);
+
         for (const item of items) {
           const fileInfo = extractFileInfoForDb(item);
 
