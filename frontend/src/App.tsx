@@ -53,7 +53,8 @@ function NavigationLinks() {
         </Button>
         {isOnDashboard && (
           <Button
-            variant={isEditMode ? 'solid' : 'ghost'}
+            variant="soft"
+            color={isEditMode ? 'yellow' : 'gray'}
             onClick={toggleEditMode}
           >
             <Pencil1Icon /> Edit Dashboard
