@@ -265,20 +265,81 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       mediaCount: mediaIds.length
     });
 
+    // Server-side validation: filter out already-tagged, ignore-tagged, and wrong-status items
+    const dbMedia = await statsService.getMediaFromDatabase(instanceId);
+
+    // For Sonarr: mediaIds are series IDs; build map keyed by series_id. For others: keyed by media_id.
+    const isSonarr = appType === 'sonarr';
+    const dbMediaMap = new Map<number, typeof dbMedia[0]>();
+    for (const m of dbMedia) {
+      const key = isSonarr && m.series_id != null ? m.series_id : m.media_id;
+      if (!dbMediaMap.has(key)) dbMediaMap.set(key, m);
+    }
+
+    const tagName = instance.tagName || 'upgradinatorr';
+    const ignoreTag = (instance as any).ignoreTag as string | undefined;
+
+    // Get status config for this app type
+    const statusConfig: string | undefined =
+      appType === 'radarr' ? (instance as any).movieStatus :
+      appType === 'sonarr' ? (instance as any).seriesStatus :
+      appType === 'lidarr' ? (instance as any).artistStatus :
+      appType === 'readarr' ? (instance as any).authorStatus : undefined;
+
+    // Map config status values to *arr API status strings (Radarr uses 'inCinemas' not 'in cinemas')
+    function normalizeStatusConfig(val: string): string {
+      return val === 'in cinemas' ? 'inCinemas' : val;
+    }
+
+    const validIds: number[] = [];
+    let skipped = 0;
+
+    for (const id of mediaIds) {
+      const m = dbMediaMap.get(id);
+      if (!m) { validIds.push(id); continue; } // not in DB, allow through
+
+      if (m.tags.includes(tagName)) {
+        logger.warn('⚠️  [Scoutarr] Skipping already-tagged item in manual search', { id, tagName });
+        skipped++; continue;
+      }
+      if (ignoreTag && m.tags.includes(ignoreTag)) {
+        logger.warn('⚠️  [Scoutarr] Skipping ignore-tagged item in manual search', { id, ignoreTag });
+        skipped++; continue;
+      }
+      if (statusConfig && statusConfig !== 'any' && statusConfig !== '' && m.status !== normalizeStatusConfig(statusConfig)) {
+        logger.warn('⚠️  [Scoutarr] Skipping wrong-status item in manual search', { id, status: m.status, required: statusConfig });
+        skipped++; continue;
+      }
+      validIds.push(id);
+    }
+
+    if (validIds.length === 0) {
+      endOp({ searched: 0, skipped }, true);
+      return res.json({
+        success: true,
+        searched: 0,
+        skipped,
+        message: `All ${skipped} item${skipped === 1 ? '' : 's'} skipped (already tagged, ignored, or wrong status)`
+      });
+    }
+
+    if (skipped > 0) {
+      logger.info('ℹ️  [Scoutarr] Some items skipped in manual search', { skipped, remaining: validIds.length });
+    }
+
     // Get service for this app type and search media
     const service = getServiceForApp(appType as AppType);
-    await service.searchMedia(instance, mediaIds);
-    logger.debug('✅ [Scoutarr] Search started', { appType, count: mediaIds.length });
+    await service.searchMedia(instance, validIds);
+    logger.debug('✅ [Scoutarr] Search started', { appType, count: validIds.length });
 
     // Add tag to searched items
-    const tagName = instance.tagName || 'upgradinatorr';
     logger.debug(`📡 [${capitalize(appType)} API] Getting tag ID`, { tagName });
     const tagId = await service.getTagId(instance, tagName);
 
     if (tagId !== null) {
-      logger.debug(`📡 [${capitalize(appType)} API] Adding tag to media`, { tagId, count: mediaIds.length });
-      await service.addTag(instance, mediaIds, tagId);
-      logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: mediaIds.length });
+      logger.debug(`📡 [${capitalize(appType)} API] Adding tag to media`, { tagId, count: validIds.length });
+      await service.addTag(instance, validIds, tagId);
+      logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: validIds.length });
 
       // Track tag in instances table
       logger.debug('💾 [Scoutarr DB] Tracking tag in instance', { tagName });
@@ -289,19 +350,20 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     }
 
     // Record in search history
-    // For Sonarr, mediaIds are series IDs (converted on the frontend), so look up by series_id
+    // For Sonarr, validIds are series IDs (converted on the frontend), so look up by series_id
     const items = appType === 'sonarr'
-      ? await statsService.getSeriesTitlesByIds(instanceId, mediaIds)
-      : await statsService.getMediaTitlesByIds(instanceId, mediaIds);
-    await statsService.addSearch(appType, mediaIds.length, items, instance.name, instanceId);
+      ? await statsService.getSeriesTitlesByIds(instanceId, validIds)
+      : await statsService.getMediaTitlesByIds(instanceId, validIds);
+    await statsService.addSearch(appType, validIds.length, items, instance.name, instanceId);
 
     // Return success
     res.json({
       success: true,
-      searched: mediaIds.length,
-      message: `Successfully searched ${mediaIds.length} item${mediaIds.length === 1 ? '' : 's'}`
+      searched: validIds.length,
+      skipped,
+      message: `Successfully searched ${validIds.length} item${validIds.length === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} skipped)` : ''}`
     });
-    endOp({ searched: mediaIds.length }, true);
+    endOp({ searched: validIds.length, skipped }, true);
 
   } catch (error: unknown) {
     endOp({ error: getErrorMessage(error) }, false);
