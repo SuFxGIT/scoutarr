@@ -115,7 +115,7 @@ class SyncSchedulerService {
           item.tags.forEach((tag: string) => allTagNames.add(tag));
         }
       });
-      logger.info(`✅ Tag conversion completed`, { 
+      logger.info(`✅ Tag conversion completed`, {
         mediaItems: mediaWithTagNames.length,
         uniqueTags: allTagNames.size,
         tags: Array.from(allTagNames)

@@ -69,11 +69,31 @@ export async function syncInstanceQualityProfiles(
 }
 
 /**
- * Fully syncs an instance: upsert instance, sync quality profiles, fetch media, convert tags
+ * Extracts the externalId for a media item based on app type.
+ * Used to build deep links into the arr application.
+ */
+export function extractExternalId(appType: AppType, item: Record<string, unknown>, fallbackId: number): string | undefined {
+  switch (appType) {
+    case 'radarr':
+      return item.tmdbId ? String(item.tmdbId) : undefined;
+    case 'sonarr':
+      return (item.titleSlug as string) || undefined;
+    case 'lidarr':
+      return (item.foreignArtistId as string) || String(fallbackId);
+    case 'readarr':
+      return (item.foreignAuthorId as string) || String(fallbackId);
+    default:
+      return String(fallbackId);
+  }
+}
+
+/**
+ * Fully syncs an instance: upsert instance, sync quality profiles, fetch media, convert tags.
+ * Returns media with title and externalId already resolved so callers don't need to re-derive them.
  */
 export async function syncInstanceMedia(options: SyncInstanceOptions): Promise<SyncResult> {
   const { instanceId, appType, instance } = options;
-  
+
   const service = getServiceForApp(appType);
 
   // Upsert instance record
@@ -88,8 +108,13 @@ export async function syncInstanceMedia(options: SyncInstanceOptions): Promise<S
   const allMedia = await service.getMedia(instance);
   logger.debug('✅ [Scoutarr] Fetched all media from *arr API', { count: allMedia.length });
 
-  // Convert tag IDs to names
-  const mediaWithTags = await convertMediaTagsToNames(service, instance, allMedia);
+  // Convert tag IDs to names, normalize title and externalId
+  const mediaWithTagNames = await convertMediaTagsToNames(service, instance, allMedia);
+  const mediaWithTags = mediaWithTagNames.map(item => ({
+    ...item,
+    title: service.getMediaTitle(item as any),
+    externalId: extractExternalId(appType, item as Record<string, unknown>, (item as any).id as number)
+  }));
 
   return {
     mediaCount: allMedia.length,

@@ -80,27 +80,8 @@ mediaLibraryRouter.get('/:appType/:instanceId', async (req, res) => {
         appType: appType as AppType,
         instance
       });
-      allMedia = (syncResult.mediaWithTags as MediaItem[]).map(m => {
-        const mediaAny = m as any;
-        let externalId: string | undefined;
-        switch (appType) {
-          case 'radarr':
-            externalId = mediaAny.tmdbId ? String(mediaAny.tmdbId) : undefined;
-            break;
-          case 'sonarr':
-            externalId = mediaAny.titleSlug || undefined;
-            break;
-          case 'lidarr':
-            externalId = mediaAny.foreignArtistId || String(m.id);
-            break;
-          case 'readarr':
-            externalId = mediaAny.foreignAuthorId || String(m.id);
-            break;
-          default:
-            externalId = String(m.id);
-        }
-        return { ...m, externalId, title: service.getMediaTitle(m) };
-      });
+      // title and externalId are already resolved by syncInstanceMedia
+      allMedia = syncResult.mediaWithTags as MediaItem[];
       // Sync to database
       logger.debug('💾 [Scoutarr DB] Syncing media to database', { count: allMedia.length });
       await statsService.syncMediaToDatabase(instanceId, allMedia);
