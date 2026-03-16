@@ -46,7 +46,7 @@ import { formatAppName, getErrorMessage, buildArrUrl } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
 import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
-import type { MediaLibraryResponse, MediaLibraryItem } from '@scoutarr/shared';
+import type { MediaLibraryResponse, MediaLibraryItem, MediaSearchConflict } from '@scoutarr/shared';
 import type { Config } from '../types/config';
 import { APP_TYPES, AppType } from '../utils/constants';
 
@@ -436,15 +436,22 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     return map;
   }, [isSonarr, mediaData?.media]);
 
+  // Conflict confirmation dialog state
+  const [conflictDialog, setConflictDialog] = useState<{ open: boolean; conflicts: MediaSearchConflict[]; idsToSend: number[] }>({
+    open: false,
+    conflicts: [],
+    idsToSend: [],
+  });
+
   // Manual search mutation
   const searchMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ force, idsOverride }: { force?: boolean; idsOverride?: number[] } = {}) => {
       if (!instanceInfo) throw new Error('No instance selected');
 
-      let idsToSend = Array.from(selectedMediaIds);
+      let idsToSend = idsOverride ?? Array.from(selectedMediaIds);
 
       // For Sonarr: convert episode IDs to unique series IDs
-      if (isSonarr) {
+      if (isSonarr && !idsOverride) {
         const seriesIdSet = new Set<number>();
         for (const episodeId of idsToSend) {
           const seriesId = episodeToSeriesMap.get(episodeId);
@@ -455,13 +462,14 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
         idsToSend = Array.from(seriesIdSet);
       }
 
-      return searchMedia(
-        instanceInfo.appType,
-        instanceInfo.instanceId,
-        idsToSend
-      );
+      return { result: await searchMedia(instanceInfo.appType, instanceInfo.instanceId, idsToSend, force), idsToSend };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ result: data, idsToSend }) => {
+      if (data.conflicts && data.conflicts.length > 0) {
+        // Backend detected conflicts — show confirmation dialog
+        setConflictDialog({ open: true, conflicts: data.conflicts, idsToSend });
+        return;
+      }
       toast.success(data.message);
       setSelectedMediaIds(new Set());
       refetch();
@@ -503,16 +511,25 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     if (isSonarr) {
       setShowSonarrTagDialog(true);
     } else {
-      searchMutation.mutate();
+      searchMutation.mutate({});
     }
   }, [selectedMediaIds.size, isSonarr, searchMutation]);
 
   const confirmSonarrManualSearch = () => {
     setShowSonarrTagDialog(false);
-    searchMutation.mutate();
+    searchMutation.mutate({});
   };
   const cancelSonarrManualSearch = () => {
     setShowSonarrTagDialog(false);
+  };
+
+  const confirmConflictSearch = () => {
+    const { idsToSend } = conflictDialog;
+    setConflictDialog({ open: false, conflicts: [], idsToSend: [] });
+    searchMutation.mutate({ force: true, idsOverride: idsToSend });
+  };
+  const cancelConflictSearch = () => {
+    setConflictDialog({ open: false, conflicts: [], idsToSend: [] });
   };
 
   // Extract unique values for dropdown filters
@@ -1225,6 +1242,36 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
                     <AlertDialog.Action>
                       <Button variant="solid" color="blue" onClick={confirmSonarrManualSearch}>
                         Continue
+                      </Button>
+                    </AlertDialog.Action>
+                  </Flex>
+                </AlertDialog.Content>
+              </AlertDialog.Root>
+
+              {/* Config conflict warning popup */}
+              <AlertDialog.Root open={conflictDialog.open} onOpenChange={(open) => { if (!open) cancelConflictSearch(); }}>
+                <AlertDialog.Content maxWidth="480px">
+                  <AlertDialog.Title>Search Conflicts Detected</AlertDialog.Title>
+                  <AlertDialog.Description size="3" mb="3">
+                    The following items conflict with your current instance configuration:
+                  </AlertDialog.Description>
+                  <Box mb="4" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {conflictDialog.conflicts.map((c) => (
+                      <Text key={c.id} as="p" size="2" color="gray" mb="1">
+                        • ID {c.id}: {c.reason}
+                      </Text>
+                    ))}
+                  </Box>
+                  <Text size="2" mb="4" as="p">Search anyway and apply the tag regardless of these conflicts?</Text>
+                  <Flex gap="3" justify="end">
+                    <AlertDialog.Cancel>
+                      <Button variant="soft" color="gray" onClick={cancelConflictSearch}>
+                        Cancel
+                      </Button>
+                    </AlertDialog.Cancel>
+                    <AlertDialog.Action>
+                      <Button variant="solid" color="orange" onClick={confirmConflictSearch}>
+                        Search Anyway
                       </Button>
                     </AlertDialog.Action>
                   </Flex>

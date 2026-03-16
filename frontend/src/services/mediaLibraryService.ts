@@ -35,14 +35,16 @@ export async function fetchCfScoreHistory(
 export async function searchMedia(
   appType: string,
   instanceId: string,
-  mediaIds: number[]
+  mediaIds: number[],
+  force?: boolean
 ): Promise<MediaSearchResponse> {
   const response = await apiClient.post<MediaSearchResponse>(
     '/media-library/search',
     {
       appType,
       instanceId,
-      mediaIds
+      mediaIds,
+      ...(force ? { force: true } : {})
     }
   );
   return response.data;

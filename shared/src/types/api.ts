@@ -95,16 +95,23 @@ export interface MediaLibraryResponse {
   scoutarrTags?: string[];
 }
 
+export interface MediaSearchConflict {
+  id: number;
+  reason: string;
+}
+
 export interface MediaSearchRequest {
   appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr';
   instanceId: string;
   mediaIds: number[];
+  force?: boolean;
 }
 
 export interface MediaSearchResponse {
   success: boolean;
   searched: number;
   message: string;
+  conflicts?: MediaSearchConflict[];
 }
 
 export interface CfScoreHistoryEntry {
