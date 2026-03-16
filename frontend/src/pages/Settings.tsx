@@ -16,7 +16,8 @@ import {
   Grid,
   Tooltip,
   AlertDialog,
-  Box
+  Box,
+  Switch
 } from '@radix-ui/themes';
 import { CheckIcon, CrossCircledIcon, PlusIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -818,6 +819,36 @@ function Settings() {
             <Card>
               <Flex direction="column" gap="4" p="4">
                 <Heading size="5">Advanced</Heading>
+                <Separator size="4" />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Unattended Mode</Text>
+                  <Text size="1" color="gray">
+                    Controls what happens during a scheduled run when all media has already been tagged and nothing is left to search.
+                  </Text>
+                  <Text size="1" color="gray">
+                    <Text size="1" weight="medium">Enabled:</Text> Scoutarr automatically removes its tag from all media in that instance, then immediately re-runs the search from scratch — keeping the upgrade cycle going indefinitely without any manual intervention.
+                  </Text>
+                  <Text size="1" color="gray">
+                    <Text size="1" weight="medium">Disabled:</Text> Scoutarr does nothing and skips the run. The schedule will keep firing but no searches will happen until untagged media becomes available (e.g. a new item is added, or you clear tags manually).
+                  </Text>
+                  <Flex align="center" gap="2">
+                    <Switch
+                      checked={config?.scheduler?.unattended ?? false}
+                      onCheckedChange={(checked) => {
+                        if (!config) return;
+                        const updated = {
+                          ...config,
+                          scheduler: { ...config.scheduler, unattended: checked }
+                        };
+                        setConfig(updated);
+                        saveConfig(updated);
+                      }}
+                    />
+                    <Text size="2">{config?.scheduler?.unattended ? 'Enabled' : 'Disabled'}</Text>
+                  </Flex>
+                </Flex>
+
                 <Separator size="4" />
 
                 <Flex direction="column" gap="2">
