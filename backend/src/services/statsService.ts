@@ -944,6 +944,22 @@ class StatsService {
     }
   }
 
+  /**
+   * Updates only the tags column for specific media IDs in the DB.
+   * For Sonarr, pass seriesIds and set isSonarr=true to update all episodes belonging to those series.
+   * Called immediately after addTag/removeTag so the DB stays in sync without a full re-sync.
+   */
+  updateMediaTags(instanceId: string, mediaIds: number[], tags: string[], isSonarr = false): void {
+    if (!this.db || mediaIds.length === 0) return;
+    const tagsJson = JSON.stringify(tags);
+    const placeholders = mediaIds.map(() => '?').join(',');
+    const column = isSonarr ? 'series_id' : 'media_id';
+    const stmt = this.db.prepare(`
+      UPDATE media_library SET tags = ? WHERE instance_id = ? AND ${column} IN (${placeholders})
+    `);
+    stmt.run(tagsJson, instanceId, ...mediaIds);
+  }
+
   // ========== CF Score History ==========
 
   async getCfScoreHistory(

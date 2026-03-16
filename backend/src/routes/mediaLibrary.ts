@@ -347,6 +347,14 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       await service.addTag(instance, idsToSearch, tagId);
       logger.debug('✅ [Scoutarr] Tag added to media', { tagId, count: idsToSearch.length });
 
+      // Update tags in DB immediately using the live tags we already fetched, no full sync needed
+      const isSonarr = appType === 'sonarr';
+      for (const id of idsToSearch) {
+        const currentTags = liveTagsMap.get(id) ?? [];
+        const updatedTags = currentTags.includes(tagName) ? currentTags : [...currentTags, tagName];
+        statsService.updateMediaTags(instanceId, [id], updatedTags, isSonarr);
+      }
+
       // Track tag in instances table
       logger.debug('💾 [Scoutarr DB] Tracking tag in instance', { tagName });
       await statsService.addScoutarrTagToInstance(instanceId, tagName);

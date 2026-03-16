@@ -260,6 +260,14 @@ export async function processApplication<TMedia extends FilterableMedia>(
           const mediaIds = [...new Set(mediaWithTag.map(processor.getMediaId))];
           await processor.removeTag(processor.config, mediaIds, tagId);
 
+          // Update DB immediately: strip tagName from each affected item's tags
+          const isSonarr = processor.appType === 'sonarr';
+          for (const m of mediaWithTag) {
+            const id = processor.getMediaId(m);
+            const updatedTags = (m.tags as string[]).filter(t => t !== tagName);
+            statsService.updateMediaTags(processor.instanceId, [id], updatedTags, isSonarr);
+          }
+
           // Re-fetch and re-filter
           allMedia = await processor.getMedia(processor.config);
           filtered = await processor.filterMedia(processor.config, allMedia);
@@ -305,6 +313,16 @@ export async function processApplication<TMedia extends FilterableMedia>(
         titles: toSearch.map(processor.getMediaTitle)
       });
       await processor.addTag(processor.config, mediaIds, tagId);
+
+      // Update tags in DB immediately so the next conflict check doesn't need a full sync
+      const isSonarr = processor.appType === 'sonarr';
+      for (const m of toSearch) {
+        const id = processor.getMediaId(m);
+        const updatedTags = Array.isArray(m.tags) && !m.tags.includes(tagName)
+          ? [...m.tags, tagName]
+          : (m.tags as string[]);
+        statsService.updateMediaTags(processor.instanceId, [id], updatedTags, isSonarr);
+      }
 
       // Track tag in instances table
       await statsService.addScoutarrTagToInstance(processor.instanceId, tagName);
