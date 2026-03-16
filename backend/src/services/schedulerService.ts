@@ -55,10 +55,24 @@ class SchedulerService {
     logger.debug('✅ Scheduler service initialization complete');
   }
 
+  // node-cron doesn't support @hourly etc., expand them to standard 5-field expressions
+  private expandCronShorthand(schedule: string): string {
+    const shorthands: Record<string, string> = {
+      '@yearly':   '0 0 1 1 *',
+      '@annually': '0 0 1 1 *',
+      '@monthly':  '0 0 1 * *',
+      '@weekly':   '0 0 * * 0',
+      '@daily':    '0 0 * * *',
+      '@midnight': '0 0 * * *',
+      '@hourly':   '0 * * * *',
+    };
+    return shorthands[schedule.toLowerCase()] ?? schedule;
+  }
+
   startGlobal(schedule: string): void {
     this.stopGlobal();
 
-    // Validate using cron-parser
+    // Validate using cron-parser (supports shorthands natively)
     try {
       CronExpressionParser.parse(schedule);
     } catch (error) {
@@ -78,7 +92,7 @@ class SchedulerService {
     const timezone = process.env.TZ || 'UTC';
     logger.info('🕐 Scheduling with timezone', { timezone });
     this.globalTask = cron.schedule(
-      schedule,
+      this.expandCronShorthand(schedule),
       async () => {
         await this.runGlobalScheduledSearch(schedule);
       },

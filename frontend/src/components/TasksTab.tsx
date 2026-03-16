@@ -43,7 +43,7 @@ interface TaskRowProps {
   onEditSchedule: (newSchedule: string) => Config;
   onSaveConfig: (config: Config) => void;
   countdown: number;
-  onManualRun: () => void;
+  onManualRun: () => Promise<void>;
   onRefreshStatus?: () => void;
 }
 
@@ -51,6 +51,7 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [editedSchedule, setEditedSchedule] = useState(cronExpression);
   const [error, setError] = useState<string>('');
+  const [isRunning, setIsRunning] = useState(false);
 
   // Debug logging to investigate stuck "Calculating" state
   useEffect(() => {
@@ -174,12 +175,20 @@ function TaskRow({ name, description, cronExpression, enabled, nextRun, onToggle
         )}
       </Table.Cell>
       <Table.Cell style={{ textAlign: 'center' }}>
-        <Tooltip content="Run now">
+        <Tooltip content={isRunning ? 'Running...' : 'Run now'}>
           <IconButton
             variant="soft"
             size="1"
-            onClick={onManualRun}
-            style={{ cursor: 'pointer' }}
+            disabled={isRunning}
+            onClick={async () => {
+              setIsRunning(true);
+              try {
+                await onManualRun();
+              } finally {
+                setIsRunning(false);
+              }
+            }}
+            style={{ cursor: isRunning ? 'not-allowed' : 'pointer' }}
           >
             <PlayIcon />
           </IconButton>
