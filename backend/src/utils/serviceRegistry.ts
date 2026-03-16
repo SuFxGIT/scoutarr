@@ -21,6 +21,8 @@ export interface ServiceMethods<TConfig, TMedia extends FilterableMedia> {
   addTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
   removeTag: (config: TConfig, mediaIds: number[], tagId: number) => Promise<void>;
   convertTagIdsToNames: (config: TConfig, tagIds: number[]) => Promise<string[]>;
+  getLiveTagsForIds: (config: TConfig, ids: number[]) => Promise<Map<number, string[]>>;
+  getLiveStatusForIds: (config: TConfig, ids: number[]) => Promise<Map<number, string>>;
 }
 
 /**
@@ -41,7 +43,11 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     removeTag: (config: RadarrInstance, mediaIds: number[], tagId: number) =>
       radarrService.removeTag(config, mediaIds, tagId),
     convertTagIdsToNames: (config: RadarrInstance, tagIds: number[]) =>
-      radarrService.convertTagIdsToNames(config, tagIds)
+      radarrService.convertTagIdsToNames(config, tagIds),
+    getLiveTagsForIds: (config: RadarrInstance, ids: number[]) =>
+      radarrService.getLiveTagsForIds(config, ids),
+    getLiveStatusForIds: (config: RadarrInstance, ids: number[]) =>
+      radarrService.getLiveStatusForIds(config, ids)
   },
   sonarr: {
     getMedia: (config: SonarrInstance) => sonarrService.getMedia(config),
@@ -57,7 +63,11 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     removeTag: (config: SonarrInstance, mediaIds: number[], tagId: number) =>
       sonarrService.removeTag(config, mediaIds, tagId),
     convertTagIdsToNames: (config: SonarrInstance, tagIds: number[]) =>
-      sonarrService.convertTagIdsToNames(config, tagIds)
+      sonarrService.convertTagIdsToNames(config, tagIds),
+    getLiveTagsForIds: (config: SonarrInstance, ids: number[]) =>
+      sonarrService.getLiveTagsForIds(config, ids),
+    getLiveStatusForIds: (config: SonarrInstance, ids: number[]) =>
+      sonarrService.getLiveStatusForIds(config, ids)
   },
   lidarr: {
     getMedia: (config: LidarrInstance) => lidarrService.getMedia(config),
@@ -73,7 +83,11 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     removeTag: (config: LidarrInstance, mediaIds: number[], tagId: number) =>
       lidarrService.removeTag(config, mediaIds, tagId),
     convertTagIdsToNames: (config: LidarrInstance, tagIds: number[]) =>
-      lidarrService.convertTagIdsToNames(config, tagIds)
+      lidarrService.convertTagIdsToNames(config, tagIds),
+    getLiveTagsForIds: (config: LidarrInstance, ids: number[]) =>
+      lidarrService.getLiveTagsForIds(config, ids),
+    getLiveStatusForIds: (config: LidarrInstance, ids: number[]) =>
+      lidarrService.getLiveStatusForIds(config, ids)
   },
   readarr: {
     getMedia: (config: ReadarrInstance) => readarrService.getMedia(config),
@@ -89,7 +103,11 @@ export const serviceRegistry: Record<AppType, ServiceMethods<any, any>> = {
     removeTag: (config: ReadarrInstance, mediaIds: number[], tagId: number) =>
       readarrService.removeTag(config, mediaIds, tagId),
     convertTagIdsToNames: (config: ReadarrInstance, tagIds: number[]) =>
-      readarrService.convertTagIdsToNames(config, tagIds)
+      readarrService.convertTagIdsToNames(config, tagIds),
+    getLiveTagsForIds: (config: ReadarrInstance, ids: number[]) =>
+      readarrService.getLiveTagsForIds(config, ids),
+    getLiveStatusForIds: (config: ReadarrInstance, ids: number[]) =>
+      readarrService.getLiveStatusForIds(config, ids)
   }
 };
 

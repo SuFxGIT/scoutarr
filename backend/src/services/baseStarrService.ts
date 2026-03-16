@@ -386,6 +386,49 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
   }
 
   /**
+   * Fetches live tag names for specific media IDs directly from the arr API.
+   * Returns a map of mediaId → string[] of tag names.
+   * Used for conflict checking on manual searches to avoid stale DB data.
+   */
+  async getLiveTagsForIds(config: TConfig, ids: number[]): Promise<Map<number, string[]>> {
+    const client = this.createClient(config);
+    const allTags = await this.getAllTags(config);
+    const tagIdToName = new Map(allTags.map(t => [t.id, t.label]));
+
+    const result = new Map<number, string[]>();
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const response = await client.get<{ id: number; tags: number[]; status?: string }>(`/api/${this.apiVersion}/${this.mediaEndpoint}/${id}`);
+        const tagNames = (response.data.tags ?? []).map(tid => tagIdToName.get(tid) ?? `unknown-${tid}`);
+        result.set(id, tagNames);
+      } catch (error: unknown) {
+        logger.warn(`⚠️  [${this.appName}] Failed to fetch live tags for id ${id}`, { error: getErrorMessage(error) });
+        result.set(id, []);
+      }
+    }));
+    return result;
+  }
+
+  /**
+   * Fetches live status for specific media IDs directly from the arr API.
+   * Returns a map of mediaId → status string.
+   */
+  async getLiveStatusForIds(config: TConfig, ids: number[]): Promise<Map<number, string>> {
+    const client = this.createClient(config);
+    const result = new Map<number, string>();
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const response = await client.get<{ id: number; status: string }>(`/api/${this.apiVersion}/${this.mediaEndpoint}/${id}`);
+        result.set(id, response.data.status ?? '');
+      } catch (error: unknown) {
+        logger.warn(`⚠️  [${this.appName}] Failed to fetch live status for id ${id}`, { error: getErrorMessage(error) });
+        result.set(id, '');
+      }
+    }));
+    return result;
+  }
+
+  /**
    * Fetches all media items from the Starr application
    * Must be implemented by each service
    */

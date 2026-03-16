@@ -265,17 +265,6 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       mediaCount: mediaIds.length
     });
 
-    // Server-side validation: filter out already-tagged, ignore-tagged, and wrong-status items
-    const dbMedia = await statsService.getMediaFromDatabase(instanceId);
-
-    // For Sonarr: mediaIds are series IDs; build map keyed by series_id. For others: keyed by media_id.
-    const isSonarr = appType === 'sonarr';
-    const dbMediaMap = new Map<number, typeof dbMedia[0]>();
-    for (const m of dbMedia) {
-      const key = isSonarr && m.series_id != null ? m.series_id : m.media_id;
-      if (!dbMediaMap.has(key)) dbMediaMap.set(key, m);
-    }
-
     const tagName = instance.tagName || 'upgradinatorr';
     const ignoreTag = (instance as any).ignoreTag as string | undefined;
 
@@ -291,27 +280,38 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       return val === 'in cinemas' ? 'inCinemas' : val;
     }
 
+    // Fetch live tags and status directly from arr instance (not Scoutarr DB) to avoid stale data
+    const service = getServiceForApp(appType as AppType);
+    const [liveTagsMap, liveStatusMap] = await Promise.all([
+      service.getLiveTagsForIds(instance, mediaIds),
+      (statusConfig && statusConfig !== 'any' && statusConfig !== '')
+        ? service.getLiveStatusForIds(instance, mediaIds)
+        : Promise.resolve(new Map<number, string>())
+    ]);
+
     const validIds: number[] = [];
     const conflicts: { id: number; reason: string }[] = [];
 
     for (const id of mediaIds) {
-      const m = dbMediaMap.get(id);
-      if (!m) { validIds.push(id); continue; } // not in DB, allow through
+      const tags = liveTagsMap.get(id) ?? [];
 
-      if (m.tags.includes(tagName)) {
+      if (tags.includes(tagName)) {
         logger.warn('⚠️  [Scoutarr] Conflict: already-tagged item in manual search', { id, tagName });
         conflicts.push({ id, reason: `Already tagged with "${tagName}"` });
         continue;
       }
-      if (ignoreTag && m.tags.includes(ignoreTag)) {
+      if (ignoreTag && tags.includes(ignoreTag)) {
         logger.warn('⚠️  [Scoutarr] Conflict: ignore-tagged item in manual search', { id, ignoreTag });
         conflicts.push({ id, reason: `Has ignore tag "${ignoreTag}"` });
         continue;
       }
-      if (statusConfig && statusConfig !== 'any' && statusConfig !== '' && m.status !== normalizeStatusConfig(statusConfig)) {
-        logger.warn('⚠️  [Scoutarr] Conflict: wrong-status item in manual search', { id, status: m.status, required: statusConfig });
-        conflicts.push({ id, reason: `Status is "${m.status}" but config requires "${statusConfig}"` });
-        continue;
+      if (statusConfig && statusConfig !== 'any' && statusConfig !== '') {
+        const liveStatus = liveStatusMap.get(id) ?? '';
+        if (liveStatus && liveStatus !== normalizeStatusConfig(statusConfig)) {
+          logger.warn('⚠️  [Scoutarr] Conflict: wrong-status item in manual search', { id, status: liveStatus, required: statusConfig });
+          conflicts.push({ id, reason: `Status is "${liveStatus}" but config requires "${statusConfig}"` });
+          continue;
+        }
       }
       validIds.push(id);
     }
@@ -334,8 +334,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
       logger.info('ℹ️  [Scoutarr] Force search: bypassing conflicts', { conflicts: conflicts.length, total: mediaIds.length });
     }
 
-    // Get service for this app type and search media
-    const service = getServiceForApp(appType as AppType);
+    // Search media using the already-initialized service
     await service.searchMedia(instance, idsToSearch);
     logger.debug('✅ [Scoutarr] Search started', { appType, count: idsToSearch.length });
 
