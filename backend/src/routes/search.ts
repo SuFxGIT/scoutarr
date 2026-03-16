@@ -53,7 +53,7 @@ async function saveStatsForResults(results: SearchResults): Promise<void> {
     const appType = resultKey.split('-')[0] as AppType;
     const items = extractItemsFromResult(result);
     
-    await statsService.addSearch(appType, result.searched, items, result.instanceName);
+    await statsService.addSearch(appType, result.searched, items, result.instanceName, result.instanceId);
 
     // Info-level feedback for operators
     logger.info('ℹ️  Stats updated for search result', {
@@ -136,7 +136,8 @@ async function processAppInstances<T extends StarrInstanceConfig>(
     results[resultKey] = {
       ...result,
       [getMediaTypeKey(appType)]: result.items,
-      instanceName
+      instanceName,
+      instanceId
     };
   }
 }

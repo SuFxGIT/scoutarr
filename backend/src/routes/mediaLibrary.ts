@@ -293,7 +293,7 @@ mediaLibraryRouter.post('/search', async (req, res) => {
     const items = appType === 'sonarr'
       ? await statsService.getSeriesTitlesByIds(instanceId, mediaIds)
       : await statsService.getMediaTitlesByIds(instanceId, mediaIds);
-    await statsService.addSearch(appType, mediaIds.length, items, instance.name);
+    await statsService.addSearch(appType, mediaIds.length, items, instance.name, instanceId);
 
     // Return success
     res.json({

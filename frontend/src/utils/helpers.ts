@@ -56,6 +56,21 @@ export const formatCountdown = (milliseconds: number): string => {
  * Format milliseconds into human-readable duration for scheduler messages
  * Examples: "2 hours and 30 minutes", "3 days and 4 hours"
  */
+/**
+ * Build a deep-link URL to a media item in a *arr app
+ * Examples: radarr → /movie/{id}, sonarr → /series/{slug}
+ */
+export function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
+  const base = instanceUrl.replace(/\/$/, '');
+  switch (appType) {
+    case 'radarr': return `${base}/movie/${externalId}`;
+    case 'sonarr': return `${base}/series/${externalId}`;
+    case 'lidarr': return `${base}/artist/${externalId}`;
+    case 'readarr': return `${base}/author/${externalId}`;
+    default: return base;
+  }
+}
+
 export const formatSchedulerDuration = (milliseconds: number): string => {
   return humanizeDuration(milliseconds, {
     round: true,

@@ -42,7 +42,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
 import { toast } from 'sonner';
-import { formatAppName, getErrorMessage } from '../utils/helpers';
+import { formatAppName, getErrorMessage, buildArrUrl } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
 import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -299,16 +299,6 @@ function saveToStorage<T>(key: string, value: T): void {
   }
 }
 
-function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
-  const base = instanceUrl.replace(/\/$/, '');
-  switch (appType) {
-    case 'radarr': return `${base}/movie/${externalId}`;
-    case 'sonarr': return `${base}/series/${externalId}`;
-    case 'lidarr': return `${base}/artist/${externalId}`;
-    case 'readarr': return `${base}/author/${externalId}`;
-    default: return base;
-  }
-}
 
 interface MediaLibraryCardProps {
   config?: Config;

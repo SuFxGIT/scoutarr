@@ -21,6 +21,7 @@ export interface SearchResults {
     items?: Array<{ id: number; title: string }>;
     error?: string;
     instanceName?: string;
+    instanceId?: string;
   };
 }
 
@@ -61,7 +62,7 @@ export interface Stats {
     application: string;
     instance?: string;
     count: number;
-    items: Array<{ id: number; title: string }>;
+    items: Array<{ id: number; title: string; externalId?: string }>;
   }>;
   lastSearch?: string;
 }

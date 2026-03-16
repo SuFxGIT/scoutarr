@@ -22,10 +22,12 @@ import {
   ArrowDownIcon,
   EyeNoneIcon,
   EyeOpenIcon,
+  ExternalLinkIcon,
 } from '@radix-ui/react-icons';
 import { useQuery } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
 import { ITEMS_PER_PAGE } from '../utils/constants';
+import { buildArrUrl } from '../utils/helpers';
 import { APP_BADGE_COLORS } from '../utils/appInfo';
 import type { AppType } from '../utils/constants';
 import { AppIcon } from '../components/icons/AppIcon';
@@ -177,6 +179,12 @@ function Dashboard() {
     }
     if (instances.length === 1) return instances[0].id;
     return null;
+  }, [config]);
+
+  const resolveInstanceUrl = useCallback((appType: string, instanceId: string | null): string | null => {
+    if (!config || !instanceId) return null;
+    const instances = config.applications[appType as keyof typeof config.applications];
+    return instances?.find(inst => inst.id === instanceId)?.url ?? null;
   }, [config]);
 
   // Fetch stats
@@ -567,31 +575,47 @@ function Dashboard() {
                                   <Text size="2" color="gray">No items recorded for this search.</Text>
                                 ) : (
                                   <Flex direction="column" gap="1">
-                                    {search.items.map((item: { id: number; title: string }) => {
+                                    {search.items.map((item: { id: number; title: string; externalId?: string }) => {
                                       const cfHistoryUrl = instanceId
-                                        ? `/cf-history/${search.application}/${instanceId}/${item.id}?title=${encodeURIComponent(item.title)}`
+                                        ? `/cf-history/${search.application}/${instanceId}/${item.id}?title=${encodeURIComponent(item.title)}${item.externalId ? `&externalId=${encodeURIComponent(item.externalId)}` : ''}`
+                                        : null;
+                                      const instanceUrl = resolveInstanceUrl(search.application, instanceId);
+                                      const arrUrl = item.externalId && instanceUrl
+                                        ? buildArrUrl(search.application, instanceUrl, item.externalId)
                                         : null;
 
-                                      return cfHistoryUrl ? (
-                                        <a
-                                          key={item.id}
-                                          href={cfHistoryUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          style={{
-                                            textDecoration: 'none',
-                                            color: 'var(--accent-11)',
-                                            padding: '0.2rem 0',
-                                            fontSize: 'var(--font-size-2)',
-                                            display: 'block',
-                                          }}
-                                        >
-                                          {item.title}
-                                        </a>
-                                      ) : (
-                                        <Text key={item.id} size="2" style={{ padding: '0.2rem 0' }}>
-                                          {item.title}
-                                        </Text>
+                                      return (
+                                        <Flex key={item.id} align="center" gap="2" style={{ padding: '0.2rem 0' }}>
+                                          {arrUrl && (
+                                            <Tooltip content={`Open in ${search.application.charAt(0).toUpperCase() + search.application.slice(1)}`}>
+                                              <IconButton
+                                                size="1"
+                                                variant="ghost"
+                                                color="gray"
+                                                onClick={() => window.open(arrUrl, '_blank', 'noopener,noreferrer')}
+                                              >
+                                                <ExternalLinkIcon />
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          {cfHistoryUrl ? (
+                                            <a
+                                              href={cfHistoryUrl}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              style={{
+                                                textDecoration: 'none',
+                                                color: 'var(--accent-11)',
+                                                fontSize: 'var(--font-size-2)',
+                                                flex: 1,
+                                              }}
+                                            >
+                                              {item.title}
+                                            </a>
+                                          ) : (
+                                            <Text size="2" style={{ flex: 1 }}>{item.title}</Text>
+                                          )}
+                                        </Flex>
                                       );
                                     })}
                                   </Flex>

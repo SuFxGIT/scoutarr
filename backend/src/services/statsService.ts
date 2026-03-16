@@ -14,7 +14,7 @@ export interface SearchEntry {
   application: string;
   instance?: string; // Instance name/ID
   count: number;
-  items: Array<{ id: number; title: string }>;
+  items: Array<{ id: number; title: string; externalId?: string }>;
 }
 
 export interface Stats {
@@ -162,6 +162,14 @@ class StatsService {
       )
     `);
 
+    // Migration: Add instance_id column to history if it doesn't exist (for existing databases)
+    try {
+      this.db.exec(`ALTER TABLE history ADD COLUMN instance_id TEXT`);
+      logger.info('✅ Added instance_id column to history table');
+    } catch {
+      // Column already exists — ignore
+    }
+
     // Migration: Add external_id column if it doesn't exist (for existing databases)
     try {
       this.db.exec(`ALTER TABLE media_library ADD COLUMN external_id TEXT`);
@@ -172,7 +180,38 @@ class StatsService {
     }
   }
 
-  async addSearch(application: string, count: number, items: Array<{ id: number; title: string }>, instance?: string): Promise<void> {
+  private enrichItemsWithExternalId(
+    items: Array<{ id: number; title: string }>,
+    instanceId: string | null
+  ): Array<{ id: number; title: string; externalId?: string }> {
+    if (!this.db || !instanceId || items.length === 0) return items;
+    try {
+      const placeholders = items.map(() => '?').join(',');
+      // First try direct media_id match (Radarr, Lidarr, Readarr)
+      const directStmt = this.db.prepare(
+        `SELECT media_id as id, external_id FROM media_library WHERE instance_id = ? AND media_id IN (${placeholders})`
+      );
+      const directRows = directStmt.all(instanceId, ...items.map(i => i.id)) as Array<{ id: number; external_id: string | null }>;
+      const externalIdMap = new Map(directRows.map(r => [r.id, r.external_id ?? undefined]));
+
+      // For any items not found (Sonarr stores series_id, not episode_id), try series_id lookup
+      const missing = items.filter(i => !externalIdMap.has(i.id));
+      if (missing.length > 0) {
+        const missingPlaceholders = missing.map(() => '?').join(',');
+        const seriesStmt = this.db.prepare(
+          `SELECT DISTINCT series_id as id, external_id FROM media_library WHERE instance_id = ? AND series_id IN (${missingPlaceholders})`
+        );
+        const seriesRows = seriesStmt.all(instanceId, ...missing.map(i => i.id)) as Array<{ id: number; external_id: string | null }>;
+        for (const r of seriesRows) externalIdMap.set(r.id, r.external_id ?? undefined);
+      }
+
+      return items.map(item => ({ ...item, externalId: externalIdMap.get(item.id) }));
+    } catch {
+      return items;
+    }
+  }
+
+  async addSearch(application: string, count: number, items: Array<{ id: number; title: string; externalId?: string }>, instance?: string, instanceId?: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     try {
@@ -180,8 +219,8 @@ class StatsService {
       const appKey = application.toLowerCase();
 
       const insertStmt = this.db.prepare(`
-        INSERT INTO history (timestamp, application, instance, count, items)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO history (timestamp, application, instance, count, items, instance_id)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       insertStmt.run(
@@ -189,7 +228,8 @@ class StatsService {
         appKey,
         instance || null,
         count,
-        JSON.stringify(items)
+        JSON.stringify(items),
+        instanceId || null
       );
 
       logger.debug('📊 Stats updated', {
@@ -255,7 +295,7 @@ class StatsService {
 
     // Get recent searches (limited for API response)
     const recentStmt = this.db.prepare(`
-      SELECT timestamp, application, instance, count, items
+      SELECT timestamp, application, instance, instance_id, count, items
       FROM history
       ORDER BY timestamp DESC
       LIMIT ?
@@ -264,6 +304,7 @@ class StatsService {
       timestamp: string;
       application: string;
       instance: string | null;
+      instance_id: string | null;
       count: number;
       items: string;
     }>;
@@ -273,7 +314,10 @@ class StatsService {
       application: row.application,
       instance: row.instance || undefined,
       count: row.count,
-      items: JSON.parse(row.items) as Array<{ id: number; title: string }>
+      items: this.enrichItemsWithExternalId(
+        JSON.parse(row.items) as Array<{ id: number; title: string }>,
+        row.instance_id
+      )
     }));
 
     // Get last search timestamp
@@ -355,7 +399,7 @@ class StatsService {
       const offset = (page - 1) * pageSize;
       logger.debug('📊 Fetching paginated results', { offset, limit: pageSize });
       const stmt = this.db.prepare(`
-        SELECT timestamp, application, instance, count, items
+        SELECT timestamp, application, instance, instance_id, count, items
         FROM history
         ORDER BY timestamp DESC
         LIMIT ? OFFSET ?
@@ -364,6 +408,7 @@ class StatsService {
         timestamp: string;
         application: string;
         instance: string | null;
+        instance_id: string | null;
         count: number;
         items: string;
       }>;
@@ -373,7 +418,10 @@ class StatsService {
         application: row.application,
         instance: row.instance || undefined,
         count: row.count,
-        items: JSON.parse(row.items) as Array<{ id: number; title: string }>
+        items: this.enrichItemsWithExternalId(
+          JSON.parse(row.items) as Array<{ id: number; title: string }>,
+          row.instance_id
+        )
       }));
 
       logger.debug('✅ Recent searches retrieved', {
@@ -868,26 +916,28 @@ class StatsService {
     try {
       const placeholders = mediaIds.map(() => '?').join(',');
       const stmt = this.db.prepare(`
-        SELECT media_id as id, title FROM media_library
+        SELECT media_id as id, title, external_id FROM media_library
         WHERE instance_id = ? AND media_id IN (${placeholders})
       `);
-      return stmt.all(instanceId, ...mediaIds) as Array<{ id: number; title: string }>;
+      const rows = stmt.all(instanceId, ...mediaIds) as Array<{ id: number; title: string; external_id: string | null }>;
+      return rows.map(r => ({ id: r.id, title: r.title, externalId: r.external_id ?? undefined }));
     } catch (error: unknown) {
       logger.error('❌ Error fetching media titles', { error: getErrorMessage(error) });
       return [];
     }
   }
 
-  async getSeriesTitlesByIds(instanceId: string, seriesIds: number[]): Promise<Array<{ id: number; title: string }>> {
+  async getSeriesTitlesByIds(instanceId: string, seriesIds: number[]): Promise<Array<{ id: number; title: string; externalId?: string }>> {
     if (!this.db || seriesIds.length === 0) return [];
 
     try {
       const placeholders = seriesIds.map(() => '?').join(',');
       const stmt = this.db.prepare(`
-        SELECT DISTINCT series_id as id, title FROM media_library
+        SELECT DISTINCT series_id as id, series_title as title, external_id FROM media_library
         WHERE instance_id = ? AND series_id IN (${placeholders})
       `);
-      return stmt.all(instanceId, ...seriesIds) as Array<{ id: number; title: string }>;
+      const rows = stmt.all(instanceId, ...seriesIds) as Array<{ id: number; title: string; external_id: string | null }>;
+      return rows.map(r => ({ id: r.id, title: r.title, externalId: r.external_id ?? undefined }));
     } catch (error: unknown) {
       logger.error('❌ Error fetching series titles', { error: getErrorMessage(error) });
       return [];

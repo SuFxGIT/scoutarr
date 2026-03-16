@@ -14,11 +14,12 @@ import {
 import { ChevronLeftIcon } from '@radix-ui/react-icons';
 import { format } from 'date-fns';
 import { fetchCfScoreHistory } from '../services/mediaLibraryService';
+import { configService } from '../services/configService';
+import type { Config } from '../types/config';
 import { useNavigation } from '../contexts/NavigationContext';
-import { formatAppName } from '../utils/helpers';
+import { formatAppName, buildArrUrl } from '../utils/helpers';
 import { ExternalLinkIcon } from '@radix-ui/react-icons';
 import { useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import type { CfScoreHistoryEntry } from '@scoutarr/shared';
 
 const MAX_CHART_BARS = 120;
@@ -113,16 +114,6 @@ function ScoreStats({ history }: { history: CfScoreHistoryEntry[] }) {
   );
 }
 
-function buildArrUrl(appType: string, instanceUrl: string, externalId: string): string {
-  const base = instanceUrl.replace(/\/$/, '');
-  switch (appType) {
-    case 'radarr': return `${base}/movie/${externalId}`;
-    case 'sonarr': return `${base}/series/${externalId}`;
-    case 'lidarr': return `${base}/artist/${externalId}`;
-    case 'readarr': return `${base}/author/${externalId}`;
-    default: return base;
-  }
-}
 
 function CfScoreHistory() {
   const { appType, instanceId, mediaId } = useParams<{
@@ -143,14 +134,16 @@ function CfScoreHistory() {
 
   // Get externalId from search params
   const externalId = searchParams.get('externalId');
-  // Get instanceUrl from config (via react-query cache)
-  const queryClient = useQueryClient();
-  const config = queryClient.getQueryData(['config']);
+  // Get instanceUrl from config
+  const { data: config } = useQuery<Config>({
+    queryKey: ['config'],
+    queryFn: () => configService.getConfig(),
+    staleTime: Infinity,
+  });
   const instanceUrl = useMemo(() => {
     if (!config || !instanceId || !appType) return null;
-    const appConfig = (config as any).applications?.[appType] || [];
-    const inst = appConfig.find((i: any) => i.id === instanceId);
-    return inst?.url ?? null;
+    const instances = config.applications[appType as keyof typeof config.applications] || [];
+    return instances.find(i => i.id === instanceId)?.url ?? null;
   }, [config, instanceId, appType]);
 
   return (
