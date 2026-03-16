@@ -219,7 +219,7 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
         // Find media with this tag (by name)
         const taggedMedia = mediaWithTagNames.filter(m => m.tagNames.includes(tagName));
         if (taggedMedia.length > 0) {
-          const taggedMediaIds = taggedMedia.map(media => service.getMediaId(media));
+          const taggedMediaIds = [...new Set(taggedMedia.map(media => service.getMediaId(media)))];
           logger.debug(`🏷️  Removing tag "${tagName}" from ${taggedMediaIds.length} items`);
           await service.removeTag(instanceConfig, taggedMediaIds, tagId);
           totalCleared += taggedMediaIds.length;
