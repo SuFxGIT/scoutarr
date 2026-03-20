@@ -260,6 +260,12 @@ function Dashboard() {
       else if (key.startsWith('readarr')) readarrTotal += count as number;
     });
 
+    const lidarrUpgrades = stats.upgradesByApplication?.['lidarr'] ?? 0;
+    const radarrUpgrades = stats.upgradesByApplication?.['radarr'] ?? 0;
+    const sonarrUpgrades = stats.upgradesByApplication?.['sonarr'] ?? 0;
+    const readarrUpgrades = stats.upgradesByApplication?.['readarr'] ?? 0;
+    const totalUpgrades = stats.totalUpgrades ?? 0;
+
     const statCardStyle = {
       flex: '1 1 200px',
       minWidth: '150px',
@@ -297,7 +303,10 @@ function Dashboard() {
                       <AppIcon app="lidarr" size={20} variant="light" />
                       <Text size="2" color="gray">Lidarr</Text>
                     </Flex>
-                    <Heading size="7">{lidarrTotal}</Heading>
+                    <Flex align="baseline" gap="2">
+                      <Heading size="7">{lidarrTotal}</Heading>
+                      <Text size="1" style={{ color: 'var(--green-11)' }}>▲ {lidarrUpgrades}</Text>
+                    </Flex>
                   </Flex>
                 </Card>
 
@@ -316,7 +325,10 @@ function Dashboard() {
                       <AppIcon app="radarr" size={20} variant="light" />
                       <Text size="2" color="gray">Radarr</Text>
                     </Flex>
-                    <Heading size="7">{radarrTotal}</Heading>
+                    <Flex align="baseline" gap="2">
+                      <Heading size="7">{radarrTotal}</Heading>
+                      <Text size="1" style={{ color: 'var(--green-11)' }}>▲ {radarrUpgrades}</Text>
+                    </Flex>
                   </Flex>
                 </Card>
 
@@ -332,7 +344,10 @@ function Dashboard() {
                 >
                   <Flex direction="column" gap="2" align="center" justify="center">
                     <Text size="2" color="gray">Total Searched</Text>
-                    <Heading size="7">{stats.totalSearches}</Heading>
+                    <Flex align="baseline" gap="2">
+                      <Heading size="7">{stats.totalSearches}</Heading>
+                      <Text size="1" style={{ color: 'var(--green-11)' }}>▲ {totalUpgrades}</Text>
+                    </Flex>
                   </Flex>
                 </Card>
 
@@ -351,7 +366,10 @@ function Dashboard() {
                       <AppIcon app="sonarr" size={20} variant="light" />
                       <Text size="2" color="gray">Sonarr</Text>
                     </Flex>
-                    <Heading size="7">{sonarrTotal}</Heading>
+                    <Flex align="baseline" gap="2">
+                      <Heading size="7">{sonarrTotal}</Heading>
+                      <Text size="1" style={{ color: 'var(--green-11)' }}>▲ {sonarrUpgrades}</Text>
+                    </Flex>
                   </Flex>
                 </Card>
 
@@ -370,7 +388,10 @@ function Dashboard() {
                       <AppIcon app="readarr" size={20} variant="light" />
                       <Text size="2" color="gray">Readarr</Text>
                     </Flex>
-                    <Heading size="7">{readarrTotal}</Heading>
+                    <Flex align="baseline" gap="2">
+                      <Heading size="7">{readarrTotal}</Heading>
+                      <Text size="1" style={{ color: 'var(--green-11)' }}>▲ {readarrUpgrades}</Text>
+                    </Flex>
                   </Flex>
                 </Card>
               </Flex>

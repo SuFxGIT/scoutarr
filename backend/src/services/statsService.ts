@@ -23,6 +23,8 @@ export interface Stats {
   searchesByInstance: Record<string, number>; // Key: "application-instance" or "application" if no instance
   recentSearches: SearchEntry[];
   lastSearch?: string;
+  totalUpgrades: number;
+  upgradesByApplication: Record<string, number>;
 }
 
 class StatsService {
@@ -248,6 +250,29 @@ class StatsService {
     }
   }
 
+  private getUpgradeCounts(): Record<string, number> {
+    if (!this.db) return {};
+    const stmt = this.db.prepare(`
+      SELECT i.application, COUNT(*) AS upgrades
+      FROM (
+        SELECT
+          instance_id,
+          LAG(score) OVER (PARTITION BY instance_id, media_id ORDER BY recorded_at) AS prev_score,
+          score
+        FROM cf_score_history
+      ) sub
+      JOIN instances i ON sub.instance_id = i.instance_id
+      WHERE sub.prev_score IS NOT NULL AND sub.score > sub.prev_score
+      GROUP BY i.application
+    `);
+    const rows = stmt.all() as Array<{ application: string; upgrades: number }>;
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.application] = row.upgrades;
+    }
+    return result;
+  }
+
   private calculateStats(limit: number = 100): Stats {
     if (!this.db) {
       return {
@@ -255,7 +280,9 @@ class StatsService {
         searchesByApplication: {},
         searchesByInstance: {},
         recentSearches: [],
-        lastSearch: undefined
+        lastSearch: undefined,
+        totalUpgrades: 0,
+        upgradesByApplication: {}
       };
     }
 
@@ -330,12 +357,17 @@ class StatsService {
     const lastResult = lastStmt.get() as { timestamp: string } | undefined;
     const lastSearch = lastResult?.timestamp;
 
+    const upgradesByApplication = this.getUpgradeCounts();
+    const totalUpgrades = Object.values(upgradesByApplication).reduce((a, b) => a + b, 0);
+
     return {
       totalSearches,
       searchesByApplication,
       searchesByInstance,
       recentSearches,
-      lastSearch
+      lastSearch,
+      totalUpgrades,
+      upgradesByApplication
     };
   }
 
@@ -347,7 +379,9 @@ class StatsService {
         totalSearches: 0,
         searchesByApplication: {},
         searchesByInstance: {},
-        recentSearches: []
+        recentSearches: [],
+        totalUpgrades: 0,
+        upgradesByApplication: {}
       };
     }
 
@@ -370,7 +404,9 @@ class StatsService {
         totalSearches: 0,
         searchesByApplication: {},
         searchesByInstance: {},
-        recentSearches: []
+        recentSearches: [],
+        totalUpgrades: 0,
+        upgradesByApplication: {}
       };
     }
   }

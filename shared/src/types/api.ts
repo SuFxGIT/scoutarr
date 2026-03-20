@@ -65,6 +65,8 @@ export interface Stats {
     items: Array<{ id: number; title: string; externalId?: string }>;
   }>;
   lastSearch?: string;
+  totalUpgrades: number;
+  upgradesByApplication: Record<string, number>;
 }
 
 export interface MediaLibraryItem {
