@@ -827,6 +827,24 @@ function Settings() {
                 <Heading size="5">Advanced</Heading>
                 <Separator size="4" />
 
+                <Flex direction="column" gap="3">
+                  <Text size="2" weight="medium">Support Scoutarr</Text>
+                  <Text size="1" color="gray">
+                    Scoutarr is free and open source. If it's saved you time, a coffee goes a long way.
+                  </Text>
+                  <Box>
+                    <a href="https://buymeacoffee.com/sufx" target="_blank" rel="noopener noreferrer">
+                      <img
+                        src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+                        alt="Buy Me A Coffee"
+                        style={{ height: '45px', borderRadius: '8px' }}
+                      />
+                    </a>
+                  </Box>
+                </Flex>
+
+                <Separator size="4" />
+
                 <Flex direction="column" gap="2">
                   <Text size="2" weight="medium">Unattended Mode</Text>
                   <Text size="1" color="gray">

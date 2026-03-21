@@ -1,5 +1,7 @@
 <div align="center">
   <img src="screenshots/logo.png" alt="Scoutarr" width="200">
+  <br /><br />
+  <a href="https://buymeacoffee.com/sufx"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="45"></a>
 </div>
 
 # Overview
