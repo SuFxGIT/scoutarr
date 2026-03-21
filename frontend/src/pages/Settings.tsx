@@ -830,7 +830,7 @@ function Settings() {
                 <Flex direction="column" gap="3">
                   <Text size="2" weight="medium">Support Scoutarr</Text>
                   <Text size="1" color="gray">
-                    Scoutarr is free and open source. If it's saved you time, a coffee goes a long way.
+                    Scoutarr is free and open source. If it saved you time, a coffee goes a long way.
                   </Text>
                   <Box>
                     <a href="https://buymeacoffee.com/sufx" target="_blank" rel="noopener noreferrer">
