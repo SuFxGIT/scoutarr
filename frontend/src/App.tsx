@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link, useSearchParams, useLocation } from 'react-router-dom';
 import React, { lazy, Suspense } from 'react';
-import { Flex, Heading, Button, Separator, Box, Spinner, Text } from '@radix-ui/themes';
-import { GearIcon, HomeIcon, Pencil1Icon } from '@radix-ui/react-icons';
+import { Flex, Heading, Button, Separator, Box, Spinner, Text, IconButton, Tooltip } from '@radix-ui/themes';
+import { GearIcon, HomeIcon, Pencil1Icon, GitHubLogoIcon } from '@radix-ui/react-icons';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -66,6 +66,13 @@ function NavigationLinks() {
             <GearIcon /> Settings
           </Link>
         </Button>
+        <Tooltip content="View on GitHub">
+          <IconButton variant="ghost" size="2" asChild>
+            <a href="https://github.com/SuFxGIT/scoutarr" target="_blank" rel="noopener noreferrer">
+              <GitHubLogoIcon />
+            </a>
+          </IconButton>
+        </Tooltip>
         <ThemeToggle />
       </Flex>
     </>
