@@ -14,7 +14,7 @@ export interface SearchEntry {
   application: string;
   instance?: string; // Instance name/ID
   count: number;
-  items: Array<{ id: number; title: string; externalId?: string }>;
+  items: Array<{ id: number; title: string; externalId?: string; upgraded?: boolean }>;
 }
 
 export interface Stats {

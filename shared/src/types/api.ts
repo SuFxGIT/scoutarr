@@ -62,7 +62,7 @@ export interface Stats {
     application: string;
     instance?: string;
     count: number;
-    items: Array<{ id: number; title: string; externalId?: string }>;
+    items: Array<{ id: number; title: string; externalId?: string; upgraded?: boolean }>;
   }>;
   lastSearch?: string;
   totalUpgrades: number;
