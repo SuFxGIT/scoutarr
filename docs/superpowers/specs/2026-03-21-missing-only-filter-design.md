@@ -65,14 +65,50 @@ if (config.missingOnly) {
 }
 ```
 
-Pass `missingOnly: (config as any).missingOnly` from `filterMediaItems` in `BaseStarrService`, alongside the existing `monitored`, `tagName`, etc.
+Pass `missingOnly: (config as any).missingOnly` from `filterMediaItems` in `BaseStarrService`, alongside the existing `monitored`, `tagName`, etc. Also add `missingOnly` to the filter log object in `filterMediaItems` so it appears in debug output alongside the other active filters.
 
 ### 2c. Lidarr / Readarr `hasFile` population
 
-In `lidarrService.ts` `getMedia`, set `hasFile: !artist.statistics?.trackFileCount` (or equivalent field from the Lidarr API) on each `LidarrArtist`.  
-In `readarrService.ts` `getMedia`, set `hasFile: !author.statistics?.bookFileCount` similarly.
+Add `statistics?: { trackFileCount?: number }` to `LidarrArtist` in `lidarrService.ts`.  
+Add `statistics?: { bookFileCount?: number }` to `ReadarrAuthor` in `readarrService.ts`.
 
-The DB cache stores `has_file` — verify `mediaSync.ts` already syncs this field; if not, add it.
+Then set `hasFile` from these fields:
+
+```typescript
+// lidarrService.ts — in getMedia
+hasFile: (artist.statistics?.trackFileCount ?? 0) > 0
+
+// readarrService.ts — in getMedia
+hasFile: (author.statistics?.bookFileCount ?? 0) > 0
+```
+
+**Radarr:** The Radarr API returns `hasFile: boolean` natively on the movie object and `fetchMediaWithScores` passes it through as-is. No transformation is needed — simply add `hasFile?: boolean` to the `RadarrMovie` interface:
+
+```typescript
+export interface RadarrMovie extends FilterableMedia {
+  title: string;
+  hasFile?: boolean; // natively present in Radarr API response
+}
+```
+
+**Sonarr:** `SonarrEpisode` already carries `hasFile: boolean` directly from the episode API response — no change needed.
+
+**DB cache concern:** The DB cache `has_file` column is derived in `mediaFileUtils.ts` (`extractFileInfoForDb`), which currently checks for embedded `trackFiles`/`bookFiles` arrays. The Lidarr `/api/v1/artist` and Readarr `/api/v1/author` list endpoints return `statistics.trackFileCount`/`statistics.bookFileCount` at the top level — not embedded file arrays. This means every Lidarr artist and Readarr author will sync to the DB with `has_file = 0`, making the `missingOnly` filter a no-op on those app types when served from cache.
+
+**Required fix in `mediaFileUtils.ts`:** Add a `statistics?` field check in `extractFileInfoForDb` as a fallback for Lidarr/Readarr after the existing array checks:
+
+```typescript
+// If no file arrays present, fall back to statistics counts
+if (!hasFile && item.statistics) {
+  hasFile = (item.statistics.trackFileCount ?? item.statistics.bookFileCount ?? 0) > 0;
+}
+```
+
+**DB cache path — `has_file` mapping:** The `processAppInstances` mapping from DB rows to `preloadedMedia` in `search.ts` must coerce the SQLite integer to a boolean (SQLite stores `0`/`1`; strict equality `=== false` requires an actual boolean):
+
+```typescript
+hasFile: !!m.has_file,  // coerce SQLite integer 0/1 to boolean
+```
 
 ### 2d. Unattended mode fix (`backend/src/routes/search.ts`)
 
@@ -144,8 +180,10 @@ Search run triggered
 | `shared/src/schemas/config.ts` | Add `missingOnly` to all four instance schemas |
 | `backend/src/utils/filterUtils.ts` | Add `hasFile?` to `FilterableMedia`; add `missingOnly` to `CommonFilterConfig` and `applyCommonFilters` |
 | `backend/src/services/baseStarrService.ts` | Pass `missingOnly` from config into `applyCommonFilters` |
-| `backend/src/services/lidarrService.ts` | Populate `hasFile` on `LidarrArtist` |
-| `backend/src/services/readarrService.ts` | Populate `hasFile` on `ReadarrAuthor` |
-| `backend/src/routes/search.ts` | Fix unattended tag-clear to use full filter chain |
+| `backend/src/services/radarrService.ts` | Explicitly map `hasFile` on `RadarrMovie` from API response |
+| `backend/src/services/lidarrService.ts` | Add `statistics?` to `LidarrArtist`; populate `hasFile` |
+| `backend/src/services/readarrService.ts` | Add `statistics?` to `ReadarrAuthor`; populate `hasFile` |
+| `backend/src/routes/search.ts` | Map `has_file` from DB row in `preloadedMedia`; fix unattended tag-clear to use full filter chain |
+| `backend/src/utils/mediaFileUtils.ts` | Add `statistics.trackFileCount`/`bookFileCount` fallback for Lidarr/Readarr `has_file` derivation (if needed) |
 | `frontend/src/components/InstanceCard.tsx` | Add Missing Only `Switch` |
 | `frontend/src/pages/Settings.tsx` | Update unattended mode description |
