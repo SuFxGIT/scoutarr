@@ -45,7 +45,7 @@ function NavigationLinks() {
           <Heading size="8" m="0">scoutarr</Heading>
         </Flex>
       </Link>
-      <Flex gap="3" align="center">
+      <Flex gap="4" align="center">
         <Button variant="ghost" asChild>
           <Link to="/" onClick={(e: React.MouseEvent<HTMLAnchorElement>) => handleLinkClick(e, '/')}>
             <HomeIcon /> Home
@@ -56,6 +56,7 @@ function NavigationLinks() {
             variant="soft"
             color={isEditMode ? 'yellow' : 'gray'}
             onClick={toggleEditMode}
+            style={{ cursor: 'pointer' }}
           >
             <Pencil1Icon /> Edit Dashboard
           </Button>

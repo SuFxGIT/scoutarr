@@ -61,7 +61,7 @@ const DEFAULT_LAYOUT: CardLayout[] = [
 const CARD_LABELS: Record<CardId, string> = {
   'statistics': 'Statistics',
   'media-library': 'Media Library',
-  'recent-searches': 'Recent Searches',
+  'recent-searches': 'Search History',
 };
 
 function loadLayout(): CardLayout[] {
@@ -472,7 +472,7 @@ function Dashboard() {
         <Card>
           <Flex direction="column" gap="3">
             <Flex align="center" gap="3">
-              <Heading size="5">Recent Searches</Heading>
+              <Heading size="5">Search History</Heading>
               <Flex align="center" gap="2">
                 <Text size="2" weight="medium">App:</Text>
                 <Select.Root value={appFilter} onValueChange={(value: string) => {
