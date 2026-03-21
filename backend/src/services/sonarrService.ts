@@ -57,6 +57,10 @@ class SonarrService extends BaseStarrService<SonarrInstance, SonarrEpisode> {
     return 'episodes';
   }
 
+  protected getTagTargetName(): string {
+    return 'series';
+  }
+
   protected getFileIdField(): string {
     return 'episodeFile.id';
   }

@@ -120,9 +120,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tags: [tagId],
         applyTags: 'add'
       });
-      logger.info(`✅ [${this.appName}] Added tag to ${mediaIds.length} ${this.getMediaTypeName()}`, { tagId, count: mediaIds.length });
+      logger.info(`✅ [${this.appName}] Added tag to ${mediaIds.length} ${this.getTagTargetName()}`, { tagId, count: mediaIds.length });
     } catch (error: unknown) {
-      this.logError(`Failed to add tag to ${this.getMediaTypeName()}`, error, { mediaIds, tagId, count: mediaIds.length });
+      this.logError(`Failed to add tag to ${this.getTagTargetName()}`, error, { mediaIds, tagId, count: mediaIds.length });
       throw error;
     }
   }
@@ -138,9 +138,9 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tags: [tagId],
         applyTags: 'remove'
       });
-      logger.info(`✅ [${this.appName}] Removed tag from ${mediaIds.length} ${this.getMediaTypeName()}`, { tagId, count: mediaIds.length });
+      logger.info(`✅ [${this.appName}] Removed tag from ${mediaIds.length} ${this.getTagTargetName()}`, { tagId, count: mediaIds.length });
     } catch (error: unknown) {
-      this.logError(`Failed to remove tag from ${this.getMediaTypeName()}`, error, { mediaIds, tagId, count: mediaIds.length });
+      this.logError(`Failed to remove tag from ${this.getTagTargetName()}`, error, { mediaIds, tagId, count: mediaIds.length });
       throw error;
     }
   }
@@ -149,6 +149,14 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
    * Gets the media type name for logging (movies, series, artists, authors)
    */
   protected abstract getMediaTypeName(): string;
+
+  /**
+   * Gets the entity name used for tag operations (defaults to getMediaTypeName).
+   * Override when the tag target differs from the fetch/filter media type (e.g. Sonarr tags series, not episodes).
+   */
+  protected getTagTargetName(): string {
+    return this.getMediaTypeName();
+  }
 
   /**
    * Gets the file ID field name(s) for the specific media type
