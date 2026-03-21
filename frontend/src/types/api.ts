@@ -4,10 +4,7 @@
  */
 
 export type {
-  SearchResults,
   Stats,
-  InstanceStatus,
-  StatusResponse,
   SchedulerStatus,
   SyncSchedulerStatus,
 } from '@scoutarr/shared';
