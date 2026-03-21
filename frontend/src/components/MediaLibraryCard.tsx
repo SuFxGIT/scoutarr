@@ -41,7 +41,7 @@ import {
 } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, compareAsc } from 'date-fns';
-import { toast } from 'sonner';
+import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { formatAppName, getErrorMessage, buildArrUrl } from '../utils/helpers';
 import { AppIcon } from './icons/AppIcon';
 import { fetchMediaLibrary, syncMediaLibrary, searchMedia } from '../services/mediaLibraryService';
@@ -527,13 +527,13 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
         setConflictDialog({ open: true, conflicts: data.conflicts, idsToSend });
         return;
       }
-      toast.success(data.message);
+      showSuccessToast(data.message);
       setSelectedMediaIds(new Set());
       refetch();
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (error: unknown) => {
-      toast.error('Search failed: ' + getErrorMessage(error));
+      showErrorToast('Search failed: ' + getErrorMessage(error));
     },
   });
 
@@ -544,12 +544,12 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
       return syncMediaLibrary(instanceInfo.appType, instanceInfo.instanceId);
     },
     onSuccess: () => {
-      toast.success('Media library synced successfully');
+      showSuccessToast('Media library synced successfully');
       refetch();
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (error: unknown) => {
-      toast.error('Sync failed: ' + getErrorMessage(error));
+      showErrorToast('Sync failed: ' + getErrorMessage(error));
     },
   });
 
