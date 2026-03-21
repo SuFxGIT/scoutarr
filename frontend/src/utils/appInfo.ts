@@ -1,7 +1,7 @@
 import type { AppType } from './constants';
-import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from '../types/config';
+import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance, StarrInstanceConfig } from '@scoutarr/shared';
 
-export type StarrInstanceConfig = RadarrInstance | SonarrInstance | LidarrInstance | ReadarrInstance;
+export type { StarrInstanceConfig };
 
 const DEFAULT_TAG = 'upgradinatorr';
 
