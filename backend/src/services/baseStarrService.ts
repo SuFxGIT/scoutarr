@@ -313,6 +313,7 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
         tagName: (config as any).tagName,
         ignoreTag: (config as any).ignoreTag,
         qualityProfileName: (config as any).qualityProfileName,
+        missingOnly: (config as any).missingOnly,
         statusFilter: (config as any)[this.getStatusFilterKey() || '']
       }
     });
@@ -330,6 +331,7 @@ export abstract class BaseStarrService<TConfig extends BaseStarrInstance, TMedia
           tagName: (config as any).tagName,
           ignoreTag: (config as any).ignoreTag,
           qualityProfileName: (config as any).qualityProfileName,
+          missingOnly: (config as any).missingOnly,
           getQualityProfiles: () => this.getQualityProfiles(config),
           getTagId: (tagName: string) => this.getTagId(config, tagName)
         },

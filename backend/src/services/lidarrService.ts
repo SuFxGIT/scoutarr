@@ -4,6 +4,8 @@ import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface LidarrArtist extends FilterableMedia {
   artistName: string;
+  hasFile?: boolean;
+  statistics?: { trackFileCount?: number };
 }
 
 class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
@@ -76,7 +78,11 @@ class LidarrService extends BaseStarrService<LidarrInstance, LidarrArtist> {
   }
 
   async getMedia(config: LidarrInstance): Promise<LidarrArtist[]> {
-    return this.fetchMediaWithScores(config);
+    const artists = await this.fetchMediaWithScores(config);
+    return artists.map(a => ({
+      ...a,
+      hasFile: (a.statistics?.trackFileCount ?? 0) > 0,
+    }));
   }
 
   async searchMedia(config: LidarrInstance, mediaIds: number[]): Promise<void> {

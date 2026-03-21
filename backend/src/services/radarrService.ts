@@ -5,6 +5,7 @@ import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface RadarrMovie extends FilterableMedia {
   title: string;
+  hasFile?: boolean; // natively returned by Radarr API
 }
 
 class RadarrService extends BaseStarrService<RadarrInstance, RadarrMovie> {

@@ -124,6 +124,7 @@ async function processAppInstances<T extends StarrInstanceConfig>(
         tags: m.tags,
         qualityProfileName: m.quality_profile_name || undefined,
         status: m.status,
+        hasFile: !!m.has_file,
         lastSearchTime: m.last_search_time || undefined,
         seriesId: m.series_id ?? undefined,
       }));
@@ -252,10 +253,22 @@ export async function processApplication<TMedia extends FilterableMedia>(
       const tagName = processor.config.tagName;
       const tagId = await processor.getTagId(processor.config, tagName);
       if (tagId !== null && tagName) {
-        // Filter by tag NAME now (media.tags is now string[])
-        const mediaWithTag = allMedia.filter(m => {
-          return m.monitored === processor.config.monitored && Array.isArray(m.tags) && m.tags.includes(tagName);
-        });
+        // Build a temp copy with tagName stripped so filterMedia sees all filter-passing items
+        const tempAllMedia = allMedia.map(m => ({
+          ...m,
+          tags: (m.tags as string[]).filter(t => t !== tagName)
+        })) as typeof allMedia;
+
+        // Run the full filter chain (monitored, quality profile, status, missingOnly, etc.)
+        const filterPassingMedia = await processor.filterMedia(processor.config, tempAllMedia);
+        const filterPassingIds = new Set(filterPassingMedia.map(processor.getMediaId));
+
+        // From filter-passing items, find those that originally had the tag
+        const mediaWithTag = allMedia.filter(m =>
+          filterPassingIds.has(processor.getMediaId(m)) &&
+          Array.isArray(m.tags) &&
+          m.tags.includes(tagName)
+        );
         if (mediaWithTag.length > 0) {
           const mediaIds = [...new Set(mediaWithTag.map(processor.getMediaId))];
           await processor.removeTag(processor.config, mediaIds, tagId);

@@ -243,6 +243,19 @@ export function InstanceCard({
                 />
               </Flex>
 
+              <Flex direction="row" align="center" justify="between" gap="2">
+                <Flex align="center" gap="1">
+                  <Text size="2" weight="medium">Missing Only</Text>
+                  <Tooltip content={`When enabled, only ${appInfo.mediaTypePlural} with no file will be searched. Use this to find and download missing media instead of searching for upgrades.`}>
+                    <QuestionMarkCircledIcon style={{ cursor: 'help', color: 'var(--gray-9)', width: '14px', height: '14px' }} />
+                  </Tooltip>
+                </Flex>
+                <Switch
+                  checked={(instance as { missingOnly?: boolean }).missingOnly ?? false}
+                  onCheckedChange={(checked: boolean) => updateInstanceConfig(appType, instance.id, 'missingOnly', checked)}
+                />
+              </Flex>
+
               {appType === 'radarr' && (
                 <Flex direction="column" gap="2">
                   <Flex align="center" gap="1">

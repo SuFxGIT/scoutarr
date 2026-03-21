@@ -4,6 +4,8 @@ import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface ReadarrAuthor extends FilterableMedia {
   authorName: string;
+  hasFile?: boolean;
+  statistics?: { bookFileCount?: number };
 }
 
 class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
@@ -76,7 +78,11 @@ class ReadarrService extends BaseStarrService<ReadarrInstance, ReadarrAuthor> {
   }
 
   async getMedia(config: ReadarrInstance): Promise<ReadarrAuthor[]> {
-    return this.fetchMediaWithScores(config);
+    const authors = await this.fetchMediaWithScores(config);
+    return authors.map(a => ({
+      ...a,
+      hasFile: (a.statistics?.bookFileCount ?? 0) > 0,
+    }));
   }
 
   async searchMedia(config: ReadarrInstance, mediaIds: number[]): Promise<void> {

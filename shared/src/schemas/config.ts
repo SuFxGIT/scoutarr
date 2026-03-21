@@ -39,6 +39,7 @@ export const radarrInstanceSchema = z.object({
   movieStatus: z.enum(['announced', 'in cinemas', 'released', 'any'] as const),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  missingOnly: z.boolean().optional(),
 });
 
 export const sonarrInstanceSchema = z.object({
@@ -55,6 +56,7 @@ export const sonarrInstanceSchema = z.object({
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
   hideSpecials: z.boolean().optional(),
+  missingOnly: z.boolean().optional(),
 });
 
 export const lidarrInstanceSchema = z.object({
@@ -70,6 +72,7 @@ export const lidarrInstanceSchema = z.object({
   artistStatus: z.enum(['continuing', 'ended', ''] as const),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  missingOnly: z.boolean().optional(),
 });
 
 export const readarrInstanceSchema = z.object({
@@ -85,6 +88,7 @@ export const readarrInstanceSchema = z.object({
   authorStatus: z.enum(['continuing', 'ended', ''] as const),
   qualityProfileName: z.string(),
   enabled: z.boolean().optional(),
+  missingOnly: z.boolean().optional(),
 });
 
 export const notificationConfigSchema = z.object({

@@ -11,6 +11,7 @@ export interface FilterableMedia {
   qualityProfileId?: number; // Profile ID from *arr API
   qualityProfileName?: string; // Profile name for filtering
   status: string;
+  hasFile?: boolean; // Whether the media item has a file
   lastSearchTime?: string;
   added?: string;
   movieFile?: { dateAdded?: string }; // Date imported from *arr API
@@ -27,6 +28,7 @@ interface CommonFilterConfig {
   tagName: string;
   ignoreTag?: string;
   qualityProfileName?: string;
+  missingOnly?: boolean;
   getQualityProfiles: () => Promise<StarrQualityProfile[]>;
   getTagId: (tagName: string) => Promise<number | null>;
 }
@@ -95,6 +97,17 @@ export async function applyCommonFilters<T extends FilterableMedia>(
       before,
       after: filtered.length,
       ignoreTag,
+      appName
+    });
+  }
+
+  // Filter to missing media only (no file)
+  if (config.missingOnly) {
+    const before = filtered.length;
+    filtered = filtered.filter(m => m.hasFile === false);
+    logger.debug('🔽 Filtered by missing only', {
+      before,
+      after: filtered.length,
       appName
     });
   }

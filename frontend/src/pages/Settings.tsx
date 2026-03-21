@@ -827,7 +827,7 @@ function Settings() {
                     Controls what happens during a scheduled run when all media has already been tagged and nothing is left to search.
                   </Text>
                   <Text size="1" color="gray">
-                    <Text size="1" weight="medium">Enabled:</Text> Scoutarr automatically removes its tag from all media in that instance, then immediately re-runs the search from scratch — keeping the upgrade cycle going indefinitely without any manual intervention.
+                    <Text size="1" weight="medium">Enabled:</Text> When all eligible media matching the instance's active filters has been searched, Scoutarr automatically removes its tag from those items, then immediately re-runs the search — keeping the cycle going indefinitely. Works with all filter combinations, including Missing Only.
                   </Text>
                   <Text size="1" color="gray">
                     <Text size="1" weight="medium">Disabled:</Text> Scoutarr does nothing and skips the run. The schedule will keep firing but no searches will happen until untagged media becomes available (e.g. a new item is added, or you clear tags manually).

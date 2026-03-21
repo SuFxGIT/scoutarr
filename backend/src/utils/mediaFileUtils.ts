@@ -14,6 +14,7 @@ export interface MediaWithFiles {
   episodeFile?: { dateAdded?: string; customFormatScore?: number };
   trackFiles?: Array<{ dateAdded?: string; customFormatScore?: number }>;
   bookFiles?: Array<{ dateAdded?: string; customFormatScore?: number }>;
+  statistics?: { trackFileCount?: number; bookFileCount?: number };
   [key: string]: unknown;
 }
 
@@ -63,6 +64,12 @@ export function extractFileInfo(media: MediaWithFiles): FileInfo {
       const bookWithScore = media.bookFiles.find(f => f.customFormatScore !== undefined);
       customFormatScore = bookWithScore?.customFormatScore;
     }
+  }
+
+  // Lidarr/Readarr fallback: use statistics counts when no embedded file arrays are present
+  if (!hasFile && media.statistics) {
+    const count = (media.statistics.trackFileCount ?? media.statistics.bookFileCount ?? 0);
+    hasFile = count > 0;
   }
 
   return { dateImported, hasFile, customFormatScore };
