@@ -3,11 +3,6 @@
  */
 import type { RadarrInstance, SonarrInstance, LidarrInstance, ReadarrInstance } from './config.js';
 
-export interface StarrTag {
-  id: number;
-  label: string;
-}
-
 export interface StarrQualityProfile {
   id: number;
   name: string;
