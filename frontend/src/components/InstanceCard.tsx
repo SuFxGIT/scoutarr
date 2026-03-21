@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Flex, Text, Tooltip, TextField, Switch, Select, Separator, Button } from '@radix-ui/themes';
+import { ConfirmDialog } from './ConfirmDialog';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { TrashIcon, ChevronDownIcon, ChevronRightIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { capitalize } from 'es-toolkit';
@@ -18,12 +19,8 @@ export type InstanceCardProps = {
   renderTestButton: (app: AppType, instanceId: string) => React.ReactNode;
   updateInstanceConfig: (app: AppType, instanceId: string, field: string, value: unknown) => void;
   onRemove: (app: AppType, instanceId: string) => void;
-  confirmingDeleteId: string | null;
-  setConfirmingDeleteId: (id: string | null) => void;
   qualityProfiles: Record<string, { id: number; name: string }[]>;
   loadingProfiles: Record<string, boolean>;
-  confirmingClearTags: string | null;
-  setConfirmingClearTags: (id: string | null) => void;
   onClearTags: (app: AppType, instanceId: string) => void;
   clearTagsPending: boolean;
 };
@@ -38,16 +35,14 @@ export function InstanceCard({
   renderTestButton,
   updateInstanceConfig,
   onRemove,
-  confirmingDeleteId,
-  setConfirmingDeleteId,
   qualityProfiles,
   loadingProfiles,
-  confirmingClearTags,
-  setConfirmingClearTags,
   onClearTags,
   clearTagsPending,
 }: InstanceCardProps) {
   const instanceKey = `${appType}-${instance.id}`;
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [clearTagsOpen, setClearTagsOpen] = useState(false);
   const profiles = qualityProfiles[instanceKey] || [];
   const isProfilesLoading = loadingProfiles[instanceKey];
 
@@ -66,46 +61,27 @@ export function InstanceCard({
                   <Text size="3" weight="bold">{instance.name || `${appInfo.name} ${index + 1}`}</Text>
                 </Flex>
                 <Flex align="center" gap="2">
-                  {confirmingDeleteId === instanceKey ? (
-                    <Flex gap="1" align="center">
-                      <Text size="1" color="gray">Delete?</Text>
-                      <Button
-                        variant="solid"
-                        color="red"
-                        size="1"
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                          e.stopPropagation();
-                          onRemove(appType, instance.id);
-                        }}
-                      >
-                        Yes
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="1"
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                          e.stopPropagation();
-                          setConfirmingDeleteId(null);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </Flex>
-                  ) : (
-                    <Tooltip content="Delete this instance">
-                      <Button
-                        variant="soft"
-                        color="red"
-                        size="1"
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                          e.stopPropagation();
-                          setConfirmingDeleteId(instanceKey);
-                        }}
-                      >
-                        <TrashIcon />
-                      </Button>
-                    </Tooltip>
-                  )}
+                  <Tooltip content="Delete this instance">
+                    <Button
+                      variant="soft"
+                      color="red"
+                      size="1"
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      <TrashIcon />
+                    </Button>
+                  </Tooltip>
+                  <ConfirmDialog
+                    open={deleteOpen}
+                    onOpenChange={setDeleteOpen}
+                    title="Delete instance?"
+                    description="This cannot be undone."
+                    confirmLabel="Delete"
+                    onConfirm={() => onRemove(appType, instance.id)}
+                  />
                   {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
                 </Flex>
               </Flex>
@@ -432,39 +408,23 @@ export function InstanceCard({
 
               <Flex direction="row" align="center" justify="between" gap="2">
                 <Text size="2" weight="medium">Clear Tags</Text>
-                {confirmingClearTags === instanceKey ? (
-                  <Flex gap="2" align="center">
-                    <Text size="1" color="gray">Confirm?</Text>
-                    <Button
-                      variant="solid"
-                      size="2"
-                      color="red"
-                      onClick={() => onClearTags(appType, instance.id)}
-                      disabled={clearTagsPending}
-                    >
-                      {clearTagsPending ? 'Clearing...' : 'Confirm'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="2"
-                      onClick={() => setConfirmingClearTags(null)}
-                      disabled={clearTagsPending}
-                    >
-                      Cancel
-                    </Button>
-                  </Flex>
-                ) : (
-                  <Tooltip content={`Removes the configured tag from all ${appInfo.mediaTypePlural.toLowerCase()} in this ${appInfo.name} instance. This is useful for resetting the upgrade process or clearing tags from all media at once.`}>
-                    <Button
-                      variant="outline"
-                      size="2"
-                      color="red"
-                      onClick={() => setConfirmingClearTags(instanceKey)}
-                    >
-                      Clear Tags
-                    </Button>
-                  </Tooltip>
-                )}
+                <Button
+                  variant="outline"
+                  size="2"
+                  color="red"
+                  onClick={() => setClearTagsOpen(true)}
+                >
+                  Clear Tags
+                </Button>
+                <ConfirmDialog
+                  open={clearTagsOpen}
+                  onOpenChange={setClearTagsOpen}
+                  title="Clear Tags?"
+                  description={`Removes the configured tag from all ${appInfo.mediaTypePlural.toLowerCase()} in this ${appInfo.name} instance.`}
+                  confirmLabel="Clear Tags"
+                  onConfirm={() => onClearTags(appType, instance.id)}
+                  isPending={clearTagsPending}
+                />
               </Flex>
             </Flex>
           </Collapsible.Content>

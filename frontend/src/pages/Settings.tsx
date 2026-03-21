@@ -37,6 +37,7 @@ import { statsService } from '../services/statsService';
 import { notificationService } from '../services/notificationService';
 import { buildDefaultInstance, getAppInfo, getNextInstanceId, StarrInstanceConfig } from '../utils/appInfo';
 import { InstanceCard } from '../components/InstanceCard';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const LazyTasksTab = lazy(() => import('../components/TasksTab').then(mod => ({ default: mod.TasksTab })));
 
@@ -56,8 +57,6 @@ function Settings() {
   });
   const [selectedAppType, setSelectedAppType] = useState<AppType>('radarr');
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
-  const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null);
-  const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null);
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
   const [confirmingClearData, setConfirmingClearData] = useState<boolean>(false);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
@@ -272,11 +271,9 @@ function Settings() {
       configService.clearTags(app, instanceId),
     onSuccess: () => {
       showSuccessToast('Tags cleared successfully');
-      setConfirmingClearTags(null);
     },
     onError: (error: unknown) => {
       showErrorToast('Failed to clear tags: ' + getErrorMessage(error));
-      setConfirmingClearTags(null);
     },
   });
 
@@ -359,7 +356,6 @@ function Settings() {
         [app]: updatedInstances
       }
     });
-    setConfirmingDeleteInstance(null);
   };
 
   const updateNotificationConfig = (field: string, value: string) => {
@@ -641,12 +637,8 @@ function Settings() {
                         renderTestButton={renderTestButton}
                         updateInstanceConfig={updateInstanceConfig}
                         onRemove={removeInstance}
-                        confirmingDeleteId={confirmingDeleteInstance}
-                        setConfirmingDeleteId={setConfirmingDeleteInstance}
                         qualityProfiles={qualityProfiles}
                         loadingProfiles={loadingProfiles}
-                        confirmingClearTags={confirmingClearTags}
-                        setConfirmingClearTags={setConfirmingClearTags}
                         onClearTags={(app, instanceId) => clearTagsMutation.mutate({ app, instanceId })}
                         clearTagsPending={clearTagsMutation.isPending}
                       />
@@ -856,40 +848,24 @@ function Settings() {
                   <Text size="1" color="gray">
                     Delete all search history and CF score history from the database. This resets statistics to zero but keeps your configuration, instances, and media library intact.
                   </Text>
-                  {confirmingClearData ? (
-                    <Flex gap="2" align="center" wrap="wrap">
-                      <Text size="1" color="red" weight="medium">Are you sure?</Text>
-                      <Flex gap="2">
-                        <Button
-                          variant="solid"
-                          size="2"
-                          color="red"
-                          onClick={() => clearDataMutation.mutate()}
-                          disabled={clearDataMutation.isPending}
-                        >
-                          Confirm Clear
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="2"
-                          onClick={() => setConfirmingClearData(false)}
-                          disabled={clearDataMutation.isPending}
-                        >
-                          Cancel
-                        </Button>
-                      </Flex>
-                    </Flex>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      color="red"
-                      size="2"
-                      onClick={() => setConfirmingClearData(true)}
-                      disabled={clearDataMutation.isPending}
-                    >
-                      Clear Statistics
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    color="red"
+                    size="2"
+                    onClick={() => setConfirmingClearData(true)}
+                    disabled={clearDataMutation.isPending}
+                  >
+                    Clear Statistics
+                  </Button>
+                  <ConfirmDialog
+                    open={confirmingClearData}
+                    onOpenChange={setConfirmingClearData}
+                    title="Clear Statistics?"
+                    description="Delete all search history and CF score history. This resets statistics to zero but keeps configuration, instances, and media library intact."
+                    confirmLabel="Clear Statistics"
+                    onConfirm={() => clearDataMutation.mutate()}
+                    isPending={clearDataMutation.isPending}
+                  />
                 </Flex>
 
                 <Separator size="4" />
@@ -899,40 +875,24 @@ function Settings() {
                   <Text size="1" color="gray">
                     This will completely reset the app to a fresh state like a first-time installation. It will permanently delete all configuration, quality profiles database, statistics database, log files, and clear browser storage. The app will reload automatically after reset. This action cannot be undone.
                   </Text>
-                  {confirmingResetApp ? (
-                    <Flex gap="2" align="center" wrap="wrap">
-                      <Text size="1" color="red" weight="medium">Are you sure? This will delete all data.</Text>
-                      <Flex gap="2">
-                        <Button
-                          variant="solid"
-                          size="2"
-                          color="red"
-                          onClick={() => resetAppMutation.mutate()}
-                          disabled={resetAppMutation.isPending}
-                        >
-                          Confirm Reset
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="2"
-                          onClick={() => setConfirmingResetApp(false)}
-                          disabled={resetAppMutation.isPending}
-                        >
-                          Cancel
-                        </Button>
-                      </Flex>
-                    </Flex>
-                  ) : (
-                    <Button
-                      variant="solid"
-                      color="red"
-                      size="2"
-                      onClick={() => setConfirmingResetApp(true)}
-                      disabled={resetAppMutation.isPending}
-                    >
-                      Reset App
-                    </Button>
-                  )}
+                  <Button
+                    variant="solid"
+                    color="red"
+                    size="2"
+                    onClick={() => setConfirmingResetApp(true)}
+                    disabled={resetAppMutation.isPending}
+                  >
+                    Reset App
+                  </Button>
+                  <ConfirmDialog
+                    open={confirmingResetApp}
+                    onOpenChange={setConfirmingResetApp}
+                    title="Reset App?"
+                    description="This will permanently delete all configuration, databases, log files, and clear browser storage. The app will reload automatically. This action cannot be undone."
+                    confirmLabel="Reset App"
+                    onConfirm={() => resetAppMutation.mutate()}
+                    isPending={resetAppMutation.isPending}
+                  />
                 </Flex>
               </Flex>
             </Card>
