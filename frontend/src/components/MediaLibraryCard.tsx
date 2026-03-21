@@ -340,7 +340,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
   const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
   const [showUpgradedOnly, setShowUpgradedOnly] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const roRef = useRef<ResizeObserver | null>(null);
   const [titleWidth, setTitleWidth] = useState(250);
@@ -483,7 +483,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
   );
 
   useEffect(() => {
-    setStatusFilter('');
+    setStatusFilter('all');
   }, [mediaData?.media]);
 
   // Conflict confirmation dialog state
@@ -631,7 +631,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
       filtered = filtered.filter(item => isUpgraded(item));
     }
 
-    if (statusFilter) {
+    if (statusFilter && statusFilter !== 'all') {
       filtered = filtered.filter(item => item.status === statusFilter);
     }
 
@@ -1109,7 +1109,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
             </Text>
           )}
           {mediaData && (() => {
-            const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode) || statusFilter !== '';
+            const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode) || statusFilter !== 'all';
             return (
               <Popover.Root>
                 <Popover.Trigger>
@@ -1143,7 +1143,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
                       <Select.Root size="1" value={statusFilter} onValueChange={setStatusFilter}>
                         <Select.Trigger style={{ minWidth: '110px' }} />
                         <Select.Content position="popper" sideOffset={5}>
-                          <Select.Item value="">Any Status</Select.Item>
+                          <Select.Item value="all">Any Status</Select.Item>
                           {statusOptions.map(s => (
                             <Select.Item key={s} value={s}>{formatStatus(s)}</Select.Item>
                           ))}
