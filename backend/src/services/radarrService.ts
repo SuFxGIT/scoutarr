@@ -1,6 +1,5 @@
 import { RadarrInstance } from '@scoutarr/shared';
 import { BaseStarrService } from './baseStarrService.js';
-import logger from '../utils/logger.js';
 import { FilterableMedia } from '../utils/filterUtils.js';
 
 export interface RadarrMovie extends FilterableMedia {
