@@ -260,3 +260,93 @@ configRouter.post('/clear-tags/:app/:instanceId', async (req, res) => {
     handleRouteError(res, error, 'Failed to clear tags');
   }
 });
+
+// Clear tags from all media across all configured instances
+configRouter.post('/clear-tags/all', async (_req, res) => {
+  logger.info('🧹 Clearing tags for all instances');
+  try {
+    const config = configService.getConfig();
+    let totalInstances = 0;
+    let totalCleared = 0;
+    const errors: string[] = [];
+
+    for (const appType of APP_TYPES) {
+      const instances = config.applications[appType as AppType];
+      if (!Array.isArray(instances)) continue;
+
+      for (const instance of instances) {
+        if (!instance.url || !instance.apiKey) continue;
+
+        try {
+          const service = getServiceForApp(appType as AppType);
+          const dbInstance = await statsService.getInstance(instance.id);
+          if (!dbInstance) continue;
+
+          const scoutarrTags = JSON.parse(dbInstance.scoutarr_tags || '[]') as string[];
+          const ignoreTags = JSON.parse(dbInstance.ignore_tags || '[]') as string[];
+          const allManagedTags = [...scoutarrTags, ...ignoreTags];
+
+          if (allManagedTags.length === 0) continue;
+
+          const [allMedia, allTags] = await Promise.all([
+            service.getMedia(instance),
+            service.getAllTags(instance),
+          ]);
+
+          const tagIdToName = new Map(allTags.map(t => [t.id, t.label]));
+          const tagNameToId = new Map(allTags.map(t => [t.label, t.id]));
+
+          const mediaWithTagNames = allMedia.map(item => ({
+            ...item,
+            tagNames: item.tags.map((id: number) => tagIdToName.get(id) ?? `unknown-tag-${id}`),
+          }));
+
+          for (const tagName of allManagedTags) {
+            const tagId = tagNameToId.get(tagName) ?? null;
+            if (tagId !== null) {
+              const taggedMedia = mediaWithTagNames.filter(m => m.tagNames.includes(tagName));
+              if (taggedMedia.length > 0) {
+                const taggedMediaIds = [...new Set(taggedMedia.map(media => service.getMediaId(media)))];
+                await service.removeTag(instance, taggedMediaIds, tagId);
+                totalCleared += taggedMediaIds.length;
+              }
+            }
+          }
+
+          await statsService.clearScoutarrTagsFromInstance(instance.id);
+
+          const syncResult = await syncInstanceMedia({
+            instanceId: instance.id,
+            appType: appType as AppType,
+            instance,
+          });
+          await statsService.syncMediaToDatabase(
+            instance.id,
+            syncResult.mediaWithTags as Parameters<typeof statsService.syncMediaToDatabase>[1]
+          );
+
+          totalInstances++;
+        } catch (instanceError: unknown) {
+          const msg = getErrorMessage(instanceError);
+          logger.error(`❌ Failed to clear tags for ${appType} instance ${instance.id}`, { error: msg });
+          errors.push(`${appType}/${instance.id}: ${msg}`);
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      logger.warn('⚠️  Clear all tags completed with errors', { errors });
+    }
+
+    logger.info(`✅ Cleared tags across ${totalInstances} instances, ${totalCleared} items affected`);
+    res.json({
+      success: true,
+      message: `Cleared tags across ${totalInstances} instance(s), ${totalCleared} item(s) affected`,
+      totalInstances,
+      totalCleared,
+      errors,
+    });
+  } catch (error: unknown) {
+    handleRouteError(res, error, 'Failed to clear all tags');
+  }
+});
