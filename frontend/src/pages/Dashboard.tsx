@@ -596,7 +596,7 @@ function Dashboard() {
                                   <Text size="2" color="gray">No items recorded for this search.</Text>
                                 ) : (
                                   <Flex direction="column" gap="1">
-                                    {search.items.map((item: { id: number; title: string; externalId?: string }) => {
+                                    {search.items.map((item: { id: number; title: string; externalId?: string; upgraded?: boolean }) => {
                                       const cfHistoryUrl = instanceId
                                         ? `/cf-history/${search.application}/${instanceId}/${item.id}?title=${encodeURIComponent(item.title)}${item.externalId ? `&externalId=${encodeURIComponent(item.externalId)}` : ''}`
                                         : null;
@@ -635,6 +635,9 @@ function Dashboard() {
                                             </a>
                                           ) : (
                                             <Text size="2" style={{ flex: 1 }}>{item.title}</Text>
+                                          )}
+                                          {item.upgraded && (
+                                            <Text size="1" style={{ color: 'var(--green-11)', lineHeight: 1 }}>▲</Text>
                                           )}
                                         </Flex>
                                       );
