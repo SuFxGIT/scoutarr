@@ -35,6 +35,13 @@ export const configService = {
   },
 
   /**
+   * Clear tags for all configured instances
+   */
+  async clearAllTags(): Promise<void> {
+    await apiClient.post('/config/clear-tags/all');
+  },
+
+  /**
    * Fetch quality profiles for an instance from database
    */
   async getQualityProfiles(
