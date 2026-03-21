@@ -620,24 +620,33 @@ function Dashboard() {
                                             </Tooltip>
                                           )}
                                           {cfHistoryUrl ? (
-                                            <a
-                                              href={cfHistoryUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              style={{
-                                                textDecoration: 'none',
-                                                color: 'var(--accent-11)',
-                                                fontSize: 'var(--font-size-2)',
-                                                flex: 1,
-                                              }}
-                                            >
-                                              {item.title}
-                                            </a>
+                                            <Flex align="center" gap="1" style={{ flex: 1, minWidth: 0 }}>
+                                              <a
+                                                href={cfHistoryUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                  textDecoration: 'none',
+                                                  color: 'var(--accent-11)',
+                                                  fontSize: 'var(--font-size-2)',
+                                                  overflow: 'hidden',
+                                                  textOverflow: 'ellipsis',
+                                                  whiteSpace: 'nowrap',
+                                                }}
+                                              >
+                                                {item.title}
+                                              </a>
+                                              {item.upgraded && (
+                                                <Text size="1" style={{ color: 'var(--green-11)', lineHeight: 1, flexShrink: 0 }}>▲</Text>
+                                              )}
+                                            </Flex>
                                           ) : (
-                                            <Text size="2" style={{ flex: 1 }}>{item.title}</Text>
-                                          )}
-                                          {item.upgraded && (
-                                            <Text size="1" style={{ color: 'var(--green-11)', lineHeight: 1 }}>▲</Text>
+                                            <Flex align="center" gap="1" style={{ flex: 1, minWidth: 0 }}>
+                                              <Text size="2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</Text>
+                                              {item.upgraded && (
+                                                <Text size="1" style={{ color: 'var(--green-11)', lineHeight: 1, flexShrink: 0 }}>▲</Text>
+                                              )}
+                                            </Flex>
                                           )}
                                         </Flex>
                                       );
