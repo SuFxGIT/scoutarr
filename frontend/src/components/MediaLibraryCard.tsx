@@ -22,7 +22,7 @@ import {
   SegmentedControl,
   IconButton,
   DropdownMenu,
-  Popover,
+  Dialog,
 } from '@radix-ui/themes';
 import {
   MagnifyingGlassIcon,
@@ -379,6 +379,13 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
       'tags'
     ])
   );
+
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+
+  // Close filter dialog when switching instances
+  useEffect(() => {
+    setFilterDialogOpen(false);
+  }, [selectedInstance]);
 
   // Auto-select first available instance if none is selected
   useEffect(() => {
@@ -1111,64 +1118,91 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
           {mediaData && (() => {
             const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode) || statusFilter !== 'all';
             return (
-              <Popover.Root>
-                <Popover.Trigger>
-                  <Button
-                    size="2"
-                    variant="ghost"
-                    color={filtersActive ? 'blue' : 'gray'}
-                    radius="full"
-                    aria-label="Filters"
-                  >
-                    <MixerHorizontalIcon />
-                    Apply Filters
-                  </Button>
-                </Popover.Trigger>
-                <Popover.Content width="220px" align="end">
-                  <Flex direction="column" gap="3">
-                    <Flex align="center" justify="between" gap="4">
-                      <Text size="2">Monitored Only</Text>
-                      <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
+              <>
+                <Button
+                  size="2"
+                  variant="ghost"
+                  color={filtersActive ? 'blue' : 'gray'}
+                  radius="full"
+                  aria-label="Filters"
+                  onClick={() => setFilterDialogOpen(true)}
+                >
+                  <MixerHorizontalIcon />
+                  Apply Filters
+                </Button>
+
+                <Dialog.Root open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+                  <Dialog.Content maxWidth="320px">
+                    <Dialog.Title>Filters</Dialog.Title>
+
+                    <Flex direction="column" gap="3">
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Monitored Only</Text>
+                        <Switch size="1" checked={showMonitoredOnly} onCheckedChange={setShowMonitoredOnly} />
+                      </Flex>
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Missing Only</Text>
+                        <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+                      </Flex>
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Upgraded Only</Text>
+                        <Switch size="1" checked={showUpgradedOnly} onCheckedChange={setShowUpgradedOnly} />
+                      </Flex>
+                      <Flex align="center" justify="between" gap="4">
+                        <Text size="2">Status</Text>
+                        <Select.Root size="1" value={statusFilter} onValueChange={setStatusFilter}>
+                          <Select.Trigger style={{ minWidth: '110px' }} />
+                          <Select.Content position="popper" sideOffset={5}>
+                            <Select.Item value="all">Any Status</Select.Item>
+                            {statusOptions.map(s => (
+                              <Select.Item key={s} value={s}>{formatStatus(s)}</Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      </Flex>
+                      {isSonarr && (
+                        <>
+                          <Separator size="4" />
+                          <Flex direction="column" gap="2">
+                            <Text size="2">View Mode</Text>
+                            <SegmentedControl.Root
+                              size="1"
+                              value={episodeMode ? 'episodes' : 'series'}
+                              onValueChange={(value) => setEpisodeMode(value === 'episodes')}
+                            >
+                              <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
+                              <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
+                            </SegmentedControl.Root>
+                          </Flex>
+                        </>
+                      )}
                     </Flex>
-                    <Flex align="center" justify="between" gap="4">
-                      <Text size="2">Missing Only</Text>
-                      <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+
+                    <Flex mt="4" justify="between" align="center">
+                      {filtersActive && (
+                        <Button
+                          size="2"
+                          variant="ghost"
+                          color="red"
+                          onClick={() => {
+                            setShowMonitoredOnly(false);
+                            setShowMissingOnly(false);
+                            setShowUpgradedOnly(false);
+                            setStatusFilter('all');
+                            setEpisodeMode(false);
+                          }}
+                        >
+                          Clear
+                        </Button>
+                      )}
+                      <Dialog.Close asChild>
+                        <Button size="2" ml="auto">Done</Button>
+                      </Dialog.Close>
                     </Flex>
-                    <Flex align="center" justify="between" gap="4">
-                      <Text size="2">Upgraded Only</Text>
-                      <Switch size="1" checked={showUpgradedOnly} onCheckedChange={setShowUpgradedOnly} />
-                    </Flex>
-                    <Flex align="center" justify="between" gap="4">
-                      <Text size="2">Status</Text>
-                      <Select.Root size="1" value={statusFilter} onValueChange={setStatusFilter}>
-                        <Select.Trigger style={{ minWidth: '110px' }} />
-                        <Select.Content position="popper" sideOffset={5}>
-                          <Select.Item value="all">Any Status</Select.Item>
-                          {statusOptions.map(s => (
-                            <Select.Item key={s} value={s}>{formatStatus(s)}</Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Root>
-                    </Flex>
-                    {isSonarr && (
-                      <>
-                        <Separator size="4" />
-                        <Flex direction="column" gap="2">
-                          <Text size="2">View Mode</Text>
-                          <SegmentedControl.Root
-                            size="1"
-                            value={episodeMode ? 'episodes' : 'series'}
-                            onValueChange={(value) => setEpisodeMode(value === 'episodes')}
-                          >
-                            <SegmentedControl.Item value="series">Series</SegmentedControl.Item>
-                            <SegmentedControl.Item value="episodes">Episodes</SegmentedControl.Item>
-                          </SegmentedControl.Root>
-                        </Flex>
-                      </>
-                    )}
-                  </Flex>
-                </Popover.Content>
-              </Popover.Root>
+
+                  </Dialog.Content>
+                </Dialog.Root>
+              </>
             );
           })()}
           {selectedInstance && (
