@@ -74,19 +74,19 @@ export function InstanceCard({
                       <TrashIcon />
                     </Button>
                   </Tooltip>
-                  <ConfirmDialog
-                    open={deleteOpen}
-                    onOpenChange={setDeleteOpen}
-                    title="Delete instance?"
-                    description="This cannot be undone."
-                    confirmLabel="Delete"
-                    onConfirm={() => onRemove(appType, instance.id)}
-                  />
                   {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
                 </Flex>
               </Flex>
             </div>
           </Collapsible.Trigger>
+          <ConfirmDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title="Delete instance?"
+            description="This cannot be undone."
+            confirmLabel="Delete"
+            onConfirm={() => onRemove(appType, instance.id)}
+          />
 
           <Collapsible.Content style={{ overflow: 'hidden' }}>
             <Flex direction="column" gap="3" p="3" pt="2">
