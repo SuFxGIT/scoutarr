@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect, type ReactNode } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useSearchParams, useLocation, Link, useNavigate } from 'react-router-dom';
 import { DataGrid, TreeDataGrid, Column, SelectColumn, SortColumn, RenderHeaderCellProps, RenderGroupCellProps, SELECT_COLUMN_KEY } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
@@ -328,10 +328,11 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
   const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
   const [showUpgradedOnly, setShowUpgradedOnly] = useState(false);
 
-  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const roRef = useRef<ResizeObserver | null>(null);
   const [titleWidth, setTitleWidth] = useState(250);
-  useLayoutEffect(() => {
-    const el = gridContainerRef.current;
+  const gridBoxRef = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
     if (!el) return;
     // Sum of all fixed-width columns: SelectColumn(35) + qualityProfileName(130) +
     // lastSearched(115) + dateImported(115) + cfScore(120) + tags(136) + actions(44)
@@ -341,7 +342,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(el);
-    return () => ro.disconnect();
+    roRef.current = ro;
   }, []);
 
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
@@ -1208,7 +1209,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
         {mediaData && mediaData.media.length > 0 && (
           <>
             <Box
-              ref={gridContainerRef}
+              ref={gridBoxRef}
               style={{ height: '900px' }}
               onClick={isSonarr && !episodeMode ? (e: React.MouseEvent) => {
                 const target = e.target as HTMLElement;
