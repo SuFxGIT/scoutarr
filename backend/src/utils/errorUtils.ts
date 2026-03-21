@@ -5,14 +5,6 @@ import { Response } from 'express';
 import logger from './logger.js';
 
 /**
- * Standard error response format
- */
-export interface ErrorResponse {
-  error: string;
-  message?: string;
-}
-
-/**
  * Extracts error message from unknown error type
  */
 export function getErrorMessage(error: unknown): string {
@@ -70,5 +62,5 @@ export function handleRouteError(
   res.status(statusCode).json({
     error: context,
     message: errorMessage
-  } as ErrorResponse);
+  } as { error: string; message?: string });
 }
