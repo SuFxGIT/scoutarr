@@ -58,6 +58,7 @@ function Settings() {
   const [expandedInstances, setExpandedInstances] = useState<Set<string>>(new Set());
   const [confirmingResetApp, setConfirmingResetApp] = useState<boolean>(false);
   const [confirmingClearData, setConfirmingClearData] = useState<boolean>(false);
+  const [confirmingClearAllTags, setConfirmingClearAllTags] = useState<boolean>(false);
   const [qualityProfiles, setQualityProfiles] = useState<Record<string, { id: number; name: string }[]>>({});
   const [loadingProfiles, setLoadingProfiles] = useState<Record<string, boolean>>({});
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -266,13 +267,27 @@ function Settings() {
 
   // Clear tags mutation
   const clearTagsMutation = useMutation({
-    mutationFn: ({ app, instanceId }: { app: string; instanceId: string }) => 
+    mutationFn: ({ app, instanceId }: { app: string; instanceId: string }) =>
       configService.clearTags(app, instanceId),
     onSuccess: () => {
       showSuccessToast('Tags cleared successfully');
     },
     onError: (error: unknown) => {
       showErrorToast('Failed to clear tags: ' + getErrorMessage(error));
+    },
+  });
+
+  // Clear all tags mutation (clears tags from all configured instances)
+  const clearAllTagsMutation = useMutation({
+    mutationFn: () => configService.clearAllTags(),
+    onSuccess: () => {
+      showSuccessToast('All tags cleared successfully');
+      setConfirmingClearAllTags(false);
+      queryClient.invalidateQueries({ queryKey: ['mediaLibrary'] });
+    },
+    onError: (error: unknown) => {
+      showErrorToast('Failed to clear all tags: ' + getErrorMessage(error));
+      setConfirmingClearAllTags(false);
     },
   });
 
@@ -838,6 +853,33 @@ function Settings() {
                     />
                     <Text size="2">{config?.scheduler?.unattended ? 'Enabled' : 'Disabled'}</Text>
                   </Flex>
+                </Flex>
+
+                <Separator size="4" />
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Clear All Tags</Text>
+                  <Text size="1" color="gray">
+                    Remove all Scoutarr-managed tags from every item across all configured instances. Useful for resetting the search cycle without wiping statistics or configuration.
+                  </Text>
+                  <Button
+                    variant="outline"
+                    color="red"
+                    size="2"
+                    onClick={() => setConfirmingClearAllTags(true)}
+                    disabled={clearAllTagsMutation.isPending}
+                  >
+                    Clear All Tags
+                  </Button>
+                  <ConfirmDialog
+                    open={confirmingClearAllTags}
+                    onOpenChange={setConfirmingClearAllTags}
+                    title="Clear All Tags?"
+                    description="This will remove all Scoutarr-managed tags from every item in every configured instance. Your configuration, statistics, and media library data are not affected. This action cannot be undone."
+                    confirmLabel="Clear All Tags"
+                    onConfirm={() => clearAllTagsMutation.mutate()}
+                    isPending={clearAllTagsMutation.isPending}
+                  />
                 </Flex>
 
                 <Separator size="4" />
