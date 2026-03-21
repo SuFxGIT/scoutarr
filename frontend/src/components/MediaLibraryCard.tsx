@@ -21,7 +21,6 @@ import {
   Switch,
   SegmentedControl,
   IconButton,
-  Checkbox,
   DropdownMenu,
   Popover,
 } from '@radix-ui/themes';
@@ -864,22 +863,12 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
           );
         },
         renderHeaderCell: (props) => (
-          <Flex direction="column" gap="1" style={{ width: '100%' }}>
-            <TextFilterHeaderCell
-              {...props}
-              numeric
-              filterValue={columnFilters.cfScore}
-              onFilterChange={(value) => handleFilterChange('cfScore', value)}
-            />
-            <Flex align="center" gap="1" style={{ paddingLeft: '2px' }}>
-              <Checkbox
-                size="1"
-                checked={showUpgradedOnly}
-                onCheckedChange={(checked) => setShowUpgradedOnly(checked === true)}
-              />
-              <Text size="1" color="gray">▲ only</Text>
-            </Flex>
-          </Flex>
+          <TextFilterHeaderCell
+            {...props}
+            numeric
+            filterValue={columnFilters.cfScore}
+            onFilterChange={(value) => handleFilterChange('cfScore', value)}
+          />
         )
       },
       tags: {
@@ -1097,6 +1086,10 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
                     <Flex align="center" justify="between" gap="4">
                       <Text size="2">Missing Only</Text>
                       <Switch size="1" checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+                    </Flex>
+                    <Flex align="center" justify="between" gap="4">
+                      <Text size="2">Upgraded Only</Text>
+                      <Switch size="1" checked={showUpgradedOnly} onCheckedChange={setShowUpgradedOnly} />
                     </Flex>
                     {isSonarr && (
                       <>
