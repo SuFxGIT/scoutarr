@@ -26,6 +26,7 @@ import {
 } from '@radix-ui/react-icons';
 import { useQuery } from '@tanstack/react-query';
 import { format, isToday, subWeeks, subMonths, isAfter } from 'date-fns';
+import { capitalize } from 'es-toolkit';
 import { ITEMS_PER_PAGE } from '../utils/constants';
 import { buildArrUrl } from '../utils/helpers';
 import { APP_BADGE_COLORS } from '../utils/appInfo';
@@ -185,6 +186,19 @@ function Dashboard() {
     if (!config || !instanceId) return null;
     const instances = config.applications[appType as keyof typeof config.applications];
     return instances?.find(inst => inst.id === instanceId)?.url ?? null;
+  }, [config]);
+
+  const getInstanceDisplayName = useCallback((appType: string, instanceId: string | null): string => {
+    const instances = config?.applications[appType as keyof typeof config.applications];
+    if (!instances || instances.length === 0) return capitalize(appType);
+    if (instanceId) {
+      const idx = instances.findIndex(inst => inst.id === instanceId);
+      if (idx !== -1) {
+        const inst = instances[idx];
+        return inst.name || (instances.length === 1 ? capitalize(appType) : `${capitalize(appType)} ${idx + 1}`);
+      }
+    }
+    return capitalize(appType);
   }, [config]);
 
   // Fetch stats
@@ -518,15 +532,12 @@ function Dashboard() {
                         const key = `${currentPage}-${idx}`;
                         const isExpanded = expandedSearchKeys.has(key);
                         const timestamp = new Date(search.timestamp);
-                        const appName = search.instance
-                          ? `${search.application} (${search.instance})`
-                          : search.application;
+                        const instanceId = resolveInstanceId(search.application, search.instance);
+                        const appName = getInstanceDisplayName(search.application, instanceId);
                         const itemsPreview = search.items.length > 0
                           ? search.items.slice(0, 3).map((i: { id: number; title: string }) => i.title).join(', ') +
                             (search.items.length > 3 ? ` +${search.items.length - 3} more` : '')
                           : 'No items';
-
-                        const instanceId = resolveInstanceId(search.application, search.instance);
 
                         return (
                           <Box
