@@ -21,12 +21,12 @@ const [statusFilter, setStatusFilter] = useState<string>('');
 
 Empty string means "no filter / any status".
 
-When the loaded `media` prop changes (user switches instance tab), `statusFilter` resets to `''`:
+When the loaded media changes (user switches instance tab), `statusFilter` resets to `''`. The component receives media from `useQuery` as `mediaData?.media`:
 
 ```ts
 useEffect(() => {
   setStatusFilter('');
-}, [media]);
+}, [mediaData?.media]);
 ```
 
 ---
@@ -37,8 +37,8 @@ A `useMemo` over `media` produces sorted, deduplicated raw status values:
 
 ```ts
 const statusOptions = useMemo(
-  () => [...new Set(media.map(m => m.status))].filter(Boolean).sort(),
-  [media]
+  () => [...new Set((mediaData?.media ?? []).map(m => m.status))].filter(Boolean).sort(),
+  [mediaData?.media]
 );
 ```
 
@@ -64,12 +64,21 @@ Fallback: `raw.replace(/([A-Z])/g, ' $1').trim()` then `capitalize` each word.
 
 ## Filter Application
 
-Added to the existing client-side filter pipeline `useMemo` that builds `displayRows`, after the Missing Only step:
+Added to the existing client-side filter pipeline `gridRows` useMemo (line ~594), after the Missing Only step:
 
 ```ts
 if (statusFilter) {
   filtered = filtered.filter(m => m.status === statusFilter);
 }
+```
+
+`statusFilter` must also be added to the `gridRows` useMemo dependency array:
+
+```ts
+// before:
+[mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly, showUpgradedOnly]
+// after:
+[mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly, showUpgradedOnly, statusFilter]
 ```
 
 ---
@@ -82,7 +91,7 @@ New row added below the "Upgraded Only" row inside the Popover:
 Status   [Any Status ▼]
 ```
 
-- Label: `<Text size="1">Status</Text>` — matches existing switch-row label style
+- Label: `<Text size="2">Status</Text>` — matches existing switch-row label style (`size="2"` per lines 1276/1280/1284)
 - Control: `<Select.Root size="1" value={statusFilter} onValueChange={setStatusFilter}>` with:
   - First item: `<Select.Item value="">Any Status</Select.Item>`
   - Dynamic items: `statusOptions.map(s => <Select.Item key={s} value={s}>{formatStatus(s)}</Select.Item>)`
@@ -92,7 +101,11 @@ Status   [Any Status ▼]
 
 ## Active Filter Indicator
 
-The Popover trigger button uses a conditional color/variant to indicate an active filter. The `statusFilter !== ''` condition is added to the existing active-filter boolean alongside `showMonitoredOnly`, `showMissingOnly`, `showUpgradedOnly`.
+The Popover trigger button uses a conditional color/variant to indicate an active filter. The component defines `const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode);`. The `statusFilter !== ''` condition must be added to this boolean:
+
+```ts
+const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode) || statusFilter !== '';
+```
 
 ---
 
