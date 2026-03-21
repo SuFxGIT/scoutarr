@@ -102,13 +102,6 @@ export interface MediaSearchConflict {
   reason: string;
 }
 
-export interface MediaSearchRequest {
-  appType: 'radarr' | 'sonarr' | 'lidarr' | 'readarr';
-  instanceId: string;
-  mediaIds: number[];
-  force?: boolean;
-}
-
 export interface MediaSearchResponse {
   success: boolean;
   searched: number;
