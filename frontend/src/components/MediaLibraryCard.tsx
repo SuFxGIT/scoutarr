@@ -930,6 +930,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     cols.push({
       key: 'title',
       name: 'Title',
+      width: 250,
       minWidth: 100,
       draggable: false,
       renderCell: isSonarr
