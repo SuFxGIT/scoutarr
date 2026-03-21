@@ -21,6 +21,7 @@ import {
   Switch,
   SegmentedControl,
   IconButton,
+  Checkbox,
   DropdownMenu,
   Popover,
 } from '@radix-ui/themes';
@@ -300,6 +301,14 @@ function saveToStorage<T>(key: string, value: T): void {
 }
 
 
+function isUpgraded(row: { customFormatScore?: number | null; previousCfScore?: number | null }): boolean {
+  return (
+    row.customFormatScore != null &&
+    row.previousCfScore != null &&
+    row.customFormatScore > row.previousCfScore
+  );
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
   headerActions?: ReactNode;
@@ -318,6 +327,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
   const [episodeMode, setEpisodeMode] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
+  const [showUpgradedOnly, setShowUpgradedOnly] = useState(false);
   const [sortColumns, setSortColumns] = useState<readonly SortColumn[]>(() =>
     loadFromStorage('scoutarr_media_library_sort_columns', [{ columnKey: 'title', direction: 'ASC' }])
   );
@@ -576,6 +586,10 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
       filtered = filtered.filter(item => item.monitored === true);
     }
 
+    if (showUpgradedOnly) {
+      filtered = filtered.filter(item => isUpgraded(item));
+    }
+
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
       filtered = filtered.filter(item => {
@@ -696,7 +710,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly, showUpgradedOnly]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -814,7 +828,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
           const current = row.customFormatScore;
           const previous = row.previousCfScore;
           const hasChanged = current != null && previous != null && current !== previous;
-          const increased = hasChanged && current > previous;
+          const increased = isUpgraded(row);
           const decreased = hasChanged && current < previous;
 
           return (
@@ -850,12 +864,22 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
           );
         },
         renderHeaderCell: (props) => (
-          <TextFilterHeaderCell
-            {...props}
-            numeric
-            filterValue={columnFilters.cfScore}
-            onFilterChange={(value) => handleFilterChange('cfScore', value)}
-          />
+          <Flex direction="column" gap="1" style={{ width: '100%' }}>
+            <TextFilterHeaderCell
+              {...props}
+              numeric
+              filterValue={columnFilters.cfScore}
+              onFilterChange={(value) => handleFilterChange('cfScore', value)}
+            />
+            <Flex align="center" gap="1" style={{ paddingLeft: '2px' }}>
+              <Checkbox
+                size="1"
+                checked={showUpgradedOnly}
+                onCheckedChange={(checked) => setShowUpgradedOnly(checked === true)}
+              />
+              <Text size="1" color="gray">▲ only</Text>
+            </Flex>
+          </Flex>
         )
       },
       tags: {
@@ -1049,7 +1073,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
             </Text>
           )}
           {mediaData && (() => {
-            const filtersActive = showMonitoredOnly || showMissingOnly || (isSonarr && episodeMode);
+            const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode);
             return (
               <Popover.Root>
                 <Popover.Trigger>
