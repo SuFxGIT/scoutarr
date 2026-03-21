@@ -52,6 +52,16 @@ type ConfirmDialogProps = {
 
 ## Changes to `InstanceCard.tsx`
 
+> **State ownership context:** Currently, the two confirmation states (`confirmingDeleteInstance` and `confirmingClearTags`) live in `Settings.tsx` and are passed down to every `InstanceCard` instance as four props. This was necessary because only one confirmation can be active across all cards at once. After this refactor, each `InstanceCard` manages its own local open/close boolean — the mutual-exclusion requirement is dropped in favour of native `AlertDialog` modal behaviour (only one modal can be open at a time anyway).
+
+### New import
+
+```ts
+import { ConfirmDialog } from './ConfirmDialog';
+```
+
+(Also add `useState` to the React import.)
+
 ### Props removed
 
 Four props are removed from `InstanceCardProps` (and the destructure):
@@ -69,9 +79,10 @@ const [clearTagsOpen, setClearTagsOpen] = useState(false);
 
 ### Delete instance
 
-- Trash button always renders (no ternary). Clicking it calls `setDeleteOpen(true)`.
-- `e.stopPropagation()` retained on the button click — needed to prevent the collapsible from toggling.
-- `<ConfirmDialog>` placed after the `<Tooltip>` block:
+- Trash button always renders (no ternary): `variant="soft" color="red" size="1"`. Clicking it calls `setDeleteOpen(true)`.
+- `e.stopPropagation()` retained **only on the trash button click handler** — needed to prevent the Collapsible from toggling. The `ConfirmDialog` renders as a modal overlay outside the Collapsible tree; its internal Cancel and Confirm buttons do NOT need `stopPropagation()`.
+- `<ConfirmDialog>` rendered immediately after the `<Tooltip>` + trash button block (same flex row level):
+  - `open={deleteOpen} onOpenChange={setDeleteOpen}`
   - `title="Delete instance?"`
   - `description="This cannot be undone."`
   - `confirmLabel="Delete"`
@@ -79,13 +90,14 @@ const [clearTagsOpen, setClearTagsOpen] = useState(false);
 
 ### Clear tags
 
-- "Clear Tags" button always renders (no ternary). Clicking it calls `setClearTagsOpen(true)`.
-- `<ConfirmDialog>` placed adjacent:
+- "Clear Tags" button always renders (no ternary): `variant="outline" color="red" size="2"`. Clicking it calls `setClearTagsOpen(true)`.
+- `<ConfirmDialog>` rendered adjacent to the Clear Tags button:
+  - `open={clearTagsOpen} onOpenChange={setClearTagsOpen}`
   - `title="Clear Tags?"`
   - `description={\`Removes the configured tag from all ${appInfo.mediaTypePlural.toLowerCase()} in this ${appInfo.name} instance.\`}`
   - `confirmLabel="Clear Tags"`
   - `onConfirm={() => onClearTags(appType, instance.id)}`
-  - `isPending={clearTagsPending}`
+  - `isPending={clearTagsPending}` *(existing prop, already part of `InstanceCardProps`)*
 
 ---
 
@@ -93,34 +105,39 @@ const [clearTagsOpen, setClearTagsOpen] = useState(false);
 
 ### State vars removed
 
-- `confirmingDeleteInstance` / `setConfirmingDeleteInstance` — deleted entirely
-- `confirmingClearTags` / `setConfirmingClearTags` — deleted entirely
+Four state vars that were centralised in `Settings.tsx` and passed down to `InstanceCard` are deleted — their responsibilities move to local state inside `InstanceCard` itself:
+
+- `const [confirmingDeleteInstance, setConfirmingDeleteInstance] = useState<string | null>(null)`
+- `const [confirmingClearTags, setConfirmingClearTags] = useState<string | null>(null)`
 - `setConfirmingDeleteInstance(null)` call inside `removeInstance` — removed
 - `setConfirmingClearTags(null)` calls inside `clearTagsMutation` `onSuccess`/`onError` — removed
 
 ### Props removed from `InstanceCard` JSX
 
-- `confirmingDeleteId`, `setConfirmingDeleteId`, `confirmingClearTags`, `setConfirmingClearTags` — removed from all render sites
+`InstanceCard` is rendered inside a `instances.map(...)` loop in the Applications tab of `Settings.tsx`. Each rendered instance receives the same 4 props that are now gone:
+- `confirmingDeleteId`, `setConfirmingDeleteId`, `confirmingClearTags`, `setConfirmingClearTags` — remove from the JSX spread at the render site.
 
 ### Clear Statistics
 
-Replace inline ternary with `<ConfirmDialog>` controlled by existing `confirmingClearData` state:
+Replace inline ternary with `<ConfirmDialog>` controlled by existing `confirmingClearData` state. The `ConfirmDialog` is rendered after the trigger button inside the same `Flex direction="column" gap="2"` section wrapper:
+- `open={confirmingClearData} onOpenChange={setConfirmingClearData}`
 - `title="Clear Statistics?"`
-- `description="Delete all search history and CF score history. This resets statistics to zero but keeps configuration, instances, and media library intact."`
+- `description="Delete all search history and CF score history. This resets statistics to zero but keeps configuration, instances, and media library intact."` *(note: description text is condensed vs. the current inline UI; the full explanation remains in the descriptive `<Text>` above the button)*
 - `confirmLabel="Clear Statistics"`
 - `onConfirm={() => clearDataMutation.mutate()}`
 - `isPending={clearDataMutation.isPending}`
-- Trigger button: `variant="outline" color="red"` "Clear Statistics" (always rendered — no more ternary)
+- Trigger button: `variant="outline" color="red" size="2"` "Clear Statistics" (always rendered — no more ternary)
 
 ### Reset App
 
-Replace inline ternary with `<ConfirmDialog>` controlled by existing `confirmingResetApp` state:
+Replace inline ternary with `<ConfirmDialog>` controlled by existing `confirmingResetApp` state. The `ConfirmDialog` is rendered after the trigger button inside the same `Flex direction="column" gap="2"` section wrapper:
+- `open={confirmingResetApp} onOpenChange={setConfirmingResetApp}`
 - `title="Reset App?"`
-- `description="This will permanently delete all configuration, databases, log files, and clear browser storage. The app will reload automatically. This action cannot be undone."`
+- `description="This will permanently delete all configuration, databases, log files, and clear browser storage. The app will reload automatically. This action cannot be undone."` *(note: condensed from the current warning text; the full explanation remains in the descriptive `<Text>` above the button)*
 - `confirmLabel="Reset App"`
 - `onConfirm={() => resetAppMutation.mutate()}`
 - `isPending={resetAppMutation.isPending}`
-- Trigger button: `variant="solid" color="red"` "Reset App" (always rendered — no more ternary)
+- Trigger button: `variant="solid" color="red" size="2"` "Reset App" (always rendered — no more ternary)
 
 ---
 
