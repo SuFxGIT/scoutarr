@@ -1195,9 +1195,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
                           Clear
                         </Button>
                       )}
-                      <Dialog.Close asChild>
-                        <Button size="2" ml="auto">Done</Button>
-                      </Dialog.Close>
+                      <Button size="2" ml="auto" onClick={() => setFilterDialogOpen(false)}>Done</Button>
                     </Flex>
 
                   </Dialog.Content>
