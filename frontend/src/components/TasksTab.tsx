@@ -347,6 +347,8 @@ export function TasksTab({ config, onConfigChange, onSaveConfig, schedulerStatus
                   try {
                     await schedulerService.runMediaSync();
                     showSuccessToast('Media library sync started');
+                    queryClient.invalidateQueries({ queryKey: ['stats'] });
+                    queryClient.invalidateQueries({ queryKey: ['mediaLibrary'] });
                   } catch (error) {
                     // Error toast handled by apiClient interceptor
                   }

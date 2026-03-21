@@ -516,6 +516,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     onSuccess: () => {
       toast.success('Media library synced successfully');
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (error: unknown) => {
       toast.error('Sync failed: ' + getErrorMessage(error));
