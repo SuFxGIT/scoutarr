@@ -308,6 +308,19 @@ function isUpgraded(row: { customFormatScore?: number | null; previousCfScore?: 
   );
 }
 
+function formatStatus(raw: string): string {
+  const known: Record<string, string> = {
+    inCinemas: 'In Cinemas',
+    released: 'Released',
+    continuing: 'Continuing',
+    ended: 'Ended',
+    upcoming: 'Upcoming',
+    announced: 'Announced',
+  };
+  if (known[raw]) return known[raw];
+  return raw.replace(/([A-Z])/g, ' $1').trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 interface MediaLibraryCardProps {
   config?: Config;
   headerActions?: ReactNode;
@@ -327,6 +340,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
   const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [showMonitoredOnly, setShowMonitoredOnly] = useState(false);
   const [showUpgradedOnly, setShowUpgradedOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
 
   const roRef = useRef<ResizeObserver | null>(null);
   const [titleWidth, setTitleWidth] = useState(250);
@@ -462,6 +476,15 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
     }
     return map;
   }, [isSonarr, mediaData?.media]);
+
+  const statusOptions = useMemo(
+    () => [...new Set((mediaData?.media ?? []).map(m => m.status))].filter(Boolean).sort(),
+    [mediaData?.media]
+  );
+
+  useEffect(() => {
+    setStatusFilter('');
+  }, [mediaData?.media]);
 
   // Conflict confirmation dialog state
   const [conflictDialog, setConflictDialog] = useState<{ open: boolean; conflicts: MediaSearchConflict[]; idsToSend: number[] }>({
@@ -608,6 +631,10 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
       filtered = filtered.filter(item => isUpgraded(item));
     }
 
+    if (statusFilter) {
+      filtered = filtered.filter(item => item.status === statusFilter);
+    }
+
     if (columnFilters.title.trim()) {
       const query = columnFilters.title.toLowerCase();
       filtered = filtered.filter(item => {
@@ -728,7 +755,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
         ? (item.seasonNumber === 0 ? 'Specials' : `Season ${item.seasonNumber}`)
         : '',
     }));
-  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly, showUpgradedOnly]);
+  }, [mediaData?.media, sortColumns, columnFilters, isSonarr, episodeMode, hideSpecials, showMissingOnly, showMonitoredOnly, showUpgradedOnly, statusFilter]);
 
   // Row grouper for TreeDataGrid
   const rowGrouper = useCallback(
@@ -1082,7 +1109,7 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
             </Text>
           )}
           {mediaData && (() => {
-            const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode);
+            const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly || (isSonarr && episodeMode) || statusFilter !== '';
             return (
               <Popover.Root>
                 <Popover.Trigger>
@@ -1110,6 +1137,18 @@ export function MediaLibraryCard({ config, headerActions }: MediaLibraryCardProp
                     <Flex align="center" justify="between" gap="4">
                       <Text size="2">Upgraded Only</Text>
                       <Switch size="1" checked={showUpgradedOnly} onCheckedChange={setShowUpgradedOnly} />
+                    </Flex>
+                    <Flex align="center" justify="between" gap="4">
+                      <Text size="2">Status</Text>
+                      <Select.Root size="1" value={statusFilter} onValueChange={setStatusFilter}>
+                        <Select.Trigger style={{ minWidth: '110px' }} />
+                        <Select.Content position="popper" sideOffset={5}>
+                          <Select.Item value="">Any Status</Select.Item>
+                          {statusOptions.map(s => (
+                            <Select.Item key={s} value={s}>{formatStatus(s)}</Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
                     </Flex>
                     {isSonarr && (
                       <>
