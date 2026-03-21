@@ -10,9 +10,7 @@ COPY shared/package*.json ./shared/
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
 
-# Install all dependencies
-RUN npm ci --prefer-offline --no-audit
-
 # Build shared package once on startup
+# npm ci runs at container start (after named volumes are mounted) so node_modules stay current
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["npm run build:shared && npm run dev"]
+CMD ["npm ci --prefer-offline --no-audit --no-update-notifier && npm run build:shared && npm run dev"]
