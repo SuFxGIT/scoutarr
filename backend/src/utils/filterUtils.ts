@@ -51,7 +51,7 @@ export async function applyCommonFilters<T extends FilterableMedia>(
   let filtered = media;
 
   // Filter by monitored status
-  if (config.monitored !== undefined) {
+  if (config.monitored === true) {
     const before = filtered.length;
     filtered = filtered.filter(m => m.monitored === config.monitored);
     logger.debug('🔽 Filtered by monitored status', {
