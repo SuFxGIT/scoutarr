@@ -213,6 +213,26 @@ class StatsService {
     }
   }
 
+  private getUpgradedItemIds(instanceId: string, mediaIds: number[]): Set<number> {
+    if (!this.db || mediaIds.length === 0) return new Set();
+    const placeholders = mediaIds.map(() => '?').join(',');
+    const stmt = this.db.prepare(`
+      SELECT m.media_id
+      FROM media_library m
+      WHERE m.instance_id = ?
+        AND m.media_id IN (${placeholders})
+        AND m.custom_format_score IS NOT NULL
+        AND m.custom_format_score > (
+          SELECT h.score FROM cf_score_history h
+          WHERE h.instance_id = m.instance_id AND h.media_id = m.media_id
+          ORDER BY h.recorded_at DESC
+          LIMIT 1 OFFSET 1
+        )
+    `);
+    const rows = stmt.all(instanceId, ...mediaIds) as Array<{ media_id: number }>;
+    return new Set(rows.map(r => r.media_id));
+  }
+
   async addSearch(application: string, count: number, items: Array<{ id: number; title: string; externalId?: string }>, instance?: string, instanceId?: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
@@ -336,16 +356,22 @@ class StatsService {
       items: string;
     }>;
 
-    const recentSearches: SearchEntry[] = recentResults.map(row => ({
-      timestamp: row.timestamp,
-      application: row.application,
-      instance: row.instance || undefined,
-      count: row.count,
-      items: this.enrichItemsWithExternalId(
+    const recentSearches: SearchEntry[] = recentResults.map(row => {
+      const enriched = this.enrichItemsWithExternalId(
         JSON.parse(row.items) as Array<{ id: number; title: string }>,
         row.instance_id
-      )
-    }));
+      );
+      const upgradedIds = row.instance_id
+        ? this.getUpgradedItemIds(row.instance_id, enriched.map(i => i.id))
+        : new Set<number>();
+      return {
+        timestamp: row.timestamp,
+        application: row.application,
+        instance: row.instance || undefined,
+        count: row.count,
+        items: enriched.map(i => ({ ...i, upgraded: upgradedIds.has(i.id) }))
+      };
+    });
 
     // Get last search timestamp
     const lastStmt = this.db.prepare(`
@@ -449,16 +475,22 @@ class StatsService {
         items: string;
       }>;
 
-      const searches: SearchEntry[] = results.map(row => ({
-        timestamp: row.timestamp,
-        application: row.application,
-        instance: row.instance || undefined,
-        count: row.count,
-        items: this.enrichItemsWithExternalId(
+      const searches: SearchEntry[] = results.map(row => {
+        const enriched = this.enrichItemsWithExternalId(
           JSON.parse(row.items) as Array<{ id: number; title: string }>,
           row.instance_id
-        )
-      }));
+        );
+        const upgradedIds = row.instance_id
+          ? this.getUpgradedItemIds(row.instance_id, enriched.map(i => i.id))
+          : new Set<number>();
+        return {
+          timestamp: row.timestamp,
+          application: row.application,
+          instance: row.instance || undefined,
+          count: row.count,
+          items: enriched.map(i => ({ ...i, upgraded: upgradedIds.has(i.id) }))
+        };
+      });
 
       logger.debug('✅ Recent searches retrieved', {
         count: searches.length,
