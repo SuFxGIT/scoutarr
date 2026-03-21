@@ -147,7 +147,7 @@ const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly |
           Clear
         </Button>
       )}
-      <Dialog.Close>
+      <Dialog.Close asChild>
         <Button size="2" ml="auto">Done</Button>
       </Dialog.Close>
     </Flex>
@@ -164,6 +164,7 @@ const filtersActive = showMonitoredOnly || showMissingOnly || showUpgradedOnly |
 - Closing the dialog (Done, Escape, backdrop click) does **not** reset filters.
 - "Clear" resets only the popup-layer filters: `showMonitoredOnly`, `showMissingOnly`, `showUpgradedOnly`, `statusFilter`, `episodeMode`. Column header filters are unaffected.
 - "Clear" is only rendered when `filtersActive` is true.
+- When `selectedInstance` changes while the dialog is open, close the dialog by setting `filterDialogOpen` to `false`. This is implemented via a `useEffect` watching `selectedInstance`.
 
 ---
 
