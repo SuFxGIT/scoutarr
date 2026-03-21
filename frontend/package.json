@@ -23,7 +23,7 @@
     "react-data-grid": "^7.0.0-beta.59",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.13.0",
-    "sonner": "^2.0.7",
+    "@radix-ui/react-toast": "^1.2.6",
     "validator": "^13.15.26",
     "zod": "^4.3.4"
   },

@@ -36,15 +36,34 @@ body {
   background-attachment: fixed;
 }
 
-/* Smaller toast notifications */
-[data-sonner-toast] {
-  padding: 0.375rem 0.5rem !important;
-  font-size: 0.75rem !important;
-  min-height: auto !important;
+/* Toast slide-in / slide-out (bottom-right) */
+@keyframes toastSlideIn {
+  from { transform: translateX(calc(100% + 16px)); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
 }
+@keyframes toastSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(calc(100% + 16px)); opacity: 0; }
+}
+.toast-item[data-state='open']   { animation: toastSlideIn  200ms ease-out; }
+.toast-item[data-state='closed'] { animation: toastSlideOut 150ms ease-in forwards; }
 
-[data-sonner-toast] [data-title] {
-  font-size: 0.75rem !important;
-  line-height: 1.125rem !important;
+/* Collapsible expand / collapse */
+@keyframes slideDown {
+  from { height: 0; }
+  to   { height: var(--radix-collapsible-content-height); }
 }
+@keyframes slideUp {
+  from { height: var(--radix-collapsible-content-height); }
+  to   { height: 0; }
+}
+.collapsible-content[data-state='open']   { animation: slideDown 200ms ease-out; }
+.collapsible-content[data-state='closed'] { animation: slideUp   200ms ease-out; }
+
+/* Settings tab content fade-in */
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.rt-TabsContent[data-state='active'] { animation: tabFadeIn 150ms ease-out; }
 

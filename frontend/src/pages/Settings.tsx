@@ -21,7 +21,6 @@ import {
 } from '@radix-ui/themes';
 import { CheckIcon, CrossCircledIcon, PlusIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import validator from 'validator';
 import type { Config } from '../types/config';
@@ -195,7 +194,7 @@ function Settings() {
       await configService.updateConfig(configToSave);
     },
     onSuccess: async (_, configToSave) => {
-      toast.success('Configuration saved successfully!');
+      showSuccessToast('Configuration saved successfully!');
       // Update ref with the saved config
       if (configToSave) {
         loadedConfigRef.current = configToSave;
@@ -218,12 +217,12 @@ function Settings() {
   const clearDataMutation = useMutation({
     mutationFn: () => statsService.clearAllData(),
     onSuccess: () => {
-      toast.success('Search history and CF score history cleared');
+      showSuccessToast('Search history and CF score history cleared');
       setConfirmingClearData(false);
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
     onError: (error: unknown) => {
-      toast.error('Failed to clear data: ' + getErrorMessage(error));
+      showErrorToast('Failed to clear data: ' + getErrorMessage(error));
       setConfirmingClearData(false);
     },
   });
@@ -248,7 +247,7 @@ function Settings() {
         // Ignore localStorage errors
       }
       
-      toast.success('App reset completed - all data cleared. Reloading...');
+      showSuccessToast('App reset completed - all data cleared. Reloading...');
       queryClient.invalidateQueries({ queryKey: ['config'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       refetchConfig();
@@ -522,7 +521,7 @@ function Settings() {
       }));
       if (success) {
         const versionText = result.version ? ` (v${result.version})` : '';
-        toast.success(`Connection test successful${versionText}`);
+        showSuccessToast(`Connection test successful${versionText}`);
         // Load quality profiles from database after successful connection test
         if (instanceId) {
           loadQualityProfilesFromDB(app, instanceId);

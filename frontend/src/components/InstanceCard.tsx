@@ -88,7 +88,7 @@ export function InstanceCard({
             onConfirm={() => onRemove(appType, instance.id)}
           />
 
-          <Collapsible.Content style={{ overflow: 'hidden' }}>
+          <Collapsible.Content className="collapsible-content" style={{ overflow: 'hidden' }}>
             <Flex direction="column" gap="3" p="3" pt="2">
               <Flex direction="row" align="center" justify="between" gap="2">
                 <Flex align="center" gap="1">

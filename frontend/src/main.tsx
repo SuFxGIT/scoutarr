@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Theme } from '@radix-ui/themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { Toaster } from './components/Toaster';
 import App from './App';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './index.css';
@@ -24,7 +24,7 @@ function ThemedApp() {
       <div className="app-shell">
         <App />
       </div>
-      <Toaster position="top-center" />
+      <Toaster />
     </Theme>
   );
 }

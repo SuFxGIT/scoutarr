@@ -1,37 +1,21 @@
-import { toast as sonnerToast } from 'sonner';
+export type ToastItem = { id: string; variant: 'success' | 'error'; message: string };
+type Listener = (item: ToastItem) => void;
 
-/**
- * Error toast styling configuration
- */
-const ERROR_TOAST_STYLE = {
-  background: 'var(--red-9)',
-  color: 'white',
-  border: '1px solid var(--red-10)',
-};
+const listeners = new Set<Listener>();
 
-/**
- * Success toast styling configuration
- */
-const SUCCESS_TOAST_STYLE = {
-  background: 'var(--green-9)',
-  color: 'white',
-  border: '1px solid var(--green-10)',
-};
-
-/**
- * Display a standardized error toast
- */
-export function showErrorToast(message: string) {
-  sonnerToast.error(message, {
-    style: ERROR_TOAST_STYLE,
-  });
+export function subscribe(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
 }
 
-/**
- * Display a standardized success toast
- */
-export function showSuccessToast(message: string) {
-  sonnerToast.success(message, {
-    style: SUCCESS_TOAST_STYLE,
-  });
+function emit(item: ToastItem): void {
+  listeners.forEach(fn => fn(item));
+}
+
+export function showErrorToast(message: string): void {
+  emit({ id: crypto.randomUUID(), variant: 'error', message });
+}
+
+export function showSuccessToast(message: string): void {
+  emit({ id: crypto.randomUUID(), variant: 'success', message });
 }
