@@ -84,7 +84,7 @@ configRouter.post('/test/:app', async (req, res) => {
     // Test connection
     const testResult = await testStarrConnection(appConfig.url, appConfig.apiKey, app);
 
-    const status = testResult.success ? 200 : 500;
+    const status = 200;
     const response = testResult.success
       ? { success: true, appName: testResult.appName, version: testResult.version }
       : { error: 'Connection test failed', message: testResult.error || 'Unable to connect' };
